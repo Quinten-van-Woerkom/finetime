@@ -77,7 +77,7 @@ impl UnixTime<i64> {
 
         // Afterwards, we convert the Gregorian date to its MJD equivalent. We do the same for the
         // Unix epoch, but then at compile time already.
-        let date_mjd = ModifiedJulianDay::from_gregorian(date);
+        let date_mjd = ModifiedJulianDay::from_gregorian_date(date);
         let unix_epoch = ModifiedJulianDay::from_date(Unix::epoch_as_date());
         let days = date_mjd - unix_epoch;
         let hours = Hours::new(hour as i64);

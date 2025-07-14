@@ -92,8 +92,8 @@ impl Sub for GregorianDate {
     /// An intermediate MJD representation is used for this, because subtracting two MJDs is very
     /// cheap to do.
     fn sub(self, rhs: Self) -> Self::Output {
-        let days_lhs = ModifiedJulianDay::from_gregorian(self);
-        let days_rhs = ModifiedJulianDay::from_gregorian(rhs);
+        let days_lhs = ModifiedJulianDay::from_gregorian_date(self);
+        let days_rhs = ModifiedJulianDay::from_gregorian_date(rhs);
         days_lhs - days_rhs
     }
 }

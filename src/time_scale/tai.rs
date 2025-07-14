@@ -76,7 +76,7 @@ impl TaiTime<i64> {
 
         // Afterwards, we convert the Gregorian date to its MJD equivalent. We do the same for the
         // TAI epoch, but then at compile time already.
-        let date_mjd = ModifiedJulianDay::from_gregorian(date);
+        let date_mjd = ModifiedJulianDay::from_gregorian_date(date);
         let tai_epoch = ModifiedJulianDay::from_date(Tai::epoch_as_date());
         let days = date_mjd - tai_epoch;
         let hours = Hours::new(hour as i64);

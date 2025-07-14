@@ -64,7 +64,7 @@ impl ModifiedJulianDay<i64> {
     /// described by Meeus in Astronomical Algorithms (Chapter 7, Julian Day). This variation
     /// adapts the algorithm to Modified Julian Days, and removes the dependency on floating point
     /// arithmetic.
-    pub const fn from_gregorian(date: GregorianDate) -> Self {
+    pub const fn from_gregorian_date(date: GregorianDate) -> Self {
         let (mut year, mut month, day) =
             (date.year() as i64, date.month() as i64, date.day() as i64);
         if month <= 2 {
@@ -174,39 +174,39 @@ fn historic_dates_from_meeus() {
 fn gregorian_dates_from_meeus() {
     use crate::calendar::Month::*;
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(2000, January, 1).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(2000, January, 1).unwrap()),
         ModifiedJulianDay::new(Days::new(51544))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(1999, January, 1).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1999, January, 1).unwrap()),
         ModifiedJulianDay::new(Days::new(51179))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(1987, January, 27).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1987, January, 27).unwrap()),
         ModifiedJulianDay::new(Days::new(46822))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(1987, June, 19).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1987, June, 19).unwrap()),
         ModifiedJulianDay::new(Days::new(46965))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(1988, January, 27).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1988, January, 27).unwrap()),
         ModifiedJulianDay::new(Days::new(47187))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(1988, June, 19).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1988, June, 19).unwrap()),
         ModifiedJulianDay::new(Days::new(47331))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(1900, January, 1).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1900, January, 1).unwrap()),
         ModifiedJulianDay::new(Days::new(15020))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(1600, January, 1).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1600, January, 1).unwrap()),
         ModifiedJulianDay::new(Days::new(-94553))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian(GregorianDate::new(1600, December, 31).unwrap()),
+        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1600, December, 31).unwrap()),
         ModifiedJulianDay::new(Days::new(-94188))
     );
 }
@@ -244,6 +244,6 @@ mod proof_harness {
     #[kani::proof]
     fn from_gregorian_never_panics() {
         let date: GregorianDate = kani::any();
-        let _ = ModifiedJulianDay::from_gregorian(date);
+        let _ = ModifiedJulianDay::from_gregorian_date(date);
     }
 }
