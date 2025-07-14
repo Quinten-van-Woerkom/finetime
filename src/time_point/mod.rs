@@ -70,6 +70,18 @@ impl<TimeScale, Representation, Period: Ratio> TimePoint<TimeScale, Representati
             time_scale: core::marker::PhantomData,
         })
     }
+
+    /// Converts towards a different representation. If the underlying representation cannot store
+    /// the result of this cast, returns `None`.
+    pub fn cast<Target: NumCast>(self) -> Option<TimePoint<TimeScale, Target, Period>>
+    where
+        Representation: NumCast,
+    {
+        Some(TimePoint {
+            duration: self.duration.cast()?,
+            time_scale: core::marker::PhantomData,
+        })
+    }
 }
 
 impl<TimeScale, Representation, Period> Copy for TimePoint<TimeScale, Representation, Period> where
