@@ -123,6 +123,7 @@ impl Unix {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum UnixTimeError {
     /// Returned when the requested time-of-day is not a valid timestamp.
     TimeDoesNotExist { hour: u8, minute: u8, second: u8 },
