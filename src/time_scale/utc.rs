@@ -159,6 +159,45 @@ fn calendar_dates_near_insertion() {
     );
 }
 
+/// If a given conversion from Unix time to UTC succeeds or is ambiguous, all results shall map
+/// back to the exact same Unix time.
+#[test]
+fn roundtrip_near_leap_seconds() {
+    // Leap second insertion of June 2015.
+    let date = Date::new(2015, June, 30).unwrap();
+    let date2 = Date::new(2015, July, 1).unwrap();
+    let date3 = Date::new(2016, December, 31).unwrap();
+    let date4 = Date::new(2017, January, 1).unwrap();
+    let date5 = Date::new(2016, June, 30).unwrap();
+
+    let times = [
+        UnixTime::from_datetime(date, 23, 59, 58).unwrap(),
+        UnixTime::from_datetime(date, 23, 59, 59).unwrap(),
+        UnixTime::from_datetime(date2, 0, 0, 0).unwrap(),
+        UnixTime::from_datetime(date2, 0, 0, 1).unwrap(),
+        UnixTime::from_datetime(date3, 23, 59, 58).unwrap(),
+        UnixTime::from_datetime(date3, 23, 59, 59).unwrap(),
+        UnixTime::from_datetime(date4, 0, 0, 0).unwrap(),
+        UnixTime::from_datetime(date5, 23, 59, 58).unwrap(),
+        UnixTime::from_datetime(date5, 23, 59, 59).unwrap(),
+    ];
+
+    for &time in times.iter() {
+        match LEAP_SECONDS.to_utc(time) {
+            LeapSecondsResult::Unambiguous(time_point) => {
+                assert_eq!(LEAP_SECONDS.to_unix(time_point), time);
+            }
+            LeapSecondsResult::InsertionPoint { start, end } => {
+                assert_eq!(LEAP_SECONDS.to_unix(start), time);
+                assert_eq!(LEAP_SECONDS.to_unix(end), time);
+            }
+            LeapSecondsResult::DeletionPoint => {
+                panic!("Unexpected deleted leap second found at {:?}", time)
+            }
+        }
+    }
+}
+
 /// Errors that may be returned when creating a UTC time point from a calendar datetime. Note that
 /// leap seconds may be included. Hence, this error will store the full timestamp when reporting
 /// that the requested datetime does not exist.
@@ -247,6 +286,23 @@ impl LeapSecondsTable {
         let time_since_epoch = unix_time.elapsed_time_since_epoch() + leap_second_offset;
         let utc_time = UtcTime::from_time_since_epoch(time_since_epoch);
         LeapSecondsResult::Unambiguous(utc_time)
+    }
+
+    /// Converts a given UTC timestamp to Unix time by removing the leap seconds. Rather than the
+    /// reverse transformation, this one will always succeed: all UTC times map to a Unix time,
+    /// even if the reverse is not true.
+    pub fn to_unix(&self, utc_time: UtcTime<i64>) -> UnixTime<i64> {
+        for leap_second in self.table.iter().rev() {
+            if leap_second.utc_time <= utc_time {
+                let time_since_epoch = utc_time.elapsed_time_since_epoch();
+                return UnixTime::from_time_since_epoch(
+                    time_since_epoch - leap_second.cumulative_offset,
+                );
+            }
+        }
+        // If no leap seconds are found that were inserted before the UTC time, we can simply set
+        // UTC equal to Unix time.
+        UnixTime::from_time_since_epoch(utc_time.elapsed_time_since_epoch())
     }
 
     /// Adds a leap second update. Checks whether it is an insertion (likely) or deletion
@@ -338,6 +394,111 @@ impl LeapSecondsEntry {
 pub enum LeapSecondsEvent {
     Insertion,
     Deletion,
+}
+
+#[cfg(kani)]
+mod proof_harness {
+    use super::*;
+
+    /// If a given conversion from Unix time to UTC succeeds or is ambiguous, all results shall map
+    /// back to the exact same Unix time. A custom, constant leap second table is used for
+    /// determinism.
+    ///
+    /// Note that this roundtrip characteristic only applies in the absence of leap second
+    /// deletions. If a leap second is deleted, some Unix time will exist that does not map to an
+    /// equivalent UTC time. Hence, that case must be checked separately, as there our
+    /// implementation is not expected to provide full roundtrip capabilities.
+    #[kani::proof]
+    fn roundtrip_near_leap_seconds() {
+        let mut leap_seconds = LeapSecondsTable::default();
+        leap_seconds.insert(Seconds::new(63072000), Seconds::new(10));
+        leap_seconds.insert(Seconds::new(78796800), Seconds::new(11));
+        leap_seconds.insert(Seconds::new(94694400), Seconds::new(12));
+        leap_seconds.insert(Seconds::new(126230400), Seconds::new(13));
+        leap_seconds.insert(Seconds::new(157766400), Seconds::new(14));
+        leap_seconds.insert(Seconds::new(189302400), Seconds::new(15));
+        leap_seconds.insert(Seconds::new(220924800), Seconds::new(16));
+        leap_seconds.insert(Seconds::new(252460800), Seconds::new(17));
+        leap_seconds.insert(Seconds::new(283996800), Seconds::new(18));
+        leap_seconds.insert(Seconds::new(315532800), Seconds::new(19));
+        leap_seconds.insert(Seconds::new(362793600), Seconds::new(20));
+        leap_seconds.insert(Seconds::new(394329600), Seconds::new(21));
+        leap_seconds.insert(Seconds::new(425865600), Seconds::new(22));
+        leap_seconds.insert(Seconds::new(489024000), Seconds::new(23));
+        leap_seconds.insert(Seconds::new(567993600), Seconds::new(24));
+        leap_seconds.insert(Seconds::new(631152000), Seconds::new(25));
+        leap_seconds.insert(Seconds::new(662688000), Seconds::new(26));
+        leap_seconds.insert(Seconds::new(709948800), Seconds::new(27));
+        leap_seconds.insert(Seconds::new(741484800), Seconds::new(28));
+        leap_seconds.insert(Seconds::new(773020800), Seconds::new(29));
+        leap_seconds.insert(Seconds::new(820454400), Seconds::new(30));
+        leap_seconds.insert(Seconds::new(867715200), Seconds::new(31));
+        leap_seconds.insert(Seconds::new(915148800), Seconds::new(32));
+        leap_seconds.insert(Seconds::new(1136073600), Seconds::new(33));
+        leap_seconds.insert(Seconds::new(1230768000), Seconds::new(34));
+        leap_seconds.insert(Seconds::new(1341100800), Seconds::new(35));
+        leap_seconds.insert(Seconds::new(1435708800), Seconds::new(36));
+        leap_seconds.insert(Seconds::new(1483228800), Seconds::new(37));
+
+        let time: UnixTime<i64> = kani::any();
+        kani::assume(time > UnixTime::from_time_since_epoch(Seconds::new(i64::MIN + 10)));
+        kani::assume(time < UnixTime::from_time_since_epoch(Seconds::new(i64::MAX - 37)));
+
+        match leap_seconds.to_utc(time) {
+            LeapSecondsResult::Unambiguous(time_point) => {
+                assert_eq!(leap_seconds.to_unix(time_point), time);
+            }
+            LeapSecondsResult::InsertionPoint { start, end } => {
+                assert_eq!(leap_seconds.to_unix(start), time);
+                assert_eq!(leap_seconds.to_unix(end), time);
+            }
+            LeapSecondsResult::DeletionPoint => {
+                panic!("Unexpected deleted leap second found at {:?}", time)
+            }
+        }
+    }
+
+    /// If our leap second table has deletions, we cannot guarantee the roundtrip property around
+    /// that time instance. However, we still want our implementation not to panic, and we can
+    /// prove that.
+    #[kani::proof]
+    fn infallible_with_deletions() {
+        let mut leap_seconds = LeapSecondsTable::default();
+        leap_seconds.insert(Seconds::new(63072000), Seconds::new(10));
+        leap_seconds.insert(Seconds::new(78796800), Seconds::new(11));
+        leap_seconds.insert(Seconds::new(94694400), Seconds::new(12));
+        leap_seconds.insert(Seconds::new(126230400), Seconds::new(13));
+        leap_seconds.insert(Seconds::new(157766400), Seconds::new(14));
+        leap_seconds.insert(Seconds::new(189302400), Seconds::new(15));
+        leap_seconds.insert(Seconds::new(220924800), Seconds::new(16));
+        leap_seconds.insert(Seconds::new(252460800), Seconds::new(17));
+        leap_seconds.insert(Seconds::new(283996800), Seconds::new(18));
+        leap_seconds.insert(Seconds::new(315532800), Seconds::new(19));
+        leap_seconds.insert(Seconds::new(362793600), Seconds::new(20));
+        leap_seconds.insert(Seconds::new(394329600), Seconds::new(21));
+        leap_seconds.insert(Seconds::new(425865600), Seconds::new(22));
+        leap_seconds.insert(Seconds::new(489024000), Seconds::new(23));
+        leap_seconds.insert(Seconds::new(567993600), Seconds::new(24));
+        leap_seconds.insert(Seconds::new(631152000), Seconds::new(25));
+        leap_seconds.insert(Seconds::new(662688000), Seconds::new(26));
+        leap_seconds.insert(Seconds::new(709948800), Seconds::new(27));
+        leap_seconds.insert(Seconds::new(741484800), Seconds::new(28));
+        leap_seconds.insert(Seconds::new(773020800), Seconds::new(29));
+        leap_seconds.insert(Seconds::new(820454400), Seconds::new(30));
+        leap_seconds.insert(Seconds::new(867715200), Seconds::new(31));
+        leap_seconds.insert(Seconds::new(915148800), Seconds::new(32));
+        leap_seconds.insert(Seconds::new(1136073600), Seconds::new(31));
+        leap_seconds.insert(Seconds::new(1230768000), Seconds::new(32));
+        leap_seconds.insert(Seconds::new(1341100800), Seconds::new(33));
+        leap_seconds.insert(Seconds::new(1435708800), Seconds::new(34));
+        leap_seconds.insert(Seconds::new(1483228800), Seconds::new(35));
+
+        let time: UnixTime<i64> = kani::any();
+        kani::assume(time > UnixTime::from_time_since_epoch(Seconds::new(i64::MIN + 10)));
+        kani::assume(time < UnixTime::from_time_since_epoch(Seconds::new(i64::MAX - 35)));
+
+        let _ = leap_seconds.to_utc(time);
+    }
 }
 
 // Load the leap seconds table as generated by the build script.
