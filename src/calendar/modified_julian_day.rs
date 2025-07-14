@@ -7,6 +7,7 @@ use core::ops::{Add, Sub};
 use crate::{
     calendar::{Date, GregorianDate},
     duration::Days,
+    time_scale::local::LocalDays,
 };
 
 /// The Modified Julian Day (MJD) representation of any given date.
@@ -92,6 +93,24 @@ impl ModifiedJulianDay<i64> {
         ModifiedJulianDay {
             day: Days::new(mjd),
         }
+    }
+}
+
+impl From<LocalDays<i64>> for ModifiedJulianDay<i64> {
+    /// Transforming from `LocalDays` (since Unix epoch) to the equivalent `ModifiedJulianDay` is
+    /// nothing more than a constant offset of the number of days between the two epochs.
+    fn from(value: LocalDays<i64>) -> Self {
+        Self {
+            day: value.elapsed_time_since_epoch() + Days::new(40587),
+        }
+    }
+}
+
+impl From<ModifiedJulianDay<i64>> for LocalDays<i64> {
+    /// Transforming to `LocalDays` (since Unix epoch) from the equivalent `ModifiedJulianDay` is
+    /// nothing more than a constant offset of the number of days between the two epochs.
+    fn from(value: ModifiedJulianDay<i64>) -> Self {
+        Self::from_time_since_epoch(value.day - Days::new(40587))
     }
 }
 

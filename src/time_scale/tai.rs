@@ -3,13 +3,13 @@
 use num::Zero;
 
 use crate::{
-    calendar::{Date, GregorianDate, ModifiedJulianDay, Month},
+    calendar::{Date, GregorianDate, Month},
     duration::{
         Hours, MilliSeconds, Minutes, Seconds,
         units::{LiteralRatio, Milli},
     },
     time_point::TimePoint,
-    time_scale::TimeScale,
+    time_scale::{TimeScale, local::LocalDays},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
@@ -37,8 +37,8 @@ impl TaiTime<i64> {
 
         // Afterwards, we convert the date to its MJD equivalent. We do the same for the TAI epoch,
         // but then at compile time already. Note that both dates are MJD, expressed in TAI.
-        let date_mjd = ModifiedJulianDay::from_date(date);
-        let tai_epoch = ModifiedJulianDay::from_date(Tai::epoch_as_date());
+        let date_mjd = LocalDays::from_date(date);
+        let tai_epoch = LocalDays::from_date(Tai::epoch_as_date());
         let days = date_mjd - tai_epoch;
         let hours = Hours::new(hour as i64);
         let minutes = Minutes::new(minute as i64);
@@ -76,8 +76,8 @@ impl TaiTime<i64> {
 
         // Afterwards, we convert the Gregorian date to its MJD equivalent. We do the same for the
         // TAI epoch, but then at compile time already.
-        let date_mjd = ModifiedJulianDay::from_gregorian_date(date);
-        let tai_epoch = ModifiedJulianDay::from_date(Tai::epoch_as_date());
+        let date_mjd = LocalDays::from_gregorian_date(date);
+        let tai_epoch = LocalDays::from_date(Tai::epoch_as_date());
         let days = date_mjd - tai_epoch;
         let hours = Hours::new(hour as i64);
         let minutes = Minutes::new(minute as i64);

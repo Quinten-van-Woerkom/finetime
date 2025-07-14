@@ -2,13 +2,14 @@
 
 use crate::{
     calendar::{
-        Date, GregorianDate, ModifiedJulianDay,
+        Date, GregorianDate,
         Month::{self, *},
     },
     duration::{Hours, Minutes, Seconds, units::LiteralRatio},
     time_point::TimePoint,
     time_scale::{
         TimeScale,
+        local::LocalDays,
         tai::{Tai, TaiTime},
     },
 };
@@ -38,8 +39,8 @@ impl UnixTime<i64> {
         // Afterwards, we convert the date to its MJD equivalent. We do the same for the Unix
         // epoch, but then at compile time already. Note that both dates are MJD, expressed in Unix
         // time.
-        let date_mjd = ModifiedJulianDay::from_date(date);
-        let unix_epoch = ModifiedJulianDay::from_date(Unix::epoch_as_date());
+        let date_mjd = LocalDays::from_date(date);
+        let unix_epoch = LocalDays::from_date(Unix::epoch_as_date());
         let days = date_mjd - unix_epoch;
         let hours = Hours::new(hour as i64);
         let minutes = Minutes::new(minute as i64);
@@ -77,8 +78,8 @@ impl UnixTime<i64> {
 
         // Afterwards, we convert the Gregorian date to its MJD equivalent. We do the same for the
         // Unix epoch, but then at compile time already.
-        let date_mjd = ModifiedJulianDay::from_gregorian_date(date);
-        let unix_epoch = ModifiedJulianDay::from_date(Unix::epoch_as_date());
+        let date_mjd = LocalDays::from_gregorian_date(date);
+        let unix_epoch = LocalDays::from_date(Unix::epoch_as_date());
         let days = date_mjd - unix_epoch;
         let hours = Hours::new(hour as i64);
         let minutes = Minutes::new(minute as i64);

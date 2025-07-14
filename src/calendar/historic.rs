@@ -1,7 +1,9 @@
 //! Implementation of the historic calendar, which is Julian before and Gregorian after the
 //! Gregoric calendar reform of 1582. When in doubt, use this calendar.
 
-use crate::calendar::Month;
+use core::ops::Sub;
+
+use crate::{calendar::Month, duration::Days, time_scale::local::LocalTime};
 
 /// Implementation of a date in the historic calendar. After 15 October 1582, this coincides with
 /// the Gregorian calendar; until 4 October 1582, this is the Julian calendar. The days inbetween
@@ -159,6 +161,22 @@ impl Date {
     /// in the historic calendar is 15 October 1582.
     const fn falls_during_gregorian_reform(year: i32, month: Month, day: u8) -> bool {
         year == 1582 && month as u8 == Month::October as u8 && day > 4 && day < 15
+    }
+}
+
+impl Sub for Date {
+    type Output = Days<i64>;
+
+    /// The difference between two Gregorian dates can be computed exactly as a number of days,
+    /// accounting for the variable number of days per leap year. Note that this is only possible
+    /// up to an accuracy of days because leap seconds depend on the time scale.
+    ///
+    /// An intermediate MJD representation is used for this, because subtracting two MJDs is very
+    /// cheap to do.
+    fn sub(self, rhs: Self) -> Self::Output {
+        let days_lhs = LocalTime::from_date(self);
+        let days_rhs = LocalTime::from_date(rhs);
+        days_lhs - days_rhs
     }
 }
 
