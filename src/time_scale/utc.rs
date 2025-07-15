@@ -5,13 +5,14 @@ use tinyvec::ArrayVec;
 
 use crate::{
     calendar::{
-        Date,
+        Date, Datelike,
         Month::{self, *},
     },
     duration::units::{LiteralRatio, Milli},
     time_point::TimePoint,
     time_scale::{
         TimeScale, TimeScaleConversion,
+        local::LocalDays,
         tai::{Tai, TaiTime},
         unix::{UnixTime, UnixTimeError},
     },
@@ -21,11 +22,20 @@ use crate::{
 pub type UtcTime<Representation, Period = LiteralRatio<1>> = TimePoint<Utc, Representation, Period>;
 
 impl UtcTime<i64> {
-    /// Creates a UTC time point from a given historic calendar date and UTC time stamp inside of
-    /// that day. Leap seconds are included, meaning that leap second days will have a 61st second
-    /// in the last minute of their day.
+    /// Creates a UTC time point from a given calendar date and UTC time stamp inside of that day.
+    /// Leap seconds are included, meaning that leap second days will have a 61st second in the
+    /// last minute of their day.
     pub fn from_datetime(
-        date: Date,
+        date: impl Datelike,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<UtcTime<i64>, UtcError> {
+        Self::from_local_datetime(date.into(), hour, minute, second)
+    }
+
+    pub fn from_local_datetime(
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -151,7 +161,7 @@ fn calendar_dates_near_insertion() {
     assert_eq!(
         leap_second,
         Err(UtcError::NoLeapSecondInsertion {
-            date,
+            date: date.into(),
             hour: 23,
             minute: 59,
             second: 60
@@ -204,9 +214,9 @@ fn roundtrip_near_leap_seconds() {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum UtcError {
     /// Returned when the given combination of date and time-of-day is not a valid datetime in
-    /// general.
+    /// general (independent of the exact calendar).
     InvalidDateTime {
-        date: Date,
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -214,14 +224,14 @@ pub enum UtcError {
     /// Returned when the requested datetime has a 61st second but is not actually situated at a
     /// leap second insertion.
     NoLeapSecondInsertion {
-        date: Date,
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
     },
     /// Returned when the requested datetime does not exist because of a leap second deletion.
     LeapSecondDeletion {
-        date: Date,
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,

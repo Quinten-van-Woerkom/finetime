@@ -2,7 +2,7 @@
 //! associated with an actual time scale. This is useful for representing intermediate objects.
 
 use crate::{
-    calendar::{Date, GregorianDate},
+    calendar::{Date, Datelike, GregorianDate},
     duration::{Days, units::LiteralRatio},
     time_point::TimePoint,
 };
@@ -91,3 +91,5 @@ impl LocalDays<i64> {
         TimePoint::from_time_since_epoch(Days::new(days_since_epoch))
     }
 }
+
+impl Datelike for LocalDays<i64> {}

@@ -3,7 +3,7 @@
 use num::Zero;
 
 use crate::{
-    calendar::{Date, GregorianDate, Month},
+    calendar::{Date, Datelike, Month},
     duration::{
         Hours, MilliSeconds, Minutes, Seconds,
         units::{LiteralRatio, Milli},
@@ -21,7 +21,16 @@ impl TaiTime<i64> {
     /// time. This has the advantages that leap seconds need not be accounted for when converting
     /// to the time since epoch, only leap days.
     pub fn from_datetime(
-        date: Date,
+        date: impl Datelike,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<TaiTime<i64>, TaiError> {
+        Self::from_local_datetime(date.into(), hour, minute, second)
+    }
+
+    pub fn from_local_datetime(
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -37,47 +46,8 @@ impl TaiTime<i64> {
 
         // Afterwards, we convert the date to its MJD equivalent. We do the same for the TAI epoch,
         // but then at compile time already. Note that both dates are MJD, expressed in TAI.
-        let date_mjd = LocalDays::from_date(date);
-        let tai_epoch = LocalDays::from_date(Tai::epoch_as_date());
-        let days = date_mjd - tai_epoch;
-        let hours = Hours::new(hour as i64);
-        let minutes = Minutes::new(minute as i64);
-        let seconds = Seconds::new(second as i64);
-        Ok(TimePoint::from_time_since_epoch(
-            days.convert() + hours.convert() + minutes.convert() + seconds,
-        ))
-    }
-
-    /// Creates a TAI time point from a given Gregorian calendar date. Note that leap seconds are
-    /// not included, as opposed to the equivalent Gregorian calendar representation of UTC time.
-    /// This does have the advantage that leap seconds need not be accounted for when converting to
-    /// the time since epoch, only leap days.
-    ///
-    /// This function will return the same value as `from_datetime` for all modern dates. Only for
-    /// values before the Gregorian calendar reform (15 October 1582) will a difference occur. The
-    /// `from_gregorian` function is in such cases less historically accurate, but it is what
-    /// `hifitime` and `chrono` do - hence it is included here for completeness, too. In practice,
-    /// it is recommended to stick to `from_date`, since that is in line with the choices made by
-    /// NAIF SPICE and IAU SOFA.
-    pub fn from_gregorian_datetime(
-        date: GregorianDate,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<TimePoint<Tai, i64>, TaiError> {
-        // First, we verify that the timestamp is valid.
-        if hour >= 24 || minute >= 60 || second >= 60 {
-            return Err(TaiError::TimeDoesNotExist {
-                hour,
-                minute,
-                second,
-            });
-        }
-
-        // Afterwards, we convert the Gregorian date to its MJD equivalent. We do the same for the
-        // TAI epoch, but then at compile time already.
-        let date_mjd = LocalDays::from_gregorian_date(date);
-        let tai_epoch = LocalDays::from_date(Tai::epoch_as_date());
+        let date_mjd = date;
+        let tai_epoch = Tai::epoch();
         let days = date_mjd - tai_epoch;
         let hours = Hours::new(hour as i64);
         let minutes = Minutes::new(minute as i64);
@@ -95,10 +65,11 @@ impl TaiTime<i64> {
 pub struct Tai;
 
 impl Tai {
-    /// Returns the TAI epoch as a date. Note that this date itself is still expressed in TAI.
-    pub const fn epoch_as_date() -> Date {
+    /// Returns the TAI epoch as a `LocalDays`. Note that this `LocalDays` itself is still
+    /// expressed in TAI.
+    pub const fn epoch() -> LocalDays<i64> {
         match Date::new(1958, Month::January, 1) {
-            Ok(date) => date,
+            Ok(date) => LocalDays::from_date(date),
             Err(_) => panic!("Internal error: TAI epoch was found to be an invalid date."),
         }
     }
@@ -137,10 +108,11 @@ mod proof_harness {
     /// Verifies that construction of a TAI time from a Gregorian date and time stamp never panics.
     #[kani::proof]
     fn from_gregorian_never_panics() {
+        use crate::calendar::GregorianDate;
         let date: GregorianDate = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = TaiTime::from_gregorian_datetime(date, hour, minute, second);
+        let _ = TaiTime::from_datetime(date, hour, minute, second);
     }
 }

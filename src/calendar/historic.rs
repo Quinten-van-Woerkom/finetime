@@ -3,7 +3,11 @@
 
 use core::ops::Sub;
 
-use crate::{calendar::Month, duration::Days, time_scale::local::LocalTime};
+use crate::{
+    calendar::{Datelike, Month},
+    duration::Days,
+    time_scale::local::{LocalDays, LocalTime},
+};
 
 /// Implementation of a date in the historic calendar. After 15 October 1582, this coincides with
 /// the Gregorian calendar; until 4 October 1582, this is the Julian calendar. The days inbetween
@@ -161,6 +165,14 @@ impl Date {
     /// in the historic calendar is 15 October 1582.
     const fn falls_during_gregorian_reform(year: i32, month: Month, day: u8) -> bool {
         year == 1582 && month as u8 == Month::October as u8 && day > 4 && day < 15
+    }
+}
+
+impl Datelike for Date {}
+
+impl From<Date> for LocalDays<i64> {
+    fn from(value: Date) -> Self {
+        LocalDays::from_date(value)
     }
 }
 

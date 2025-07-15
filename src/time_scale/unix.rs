@@ -2,7 +2,7 @@
 
 use crate::{
     calendar::{
-        Date, GregorianDate,
+        Date, Datelike,
         Month::{self, *},
     },
     duration::{Hours, Minutes, Seconds, units::LiteralRatio},
@@ -22,7 +22,16 @@ impl UnixTime<i64> {
     /// Creates a Unix time point from a given historic calendar date and time stamp. Note that
     /// Unix time points are expressed in UTC, but do not include leap seconds.
     pub fn from_datetime(
-        date: Date,
+        date: impl Datelike,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<UnixTime<i64>, UnixTimeError> {
+        Self::from_local_datetime(date.into(), hour, minute, second)
+    }
+
+    pub fn from_local_datetime(
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -39,47 +48,8 @@ impl UnixTime<i64> {
         // Afterwards, we convert the date to its MJD equivalent. We do the same for the Unix
         // epoch, but then at compile time already. Note that both dates are MJD, expressed in Unix
         // time.
-        let date_mjd = LocalDays::from_date(date);
-        let unix_epoch = LocalDays::from_date(Unix::epoch_as_date());
-        let days = date_mjd - unix_epoch;
-        let hours = Hours::new(hour as i64);
-        let minutes = Minutes::new(minute as i64);
-        let seconds = Seconds::new(second as i64);
-        Ok(TimePoint::from_time_since_epoch(
-            days.convert() + hours.convert() + minutes.convert() + seconds,
-        ))
-    }
-
-    /// Creates a Unix time point from a given Gregorian calendar date. Note that leap seconds are
-    /// not included, as opposed to the equivalent Gregorian calendar representation of UTC time.
-    /// This does have the advantage that leap seconds need not be accounted for when converting to
-    /// the time since epoch, only leap days.
-    ///
-    /// This function will return the same value as `from_datetime` for all modern dates. Only for
-    /// values before the Gregorian calendar reform (15 October 1582) will a difference occur. The
-    /// `from_gregorian` function is in such cases less historically accurate, but it is what
-    /// `hifitime` and `chrono` do - hence it is included here for completeness, too. In practice,
-    /// it is recommended to stick to `from_date`, since that is in line with the choices made by
-    /// NAIF SPICE and IAU SOFA.
-    pub fn from_gregorian_datetime(
-        date: GregorianDate,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<TimePoint<Tai, i64>, UnixTimeError> {
-        // First, we verify that the timestamp is valid.
-        if hour >= 24 || minute >= 60 || second >= 60 {
-            return Err(UnixTimeError::TimeDoesNotExist {
-                hour,
-                minute,
-                second,
-            });
-        }
-
-        // Afterwards, we convert the Gregorian date to its MJD equivalent. We do the same for the
-        // Unix epoch, but then at compile time already.
-        let date_mjd = LocalDays::from_gregorian_date(date);
-        let unix_epoch = LocalDays::from_date(Unix::epoch_as_date());
+        let date_mjd = date;
+        let unix_epoch = Unix::epoch();
         let days = date_mjd - unix_epoch;
         let hours = Hours::new(hour as i64);
         let minutes = Minutes::new(minute as i64);
@@ -113,11 +83,11 @@ impl UnixTime<i64> {
 pub struct Unix;
 
 impl Unix {
-    /// Returns the Unix epoch as a date. Note that it is still expressed in UTC, so may not be
-    /// compared directly with other time scale epochs like that of TAI.
-    pub const fn epoch_as_date() -> Date {
+    /// Returns the Unix epoch as a `LocalDays`. Note that it is still expressed in UTC, so may not
+    /// be compared directly with other time scale epochs like that of TAI.
+    pub const fn epoch() -> LocalDays<i64> {
         match Date::new(1970, Month::January, 1) {
-            Ok(date) => date,
+            Ok(date) => LocalDays::from_date(date),
             Err(_) => panic!("Internal error: Unix epoch was found to be an invalid date."),
         }
     }

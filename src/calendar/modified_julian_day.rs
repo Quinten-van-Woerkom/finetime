@@ -4,11 +4,7 @@
 
 use core::ops::{Add, Sub};
 
-use crate::{
-    calendar::{Date, GregorianDate},
-    duration::Days,
-    time_scale::local::LocalDays,
-};
+use crate::{calendar::Datelike, duration::Days, time_scale::local::LocalDays};
 
 /// The Modified Julian Day (MJD) representation of any given date.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -24,77 +20,16 @@ impl<T> ModifiedJulianDay<T> {
 }
 
 impl ModifiedJulianDay<i64> {
-    /// Constructs a MJD from a given historic calendar date. Applies a slight variation on the
-    /// approach described by Meeus in Astronomical Algorithms (Chapter 7, Julian Day). This
-    /// variation adapts the algorithm to Modified Julian Days, and removes the dependency on
-    /// floating point arithmetic.
-    pub const fn from_date(date: Date) -> Self {
-        let (mut year, mut month, day) =
-            (date.year() as i64, date.month() as i64, date.day() as i64);
-        if month <= 2 {
-            year -= 1;
-            month += 12;
-        }
-
-        // Applies the leap year correction, as described in Meeus. This is needed only for
-        // Gregorian dates: for dates in the Julian calendar, no such correction is needed.
-        let gregorian_correction = if date.is_gregorian() {
-            let a = year.div_euclid(100);
-            2 - a + a / 4
-        } else {
-            0
-        };
-
-        // Computes the days because of elapsed years. Equivalent to `INT(365.25(Y + 4716))` from
-        // Meeus.
-        let year_days = (365 * (year + 4716)) + (year + 4716) / 4;
-
-        // Computes the days due to elapsed months. Equivalent to `INT(30.6001(M + 1))` from Meeus.
-        let month_days = (306001 * (month + 1)) / 10000;
-
-        // Computes the Julian day number following Meeus' approach - though as an integer with an
-        // offset of 0.5 days. Then, we subtract 240000.5 (on top of Meeus' 1524.5) to obtain a
-        // MJD.
-        let mjd = year_days + month_days + day + gregorian_correction - 2401525;
-        ModifiedJulianDay {
-            day: Days::new(mjd),
-        }
-    }
-
-    /// Constructs a MJD from a given Gregorian date. Applies a slight variation on the approach
-    /// described by Meeus in Astronomical Algorithms (Chapter 7, Julian Day). This variation
-    /// adapts the algorithm to Modified Julian Days, and removes the dependency on floating point
-    /// arithmetic.
-    pub const fn from_gregorian_date(date: GregorianDate) -> Self {
-        let (mut year, mut month, day) =
-            (date.year() as i64, date.month() as i64, date.day() as i64);
-        if month <= 2 {
-            year -= 1;
-            month += 12;
-        }
-
-        // Applies the leap year correction, as described in Meeus.
-        let leap_year_correction = {
-            let a = year.div_euclid(100);
-            2 - a + a / 4
-        };
-
-        // Computes the days because of elapsed years. Equivalent to `INT(365.25(Y + 4716))` from
-        // Meeus.
-        let year_days = (365 * (year + 4716)) + (year + 4716) / 4;
-
-        // Computes the days due to elapsed months. Equivalent to `INT(30.6001(M + 1))` from Meeus.
-        let month_days = (306001 * (month + 1)) / 10000;
-
-        // Computes the Julian day number following Meeus' approach - though as an integer with an
-        // offset of 0.5 days. Then, we subtract 240000.5 (on top of Meeus' 1524.5) to obtain a
-        // MJD.
-        let mjd = year_days + month_days + day + leap_year_correction - 2401525;
-        ModifiedJulianDay {
-            day: Days::new(mjd),
+    /// Constructs a MJD from a given calendar date.
+    pub fn from_date(date: impl Datelike) -> Self {
+        let local_days = date.into();
+        Self {
+            day: local_days.elapsed_time_since_epoch() + Days::new(40587),
         }
     }
 }
+
+impl Datelike for ModifiedJulianDay<i64> {}
 
 impl From<LocalDays<i64>> for ModifiedJulianDay<i64> {
     /// Transforming from `LocalDays` (since Unix epoch) to the equivalent `ModifiedJulianDay` is
@@ -119,6 +54,7 @@ impl From<ModifiedJulianDay<i64>> for LocalDays<i64> {
 /// historic date structure should be able to capture that.
 #[test]
 fn historic_dates_from_meeus() {
+    use crate::calendar::Date;
     use crate::calendar::Month::*;
     assert_eq!(
         ModifiedJulianDay::from_date(Date::new(2000, January, 1).unwrap()),
@@ -191,41 +127,42 @@ fn historic_dates_from_meeus() {
 /// to 15 October 1582). Hence, we only consider dates after this reform.
 #[test]
 fn gregorian_dates_from_meeus() {
+    use crate::calendar::GregorianDate;
     use crate::calendar::Month::*;
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(2000, January, 1).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(2000, January, 1).unwrap()),
         ModifiedJulianDay::new(Days::new(51544))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1999, January, 1).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(1999, January, 1).unwrap()),
         ModifiedJulianDay::new(Days::new(51179))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1987, January, 27).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(1987, January, 27).unwrap()),
         ModifiedJulianDay::new(Days::new(46822))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1987, June, 19).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(1987, June, 19).unwrap()),
         ModifiedJulianDay::new(Days::new(46965))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1988, January, 27).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(1988, January, 27).unwrap()),
         ModifiedJulianDay::new(Days::new(47187))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1988, June, 19).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(1988, June, 19).unwrap()),
         ModifiedJulianDay::new(Days::new(47331))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1900, January, 1).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(1900, January, 1).unwrap()),
         ModifiedJulianDay::new(Days::new(15020))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1600, January, 1).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(1600, January, 1).unwrap()),
         ModifiedJulianDay::new(Days::new(-94553))
     );
     assert_eq!(
-        ModifiedJulianDay::from_gregorian_date(GregorianDate::new(1600, December, 31).unwrap()),
+        ModifiedJulianDay::from_date(GregorianDate::new(1600, December, 31).unwrap()),
         ModifiedJulianDay::new(Days::new(-94188))
     );
 }
@@ -259,10 +196,19 @@ where
 mod proof_harness {
     use super::*;
 
+    /// Verifies that construction of a MJD based on a historic date never panics.
+    #[kani::proof]
+    fn from_historic_date_never_panics() {
+        use crate::calendar::Date;
+        let date: Date = kani::any();
+        let _ = ModifiedJulianDay::from_date(date);
+    }
+
     /// Verifies that construction of a MJD based on a Gregorian date never panics.
     #[kani::proof]
     fn from_gregorian_never_panics() {
+        use crate::calendar::GregorianDate;
         let date: GregorianDate = kani::any();
-        let _ = ModifiedJulianDay::from_gregorian_date(date);
+        let _ = ModifiedJulianDay::from_date(date);
     }
 }
