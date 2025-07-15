@@ -170,9 +170,6 @@ impl Sub for Date {
     /// The difference between two Gregorian dates can be computed exactly as a number of days,
     /// accounting for the variable number of days per leap year. Note that this is only possible
     /// up to an accuracy of days because leap seconds depend on the time scale.
-    ///
-    /// An intermediate MJD representation is used for this, because subtracting two MJDs is very
-    /// cheap to do.
     fn sub(self, rhs: Self) -> Self::Output {
         let days_lhs = LocalTime::from_date(self);
         let days_rhs = LocalTime::from_date(rhs);
