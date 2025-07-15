@@ -69,7 +69,7 @@ impl Tai {
     /// expressed in TAI.
     pub const fn epoch() -> LocalDays<i64> {
         match Date::new(1958, Month::January, 1) {
-            Ok(date) => LocalDays::from_date(date),
+            Ok(date) => date.to_local_days(),
             Err(_) => panic!("Internal error: TAI epoch was found to be an invalid date."),
         }
     }

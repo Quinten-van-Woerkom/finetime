@@ -7,7 +7,8 @@ use core::ops::Sub;
 use crate::{
     calendar::{Datelike, Month},
     duration::Days,
-    time_scale::local::{LocalDays, LocalTime},
+    time_point::TimePoint,
+    time_scale::local::LocalDays,
 };
 
 /// Representation of a proleptic Gregorian date. Only represents logic down to single-day
@@ -35,6 +36,38 @@ impl GregorianDate {
         } else {
             Err(GregorianDateDoesNotExist { year, month, day })
         }
+    }
+
+    /// Constructs a MJD from a given Gregorian date. Applies a slight variation on the approach
+    /// described by Meeus in Astronomical Algorithms (Chapter 7, Julian Day). This variation
+    /// adapts the algorithm to the Unix epoch, and removes the dependency on floating point
+    /// arithmetic.
+    pub const fn to_local_days(self) -> LocalDays<i64> {
+        let (mut year, mut month, day) =
+            (self.year() as i64, self.month() as i64, self.day() as i64);
+        if month <= 2 {
+            year -= 1;
+            month += 12;
+        }
+
+        // Applies the leap year correction, as described in Meeus.
+        let leap_year_correction = {
+            let a = year.div_euclid(100);
+            2 - a + a / 4
+        };
+
+        // Computes the days because of elapsed years. Equivalent to `INT(365.25(Y + 4716))` from
+        // Meeus.
+        let year_days = (365 * (year + 4716)) + (year + 4716) / 4;
+
+        // Computes the days due to elapsed months. Equivalent to `INT(30.6001(M + 1))` from Meeus.
+        let month_days = (306001 * (month + 1)) / 10000;
+
+        // Computes the Julian day number following Meeus' approach - though as an integer with an
+        // offset of 0.5 days. Then, we subtract 2440587.5 (on top of Meeus' 1524.5) to obtain the
+        // time since the Unix epoch.
+        let days_since_epoch = year_days + month_days + day + leap_year_correction - 2442112;
+        TimePoint::from_time_since_epoch(Days::new(days_since_epoch))
     }
 
     /// Returns the year stored inside this proleptic Gregorian date. Astronomical year
@@ -87,7 +120,7 @@ impl Datelike for GregorianDate {}
 
 impl From<GregorianDate> for LocalDays<i64> {
     fn from(value: GregorianDate) -> Self {
-        LocalDays::from_gregorian_date(value)
+        value.to_local_days()
     }
 }
 
@@ -101,8 +134,8 @@ impl Sub for GregorianDate {
     /// An intermediate MJD representation is used for this, because subtracting two MJDs is very
     /// cheap to do.
     fn sub(self, rhs: Self) -> Self::Output {
-        let days_lhs = LocalTime::from_gregorian_date(self);
-        let days_rhs = LocalTime::from_gregorian_date(rhs);
+        let days_lhs = self.to_local_days();
+        let days_rhs = rhs.to_local_days();
         days_lhs - days_rhs
     }
 }

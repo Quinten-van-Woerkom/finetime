@@ -1,11 +1,8 @@
 //! Implementation of a time scale that represents that used by Unix time, i.e., the system clock.
 
 use crate::{
-    calendar::{
-        Date, Datelike,
-        Month::{self, *},
-    },
-    duration::{Hours, Minutes, Seconds, units::LiteralRatio},
+    calendar::{Date, Datelike, Month},
+    duration::{Duration, Hours, Minutes, Seconds, units::LiteralRatio},
     time_point::TimePoint,
     time_scale::{
         TimeScale,
@@ -86,10 +83,7 @@ impl Unix {
     /// Returns the Unix epoch as a `LocalDays`. Note that it is still expressed in UTC, so may not
     /// be compared directly with other time scale epochs like that of TAI.
     pub const fn epoch() -> LocalDays<i64> {
-        match Date::new(1970, Month::January, 1) {
-            Ok(date) => LocalDays::from_date(date),
-            Err(_) => panic!("Internal error: Unix epoch was found to be an invalid date."),
-        }
+        LocalDays::from_time_since_epoch(Duration::new(0))
     }
 }
 
@@ -102,7 +96,7 @@ pub enum UnixTimeError {
 impl TimeScale for Unix {
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
     fn reference_epoch() -> crate::time_point::TimePoint<Tai, i64, crate::duration::units::Milli> {
-        let date = Date::new(1970, January, 1).unwrap();
+        let date = Date::new(1970, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10).unwrap().convert()
     }
 }
