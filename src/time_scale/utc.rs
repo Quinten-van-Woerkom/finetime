@@ -40,7 +40,18 @@ impl UtcTime<i64> {
         minute: u8,
         second: u8,
     ) -> Result<UtcTime<i64>, UtcError> {
-        // First, we compute the Unix time at this point in time. In that representation, leap
+        // A quick sanity check is used to catch "easy" failures early. We only check the seconds
+        // count here because that is not caught by the steps executed next.
+        if second > 60 || (second == 60 && hour != 23) {
+            return Err(UtcError::InvalidDateTime {
+                date,
+                hour,
+                minute,
+                second,
+            });
+        }
+
+        // Then, we compute the Unix time at this point in time. In that representation, leap
         // seconds are not incorporated, so we may compute it directly. Note that we do not compute
         // the seconds component, because that will require additional logic to handle leap
         // seconds.
