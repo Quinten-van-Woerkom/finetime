@@ -4,7 +4,7 @@
 
 use core::ops::{Add, Sub};
 
-use crate::{calendar::Datelike, duration::Days, time_scale::local::LocalDays};
+use crate::{duration::Days, time_scale::local::LocalDays};
 
 /// The Modified Julian Day (MJD) representation of any given date.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
@@ -21,15 +21,13 @@ impl<T> ModifiedJulianDay<T> {
 
 impl ModifiedJulianDay<i64> {
     /// Constructs a MJD from a given calendar date.
-    pub fn from_date(date: impl Datelike) -> Self {
+    pub fn from_date(date: impl Into<LocalDays<i64>>) -> Self {
         let local_days = date.into();
         Self {
             day: local_days.elapsed_time_since_epoch() + Days::new(40587),
         }
     }
 }
-
-impl Datelike for ModifiedJulianDay<i64> {}
 
 impl From<LocalDays<i64>> for ModifiedJulianDay<i64> {
     /// Transforming from `LocalDays` (since Unix epoch) to the equivalent `ModifiedJulianDay` is

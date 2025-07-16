@@ -3,11 +3,7 @@
 
 use core::ops::Sub;
 
-use crate::{
-    calendar::{Datelike, Month},
-    duration::Days,
-    time_scale::local::LocalDays,
-};
+use crate::{calendar::Month, duration::Days, time_scale::local::LocalDays};
 
 /// Implementation of a date in the historic calendar. After 15 October 1582, this coincides with
 /// the Gregorian calendar; until 4 October 1582, this is the Julian calendar. The days inbetween
@@ -202,8 +198,6 @@ impl Date {
         year == 1582 && month as u8 == Month::October as u8 && day > 4 && day < 15
     }
 }
-
-impl Datelike for Date {}
 
 impl From<Date> for LocalDays<i64> {
     fn from(value: Date) -> Self {

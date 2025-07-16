@@ -1,114 +1,30 @@
 //! Implementation of the Coordinated Universal Time (UTC) standard.
 
-use num::Zero;
+use core::ops::{Add, Div, Mul, Sub};
+
+use num::{NumCast, Zero};
 use tinyvec::ArrayVec;
 
 use crate::{
     calendar::{
-        Date, Datelike,
+        Date,
         Month::{self, *},
     },
-    duration::units::{LiteralRatio, Milli},
-    time_point::TimePoint,
+    duration::{
+        Duration,
+        units::{IsValidConversion, LiteralRatio, Milli},
+    },
+    time_point::{DateTimeError, TimePoint},
     time_scale::{
         TimeScale, TimeScaleConversion,
         local::LocalDays,
         tai::{Tai, TaiTime},
-        unix::{UnixTime, UnixTimeError},
+        unix::UnixTime,
     },
 };
 
 /// `UtcTime` is a specialization of `TimePoint` that uses the UTC time scale.
 pub type UtcTime<Representation, Period = LiteralRatio<1>> = TimePoint<Utc, Representation, Period>;
-
-impl UtcTime<i64> {
-    /// Creates a UTC time point from a given calendar date and UTC time stamp inside of that day.
-    /// Leap seconds are included, meaning that leap second days will have a 61st second in the
-    /// last minute of their day.
-    pub fn from_datetime(
-        date: impl Datelike,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<UtcTime<i64>, UtcError> {
-        Self::from_local_datetime(date.into(), hour, minute, second)
-    }
-
-    pub fn from_local_datetime(
-        date: LocalDays<i64>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<UtcTime<i64>, UtcError> {
-        // A quick sanity check is used to catch "easy" failures early. We only check the seconds
-        // count here because that is not caught by the steps executed next.
-        if second > 60 || (second == 60 && hour != 23) {
-            return Err(UtcError::InvalidDateTime {
-                date,
-                hour,
-                minute,
-                second,
-            });
-        }
-
-        // Then, we compute the Unix time at this point in time. In that representation, leap
-        // seconds are not incorporated, so we may compute it directly. Note that we do not compute
-        // the seconds component, because that will require additional logic to handle leap
-        // seconds.
-        let unix_time_minutes = match UnixTime::from_datetime(date, hour, minute, 0) {
-            Ok(unix_time) => unix_time,
-            Err(UnixTimeError::TimeDoesNotExist {
-                hour,
-                minute,
-                second,
-            }) => {
-                return Err(UtcError::InvalidDateTime {
-                    date,
-                    hour,
-                    minute,
-                    second,
-                });
-            }
-        };
-        // The seconds component is added afterwards, so that we create a full timestamp. We also
-        // determine based on the timestamp whether a leap second is expected or not.
-        let unix_time = unix_time_minutes + Seconds::new(second as i64);
-        let expect_leap_second = second == 60;
-
-        match LEAP_SECONDS.to_utc(unix_time) {
-            // The nominal case: we do not expect a leap second, and we get a simple unambiguous
-            // UTC time point back from the leap second table.
-            LeapSecondsResult::Unambiguous(utc_time) if !expect_leap_second => Ok(utc_time),
-            // If the second count is 60, we should have expected a leap second insertion to occur.
-            // Hence, if we still find an unambiguous time stamp, that means that the requested
-            // datetime does not actually exist, because there is no 61st second there.
-            LeapSecondsResult::Unambiguous(_) => Err(UtcError::NoLeapSecondInsertion {
-                date,
-                hour,
-                minute,
-                second,
-            }),
-            // If the Unix time that we have created happens to be exactly at a leap second
-            // insertion, we must manually disambiguate. We can do this by checking whether a
-            // datetime was passed with a 61st (leap) second or not.
-            LeapSecondsResult::InsertionPoint { start, end } => {
-                if expect_leap_second {
-                    Ok(start)
-                } else {
-                    Ok(end)
-                }
-            }
-            // If the requested Unix time coincides with a leap second deletion, that means that we
-            // cannot convert it to a valid UTC time.
-            LeapSecondsResult::DeletionPoint => Err(UtcError::LeapSecondDeletion {
-                date,
-                hour,
-                minute,
-                second,
-            }),
-        }
-    }
-}
 
 /// Representation of the Coordinated Universal Time (UTC) standard. UTC utilizes leap seconds to
 /// synchronize the time to within 0.9 seconds of UT1, the solar time of the Earth. Since these
@@ -171,7 +87,7 @@ fn calendar_dates_near_insertion() {
     let leap_second = UtcTime::from_datetime(date, 23, 59, 60);
     assert_eq!(
         leap_second,
-        Err(UtcError::NoLeapSecondInsertion {
+        Err(DateTimeError::NoLeapSecondInsertion {
             date: date.into(),
             hour: 23,
             minute: 59,
@@ -224,14 +140,9 @@ fn roundtrip_near_leap_seconds() {
 /// that the requested datetime does not exist.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum UtcError {
-    /// Returned when the given combination of date and time-of-day is not a valid datetime in
-    /// general (independent of the exact calendar).
-    InvalidDateTime {
-        date: LocalDays<i64>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    },
+    /// Returned when the given time-of-day is not a valid time in general (independent of the
+    /// exact time scale used).
+    InvalidTimeOfDay { hour: u8, minute: u8, second: u8 },
     /// Returned when the requested datetime has a 61st second but is not actually situated at a
     /// leap second insertion.
     NoLeapSecondInsertion {
@@ -253,6 +164,122 @@ impl TimeScale for Utc {
     fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
         let date = Date::new(1970, January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10).unwrap().convert()
+    }
+
+    /// Because the UTC epoch coincides with the `LocalDays` epoch, it can be constructed simply
+    /// as a zero value.
+    fn epoch<T>() -> LocalDays<T>
+    where
+        T: NumCast,
+    {
+        LocalDays::from_time_since_epoch(Duration::new(0u8))
+            .cast()
+            .unwrap()
+    }
+
+    fn counts_leap_seconds() -> bool {
+        true
+    }
+
+    fn from_local_datetime<Representation>(
+        date: LocalDays<Representation>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<TimePoint<Self, Representation>, DateTimeError<Representation>>
+    where
+        Representation: NumCast
+            + Sub<Representation, Output = Representation>
+            + Add<Representation, Output = Representation>
+            + Mul<Representation, Output = Representation>
+            + Div<Representation, Output = Representation>
+            + Clone,
+        (): IsValidConversion<Representation, LiteralRatio<86400>, LiteralRatio<1>>
+            + IsValidConversion<Representation, LiteralRatio<3600>, LiteralRatio<1>>
+            + IsValidConversion<Representation, LiteralRatio<60>, LiteralRatio<1>>,
+    {
+        // Verify that the time-of-day is valid. Leap seconds are always assumed to be valid at
+        // this point - this is checked later.
+        if hour >= 24
+            || minute >= 60
+            || second > 60
+            || (second == 60 && (hour != 23 || minute != 59))
+        {
+            return Err(DateTimeError::InvalidTimeOfDay {
+                hour,
+                minute,
+                second,
+            });
+        }
+
+        // Then, we compute the Unix time at this point in time. In that representation, leap
+        // seconds are not incorporated, so we may compute it directly. Note that we do not compute
+        // the seconds component, because that will require additional logic to handle leap
+        // seconds.
+        let unix_time_minutes = match UnixTime::from_local_datetime(date.clone(), hour, minute, 0) {
+            Ok(unix_time) => unix_time,
+            _ => unreachable!(),
+        };
+        // The seconds component is added afterwards, so that we create a full timestamp. We also
+        // determine based on the timestamp whether a leap second is expected or not.
+        let unix_time = unix_time_minutes + Seconds::new(second).cast().unwrap();
+        let unix_time = unix_time.cast().ok_or(DateTimeError::NotRepresentable {
+            date: date.clone(),
+            hour,
+            minute,
+            second,
+        })?;
+        let expect_leap_second = second == 60;
+
+        match LEAP_SECONDS.to_utc(unix_time) {
+            // The nominal case: we do not expect a leap second, and we get a simple unambiguous
+            // UTC time point back from the leap second table.
+            LeapSecondsResult::Unambiguous(utc_time) if !expect_leap_second => {
+                utc_time.cast().ok_or(DateTimeError::NotRepresentable {
+                    date: date.clone(),
+                    hour,
+                    minute,
+                    second,
+                })
+            }
+            // If the second count is 60, we should have expected a leap second insertion to occur.
+            // Hence, if we still find an unambiguous time stamp, that means that the requested
+            // datetime does not actually exist, because there is no 61st second there.
+            LeapSecondsResult::Unambiguous(_) => Err(DateTimeError::NoLeapSecondInsertion {
+                date: date.clone(),
+                hour,
+                minute,
+                second,
+            }),
+            // If the Unix time that we have created happens to be exactly at a leap second
+            // insertion, we must manually disambiguate. We can do this by checking whether a
+            // datetime was passed with a 61st (leap) second or not.
+            LeapSecondsResult::InsertionPoint { start, end } => {
+                if expect_leap_second {
+                    start.cast().ok_or(DateTimeError::NotRepresentable {
+                        date,
+                        hour,
+                        minute,
+                        second,
+                    })
+                } else {
+                    end.cast().ok_or(DateTimeError::NotRepresentable {
+                        date,
+                        hour,
+                        minute,
+                        second,
+                    })
+                }
+            }
+            // If the requested Unix time coincides with a leap second deletion, that means that we
+            // cannot convert it to a valid UTC time.
+            LeapSecondsResult::DeletionPoint => Err(DateTimeError::LeapSecondDeletion {
+                date,
+                hour,
+                minute,
+                second,
+            }),
+        }
     }
 }
 

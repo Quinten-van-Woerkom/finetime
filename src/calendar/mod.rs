@@ -8,16 +8,6 @@ pub use gregorian::*;
 pub use historic::*;
 pub use modified_julian_day::*;
 
-use crate::time_scale::local::LocalDays;
-
-/// Trait describing anything that can be interpreted as a date. In practice, this means anything
-/// that can be converted to `LocalDays`, i.e., a day-accurate timestamp that is not yet bound to a
-/// timezone but that is related in some manner to actual time.
-///
-/// The reverse transformation is not required, while it would generally make sense, because it can
-/// be non-trivial to implement for certain calendars.
-pub trait Datelike: Into<LocalDays<i64>> {}
-
 /// Months as known in the Gregorian and Julian calendars.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u8)]

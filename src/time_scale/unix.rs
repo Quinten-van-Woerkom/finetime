@@ -1,8 +1,10 @@
 //! Implementation of a time scale that represents that used by Unix time, i.e., the system clock.
 
+use num::NumCast;
+
 use crate::{
-    calendar::{Date, Datelike, Month},
-    duration::{Duration, Hours, Minutes, Seconds, units::LiteralRatio},
+    calendar::{Date, Month},
+    duration::{Duration, units::LiteralRatio},
     time_point::TimePoint,
     time_scale::{
         TimeScale,
@@ -14,48 +16,6 @@ use crate::{
 /// `UnixTime` is a `TimePoint` that uses the `Unix` time scale.
 pub type UnixTime<Representation, Period = LiteralRatio<1>> =
     TimePoint<Unix, Representation, Period>;
-
-impl UnixTime<i64> {
-    /// Creates a Unix time point from a given historic calendar date and time stamp. Note that
-    /// Unix time points are expressed in UTC, but do not include leap seconds.
-    pub fn from_datetime(
-        date: impl Datelike,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<UnixTime<i64>, UnixTimeError> {
-        Self::from_local_datetime(date.into(), hour, minute, second)
-    }
-
-    pub fn from_local_datetime(
-        date: LocalDays<i64>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<UnixTime<i64>, UnixTimeError> {
-        // First, we verify that the timestamp is valid.
-        if hour >= 24 || minute >= 60 || second >= 60 {
-            return Err(UnixTimeError::TimeDoesNotExist {
-                hour,
-                minute,
-                second,
-            });
-        }
-
-        // Afterwards, we convert the date to its MJD equivalent. We do the same for the Unix
-        // epoch, but then at compile time already. Note that both dates are MJD, expressed in Unix
-        // time.
-        let date_mjd = date;
-        let unix_epoch = Unix::epoch();
-        let days = date_mjd - unix_epoch;
-        let hours = Hours::new(hour as i64);
-        let minutes = Minutes::new(minute as i64);
-        let seconds = Seconds::new(second as i64);
-        Ok(TimePoint::from_time_since_epoch(
-            days.convert() + hours.convert() + minutes.convert() + seconds,
-        ))
-    }
-}
 
 /// The Unix time scale is the scale used throughout most operating systems nowadays. It is also
 /// the default used in `libc`, for example. It counts seconds since the Unix epoch (1970-01-01 UTC),
@@ -99,11 +59,27 @@ impl TimeScale for Unix {
         let date = Date::new(1970, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10).unwrap().convert()
     }
+
+    /// Because the Unix epoch coincides with the `LocalDays` epoch, it can be constructed simply
+    /// as a zero value.
+    fn epoch<T>() -> LocalDays<T>
+    where
+        T: NumCast,
+    {
+        LocalDays::from_time_since_epoch(Duration::new(0u8))
+            .cast()
+            .unwrap()
+    }
+
+    fn counts_leap_seconds() -> bool {
+        false
+    }
 }
 
 /// Verifies this implementation by computing the `UnixTime` for some known time stamps.
 #[test]
 fn known_timestamps() {
+    use crate::duration::Seconds;
     assert_eq!(
         UnixTime::from_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()

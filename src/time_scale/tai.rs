@@ -1,11 +1,11 @@
 //! Implementation of international atomic time (TAI).
 
-use num::Zero;
+use num::{NumCast, Zero};
 
 use crate::{
-    calendar::{Date, Datelike, Month},
+    calendar::{Date, Month},
     duration::{
-        Hours, MilliSeconds, Minutes, Seconds,
+        MilliSeconds,
         units::{LiteralRatio, Milli},
     },
     time_point::TimePoint,
@@ -14,49 +14,6 @@ use crate::{
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
 pub type TaiTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tai, Representation, Period>;
-
-impl TaiTime<i64> {
-    /// Creates a TAI time point from a given historic calendar date and time stamp. Note that leap
-    /// seconds are not included, as opposed to the equivalent calendar date representation of UTC
-    /// time. This has the advantages that leap seconds need not be accounted for when converting
-    /// to the time since epoch, only leap days.
-    pub fn from_datetime(
-        date: impl Datelike,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<TaiTime<i64>, TaiError> {
-        Self::from_local_datetime(date.into(), hour, minute, second)
-    }
-
-    pub fn from_local_datetime(
-        date: LocalDays<i64>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<TaiTime<i64>, TaiError> {
-        // First, we verify that the timestamp is valid.
-        if hour >= 24 || minute >= 60 || second >= 60 {
-            return Err(TaiError::TimeDoesNotExist {
-                hour,
-                minute,
-                second,
-            });
-        }
-
-        // Afterwards, we convert the date to its MJD equivalent. We do the same for the TAI epoch,
-        // but then at compile time already. Note that both dates are MJD, expressed in TAI.
-        let date_mjd = date;
-        let tai_epoch = Tai::epoch();
-        let days = date_mjd - tai_epoch;
-        let hours = Hours::new(hour as i64);
-        let minutes = Minutes::new(minute as i64);
-        let seconds = Seconds::new(second as i64);
-        Ok(TimePoint::from_time_since_epoch(
-            days.convert() + hours.convert() + minutes.convert() + seconds,
-        ))
-    }
-}
 
 /// Time scale representing the international atomic time standard (TAI). TAI has no leap seconds
 /// and increases monotonically at a constant interval, making it useful as fundamental time scale
@@ -88,6 +45,21 @@ impl TimeScale for Tai {
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
     fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
         TimePoint::from_time_since_epoch(MilliSeconds::zero())
+    }
+
+    fn epoch<T>() -> LocalDays<T>
+    where
+        T: NumCast,
+    {
+        Date::new(1958, Month::January, 1)
+            .unwrap()
+            .to_local_days()
+            .cast()
+            .unwrap()
+    }
+
+    fn counts_leap_seconds() -> bool {
+        false
     }
 }
 
@@ -123,6 +95,7 @@ mod proof_harness {
 /// epoch, which is the difference between 1958 and 1970: 378691200 seconds.
 #[test]
 fn known_timestamps() {
+    use crate::duration::Seconds;
     assert_eq!(
         TaiTime::from_datetime(Date::new(1958, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()

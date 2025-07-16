@@ -4,12 +4,7 @@
 
 use core::ops::Sub;
 
-use crate::{
-    calendar::{Datelike, Month},
-    duration::Days,
-    time_point::TimePoint,
-    time_scale::local::LocalDays,
-};
+use crate::{calendar::Month, duration::Days, time_point::TimePoint, time_scale::local::LocalDays};
 
 /// Representation of a proleptic Gregorian date. Only represents logic down to single-day
 /// accuracy: i.e., leap days are included, but leap seconds are not. This is useful in keeping
@@ -115,8 +110,6 @@ impl GregorianDate {
         day != 0 && day <= Self::days_in_month(year, month)
     }
 }
-
-impl Datelike for GregorianDate {}
 
 impl From<GregorianDate> for LocalDays<i64> {
     fn from(value: GregorianDate) -> Self {

@@ -2,15 +2,17 @@
 //! link instances in time to a number of elapsed seconds since some epoch. The manner in which
 //! this relation is established differs per time scale.
 
+use core::ops::{Add, Div, Mul, Sub};
+
 use num::{NumCast, traits::NumOps};
 
 use crate::{
     duration::{
-        Duration,
-        units::{Milli, Ratio},
+        Duration, Hours, Minutes, Seconds,
+        units::{IsValidConversion, LiteralRatio, Milli, Ratio},
     },
-    time_point::TimePoint,
-    time_scale::tai::Tai,
+    time_point::{DateTimeError, TimePoint},
+    time_scale::{local::LocalDays, tai::Tai},
 };
 
 pub mod local;
@@ -27,6 +29,60 @@ pub trait TimeScale: Sized {
     /// Returns the reference epoch of a time scale, expressed in number of seconds since the TAI
     /// epoch.
     fn reference_epoch() -> TimePoint<Tai, i64, Milli>;
+
+    /// Returns the epoch of a time scale, expressed as a `LocalTime` in its own time scale. The
+    /// result may be expressed in any type `T`, as long as this type can be constructed from some
+    /// primitive. This function is allowed to panic if the epoch, expressed as `LocalDays`, cannot
+    /// be represented by a value of type `T`.
+    fn epoch<T>() -> LocalDays<T>
+    where
+        T: NumCast;
+
+    /// Returns whether this time scales incorporates leap seconds, i.e., whether the underlying
+    /// "seconds since epoch" count also increases one second when a leap second is inserted.
+    fn counts_leap_seconds() -> bool;
+
+    /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
+    /// time-of-day to it.
+    fn from_local_datetime<Representation>(
+        date: LocalDays<Representation>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<TimePoint<Self, Representation>, DateTimeError<Representation>>
+    where
+        Representation: NumCast
+            + Sub<Representation, Output = Representation>
+            + Add<Representation, Output = Representation>
+            + Mul<Representation, Output = Representation>
+            + Div<Representation, Output = Representation>
+            + Clone,
+        (): IsValidConversion<Representation, LiteralRatio<86400>, LiteralRatio<1>>
+            + IsValidConversion<Representation, LiteralRatio<3600>, LiteralRatio<1>>
+            + IsValidConversion<Representation, LiteralRatio<60>, LiteralRatio<1>>,
+    {
+        // First, we verify that the timestamp is valid.
+        if hour >= 24 || minute >= 60 || second >= 60 {
+            return Err(DateTimeError::InvalidTimeOfDay {
+                hour,
+                minute,
+                second,
+            });
+        }
+
+        // Afterwards, we convert the date to its MJD equivalent. We do the same for the TAI epoch,
+        // but then at compile time already. Note that both dates are MJD, expressed in TAI.
+        let date_mjd = date;
+        let tai_epoch = Self::epoch::<Representation>();
+        let days = date_mjd - tai_epoch;
+        // The following casts will always succeed for primitive types, because 0..=60
+        let hours = Hours::new(hour).cast().unwrap();
+        let minutes = Minutes::new(minute).cast().unwrap();
+        let seconds = Seconds::new(second).cast().unwrap();
+        Ok(TimePoint::from_time_since_epoch(
+            days.convert() + hours.convert() + minutes.convert() + seconds,
+        ))
+    }
 
     /// Creates a time point in this time scale based on a time point in TAI. Note that some
     /// rounding is permitted to occur here: not all time scales can be related exactly to TAI.

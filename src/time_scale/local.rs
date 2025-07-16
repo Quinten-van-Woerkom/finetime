@@ -1,7 +1,7 @@
 //! Implementation of a "fake" time scale that is used to represent time points that are not
 //! associated with an actual time scale. This is useful for representing intermediate objects.
 
-use crate::{calendar::Datelike, duration::units::LiteralRatio, time_point::TimePoint};
+use crate::{duration::units::LiteralRatio, time_point::TimePoint};
 
 /// The `Local` `TimeScale` is not actually a `TimeScale`. Instead, it is useful in scenarios where
 /// some `TimePoint` may be defined, but cannot (yet) be related to an actual time scale. This is
@@ -25,5 +25,3 @@ pub type LocalTime<Representation, Period = LiteralRatio<1>> =
 /// Typedef for a specialization of `LocalTime` to a unit of days. Useful as intermediate type for
 /// normalization of other calendrical types.
 pub type LocalDays<Representation> = LocalTime<Representation, LiteralRatio<86400, 1>>;
-
-impl Datelike for LocalDays<i64> {}

@@ -8,9 +8,12 @@ use core::{
 
 use num::{Bounded, Integer, NumCast};
 
-use crate::duration::{
-    Duration,
-    units::{IsValidConversion, LiteralRatio, Ratio},
+use crate::{
+    duration::{
+        Duration,
+        units::{IsValidConversion, LiteralRatio, Ratio},
+    },
+    time_scale::{TimeScale, local::LocalDays},
 };
 
 /// A time point indicates an elapsed duration with respect to the epoch of some time scale. It may
@@ -23,7 +26,7 @@ pub struct TimePoint<TimeScale, Representation, Period = LiteralRatio<1>> {
     time_scale: core::marker::PhantomData<TimeScale>,
 }
 
-impl<TimeScale, Representation, Period> TimePoint<TimeScale, Representation, Period> {
+impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     /// Creates a `TimePoint` directly from the given elapsed time since some `TimeScale` epoch.
     pub const fn from_time_since_epoch(duration: Duration<Representation, Period>) -> Self {
         Self {
@@ -38,6 +41,53 @@ impl<TimeScale, Representation, Period> TimePoint<TimeScale, Representation, Per
         Duration<Representation, Period>: Copy,
     {
         self.duration
+    }
+}
+
+impl<Scale, Representation> TimePoint<Scale, Representation> {
+    /// Creates a `TimePoint` from a historic date and an associated time-of-day.
+    pub fn from_datetime(
+        date: impl Into<LocalDays<Representation>>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, DateTimeError<Representation>>
+    where
+        Scale: TimeScale,
+        Representation: NumCast
+            + Sub<Representation, Output = Representation>
+            + Add<Representation, Output = Representation>
+            + Mul<Representation, Output = Representation>
+            + Div<Representation, Output = Representation>
+            + Clone,
+        (): IsValidConversion<Representation, LiteralRatio<86400>, LiteralRatio<1>>
+            + IsValidConversion<Representation, LiteralRatio<3600>, LiteralRatio<1>>
+            + IsValidConversion<Representation, LiteralRatio<60>, LiteralRatio<1>>,
+    {
+        Scale::from_local_datetime(date.into(), hour, minute, second)
+    }
+
+    /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
+    /// time-of-day to it.
+    pub fn from_local_datetime(
+        date: LocalDays<Representation>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, DateTimeError<Representation>>
+    where
+        Scale: TimeScale,
+        Representation: NumCast
+            + Sub<Representation, Output = Representation>
+            + Add<Representation, Output = Representation>
+            + Mul<Representation, Output = Representation>
+            + Div<Representation, Output = Representation>
+            + Clone,
+        (): IsValidConversion<Representation, LiteralRatio<86400>, LiteralRatio<1>>
+            + IsValidConversion<Representation, LiteralRatio<3600>, LiteralRatio<1>>
+            + IsValidConversion<Representation, LiteralRatio<60>, LiteralRatio<1>>,
+    {
+        Scale::from_local_datetime(date, hour, minute, second)
     }
 }
 
@@ -82,6 +132,38 @@ impl<TimeScale, Representation, Period: Ratio> TimePoint<TimeScale, Representati
             time_scale: core::marker::PhantomData,
         })
     }
+}
+
+/// Errors that may be returned when combining a calendar date with a time-of-day to create a
+/// `TimePoint`. Includes errors that
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum DateTimeError<T> {
+    /// Returned when the given time-of-day does not exist in general (independent of whether the
+    /// used time scale has leap seconds).
+    InvalidTimeOfDay { hour: u8, minute: u8, second: u8 },
+    /// Returned when the requested datetime has a 61st second but is not actually situated at a
+    /// leap second insertion.
+    NoLeapSecondInsertion {
+        date: LocalDays<T>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    },
+    /// Returned when the requested datetime does not exist because of a leap second deletion.
+    LeapSecondDeletion {
+        date: LocalDays<T>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    },
+    /// Returned when the requested datetime could not fit in a `TimePoint` with the given
+    /// `Representation`.
+    NotRepresentable {
+        date: LocalDays<T>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    },
 }
 
 impl<TimeScale, Representation, Period> Copy for TimePoint<TimeScale, Representation, Period> where
