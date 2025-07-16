@@ -535,6 +535,34 @@ fn known_timestamps() {
     );
 
     assert_eq!(
+        UtcTime::from_datetime(Date::new(1973, Month::December, 31).unwrap(), 23, 59, 59)
+            .unwrap()
+            .elapsed_time_since_epoch(),
+        Seconds::new(126230401)
+    );
+
+    assert_eq!(
+        UtcTime::from_datetime(Date::new(1973, Month::December, 31).unwrap(), 23, 59, 60)
+            .unwrap()
+            .elapsed_time_since_epoch(),
+        Seconds::new(126230402)
+    );
+
+    assert_eq!(
+        UtcTime::from_datetime(Date::new(1974, Month::January, 1).unwrap(), 0, 0, 0)
+            .unwrap()
+            .elapsed_time_since_epoch(),
+        Seconds::new(126230403)
+    );
+
+    assert_eq!(
+        UtcTime::from_datetime(Date::new(2025, Month::July, 16).unwrap(), 0, 0, 0)
+            .unwrap()
+            .elapsed_time_since_epoch(),
+        Seconds::new(1752624027)
+    );
+
+    assert_eq!(
         UtcTime::from_datetime(Date::new(2025, Month::July, 16).unwrap(), 17, 36, 4)
             .unwrap()
             .elapsed_time_since_epoch(),
