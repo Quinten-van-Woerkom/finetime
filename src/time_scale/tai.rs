@@ -21,17 +21,6 @@ pub type TaiTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tai, Repr
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Tai;
 
-impl Tai {
-    /// Returns the TAI epoch as a `LocalDays`. Note that this `LocalDays` itself is still
-    /// expressed in TAI.
-    pub const fn epoch() -> LocalDays<i64> {
-        match Date::new(1958, Month::January, 1) {
-            Ok(date) => date.to_local_days(),
-            Err(_) => panic!("Internal error: TAI epoch was found to be an invalid date."),
-        }
-    }
-}
-
 /// Error that may be returned when creating a TAI time point from a calendar representation. Note
 /// that this calendar representation does not allow leap seconds, as opposed to the equivalent
 /// calendar representation of UTC time.
