@@ -47,6 +47,10 @@ fn main() {
         }
         let ntp_secs: i64 = parts[0].parse().expect("Invalid NTP seconds");
         let offset: i64 = parts[1].parse().expect("Invalid leap-second count");
+        // We store the offset from Unix time rather than from TAI, since that makes for a more
+        // direct translation. With TAI, we would also have to include an epoch shift (since our
+        // `TimePoint` implementation uses an epoch of 1958-01-01 for TAI and 1970-01-01 for UTC).
+        let offset = offset - 10i64;
         let unix_secs = ntp_secs - 2_208_988_800; // Convert NTP (1900) → Unix (1970)
         output.push_str(&format!(
             "    leap_seconds.insert(Seconds::new({unix_secs}), Seconds::new({offset}));\n"
