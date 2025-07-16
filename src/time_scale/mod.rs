@@ -41,7 +41,9 @@ pub trait TimeScale: Sized {
 
     /// Returns whether this time scales incorporates leap seconds, i.e., whether the underlying
     /// "seconds since epoch" count also increases one second when a leap second is inserted.
-    fn counts_leap_seconds() -> bool;
+    fn counts_leap_seconds() -> bool {
+        false
+    }
 
     /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
     /// time-of-day to it.
