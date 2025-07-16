@@ -15,6 +15,7 @@ use crate::{
     time_scale::{local::LocalDays, tai::Tai},
 };
 
+pub mod gps;
 pub mod local;
 pub mod tai;
 pub mod tt;
