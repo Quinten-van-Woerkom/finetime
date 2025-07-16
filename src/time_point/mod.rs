@@ -55,6 +55,7 @@ impl<Scale, Representation> TimePoint<Scale, Representation> {
     where
         Scale: TimeScale,
         Representation: NumCast
+            + From<u8>
             + Sub<Representation, Output = Representation>
             + Add<Representation, Output = Representation>
             + Mul<Representation, Output = Representation>
@@ -78,6 +79,7 @@ impl<Scale, Representation> TimePoint<Scale, Representation> {
     where
         Scale: TimeScale,
         Representation: NumCast
+            + From<u8>
             + Sub<Representation, Output = Representation>
             + Add<Representation, Output = Representation>
             + Mul<Representation, Output = Representation>
@@ -121,14 +123,26 @@ impl<TimeScale, Representation, Period: Ratio> TimePoint<TimeScale, Representati
         })
     }
 
+    /// Infallibly converts towards a different representation.
+    pub fn cast<Target>(self) -> TimePoint<TimeScale, Target, Period>
+    where
+        Target: From<Representation>,
+    {
+        TimePoint {
+            duration: self.duration.cast(),
+            time_scale: core::marker::PhantomData,
+        }
+    }
+
     /// Converts towards a different representation. If the underlying representation cannot store
     /// the result of this cast, returns `None`.
-    pub fn cast<Target: NumCast>(self) -> Option<TimePoint<TimeScale, Target, Period>>
+    pub fn try_cast<Target>(self) -> Option<TimePoint<TimeScale, Target, Period>>
     where
         Representation: NumCast,
+        Target: NumCast,
     {
         Some(TimePoint {
-            duration: self.duration.cast()?,
+            duration: self.duration.try_cast()?,
             time_scale: core::marker::PhantomData,
         })
     }

@@ -115,9 +115,17 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
         }
     }
 
+    /// Infallibly converts towards a different representation.
+    pub fn cast<Target>(self) -> Duration<Target, Period>
+    where
+        Target: From<Representation>,
+    {
+        Duration::new(Target::from(self.count))
+    }
+
     /// Converts towards a different representation. If the underlying representation cannot store
     /// the result of this cast, returns `None`.
-    pub fn cast<Target: NumCast>(self) -> Option<Duration<Target, Period>>
+    pub fn try_cast<Target: NumCast>(self) -> Option<Duration<Target, Period>>
     where
         Representation: NumCast,
     {

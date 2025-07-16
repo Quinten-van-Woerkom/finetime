@@ -52,6 +52,7 @@ pub trait TimeScale: Sized {
     ) -> Result<TimePoint<Self, Representation>, DateTimeError<Representation>>
     where
         Representation: NumCast
+            + From<u8>
             + Sub<Representation, Output = Representation>
             + Add<Representation, Output = Representation>
             + Mul<Representation, Output = Representation>
@@ -75,10 +76,9 @@ pub trait TimeScale: Sized {
         let date_mjd = date;
         let tai_epoch = Self::epoch::<Representation>();
         let days = date_mjd - tai_epoch;
-        // The following casts will always succeed for primitive types, because 0..=60
-        let hours = Hours::new(hour).cast().unwrap();
-        let minutes = Minutes::new(minute).cast().unwrap();
-        let seconds = Seconds::new(second).cast().unwrap();
+        let hours = Hours::new(hour).cast();
+        let minutes = Minutes::new(minute).cast();
+        let seconds = Seconds::new(second).cast();
         Ok(TimePoint::from_time_since_epoch(
             days.convert() + hours.convert() + minutes.convert() + seconds,
         ))
@@ -144,7 +144,7 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
         // number of seconds between the `To` and `From` epoch). In such cases, this conversion will
         // panic.
         let epoch_difference: Duration<Representation, Period> =
-            (to_epoch - from_epoch).round().cast().unwrap();
+            (to_epoch - from_epoch).round().try_cast().unwrap();
         TimePoint::<To, Representation, Period>::from_time_since_epoch(
             time_since_from_epoch - epoch_difference,
         )

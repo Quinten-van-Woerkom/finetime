@@ -67,7 +67,7 @@ impl TimeScale for Unix {
         T: NumCast,
     {
         LocalDays::from_time_since_epoch(Duration::new(0u8))
-            .cast()
+            .try_cast()
             .unwrap()
     }
 

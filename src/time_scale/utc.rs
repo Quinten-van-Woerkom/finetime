@@ -173,7 +173,7 @@ impl TimeScale for Utc {
         T: NumCast,
     {
         LocalDays::from_time_since_epoch(Duration::new(0u8))
-            .cast()
+            .try_cast()
             .unwrap()
     }
 
@@ -189,6 +189,7 @@ impl TimeScale for Utc {
     ) -> Result<TimePoint<Self, Representation>, DateTimeError<Representation>>
     where
         Representation: NumCast
+            + From<u8>
             + Sub<Representation, Output = Representation>
             + Add<Representation, Output = Representation>
             + Mul<Representation, Output = Representation>
@@ -222,20 +223,22 @@ impl TimeScale for Utc {
         };
         // The seconds component is added afterwards, so that we create a full timestamp. We also
         // determine based on the timestamp whether a leap second is expected or not.
-        let unix_time = unix_time_minutes + Seconds::new(second).cast().unwrap();
-        let unix_time = unix_time.cast().ok_or(DateTimeError::NotRepresentable {
-            date: date.clone(),
-            hour,
-            minute,
-            second,
-        })?;
+        let unix_time = unix_time_minutes + Seconds::new(second).cast();
+        let unix_time = unix_time
+            .try_cast()
+            .ok_or(DateTimeError::NotRepresentable {
+                date: date.clone(),
+                hour,
+                minute,
+                second,
+            })?;
         let expect_leap_second = second == 60;
 
         match LEAP_SECONDS.to_utc(unix_time) {
             // The nominal case: we do not expect a leap second, and we get a simple unambiguous
             // UTC time point back from the leap second table.
             LeapSecondsResult::Unambiguous(utc_time) if !expect_leap_second => {
-                utc_time.cast().ok_or(DateTimeError::NotRepresentable {
+                utc_time.try_cast().ok_or(DateTimeError::NotRepresentable {
                     date: date.clone(),
                     hour,
                     minute,
@@ -256,14 +259,14 @@ impl TimeScale for Utc {
             // datetime was passed with a 61st (leap) second or not.
             LeapSecondsResult::InsertionPoint { start, end } => {
                 if expect_leap_second {
-                    start.cast().ok_or(DateTimeError::NotRepresentable {
+                    start.try_cast().ok_or(DateTimeError::NotRepresentable {
                         date,
                         hour,
                         minute,
                         second,
                     })
                 } else {
-                    end.cast().ok_or(DateTimeError::NotRepresentable {
+                    end.try_cast().ok_or(DateTimeError::NotRepresentable {
                         date,
                         hour,
                         minute,

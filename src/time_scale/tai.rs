@@ -54,7 +54,7 @@ impl TimeScale for Tai {
         Date::new(1958, Month::January, 1)
             .unwrap()
             .to_local_days()
-            .cast()
+            .try_cast()
             .unwrap()
     }
 
