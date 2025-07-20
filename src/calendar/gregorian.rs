@@ -4,7 +4,10 @@
 
 use core::ops::Sub;
 
-use crate::{calendar::Month, duration::Days, time_point::TimePoint, time_scale::local::LocalDays};
+use crate::{
+    GregorianDateDoesNotExist, calendar::Month, duration::Days, time_point::TimePoint,
+    time_scale::LocalDays,
+};
 
 /// Representation of a proleptic Gregorian date. Only represents logic down to single-day
 /// accuracy: i.e., leap days are included, but leap seconds are not. This is useful in keeping
@@ -144,15 +147,6 @@ impl kani::Arbitrary for GregorianDate {
         }
         Self { year, month, day }
     }
-}
-
-/// Error returned when the requested Gregorian date does not exist, because the requested
-/// combination of month and year does not have the requested number of days.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct GregorianDateDoesNotExist {
-    year: i32,
-    month: Month,
-    day: u8,
 }
 
 #[cfg(kani)]

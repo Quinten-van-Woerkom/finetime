@@ -1,12 +1,12 @@
 //! Implementation of all calendar-related functionality.
 
-pub mod gregorian;
-pub mod historic;
-pub mod modified_julian_day;
+mod gregorian;
+mod historic;
+mod mjd;
 
 pub use gregorian::*;
 pub use historic::*;
-pub use modified_julian_day::*;
+pub use mjd::*;
 
 /// Months as known in the Gregorian and Julian calendars.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -1,25 +1,25 @@
 //! Implementation of the Coordinated Universal Time (UTC) standard.
 
-use core::ops::{Add, Div, Mul, Sub};
-
-use num::{NumCast, Zero};
+use num::{NumCast, One, Zero, traits::NumOps};
 use tinyvec::ArrayVec;
 
 use crate::{
+    DateTimeError, FineDateTimeError,
     calendar::{
         Date,
         Month::{self, *},
     },
-    duration::{
-        Duration,
-        units::{IsValidConversion, LiteralRatio, Milli},
-    },
-    time_point::{DateTimeError, TimePoint},
+    duration::Duration,
+    time_point::TimePoint,
     time_scale::{
         TimeScale, TimeScaleConversion,
         local::LocalDays,
         tai::{Tai, TaiTime},
         unix::UnixTime,
+    },
+    units::{
+        IsValidConversion, LiteralRatio, Milli, Ratio, SecondsPerDay, SecondsPerHour,
+        SecondsPerMinute,
     },
 };
 
@@ -135,31 +135,6 @@ fn roundtrip_near_leap_seconds() {
     }
 }
 
-/// Errors that may be returned when creating a UTC time point from a calendar datetime. Note that
-/// leap seconds may be included. Hence, this error will store the full timestamp when reporting
-/// that the requested datetime does not exist.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum UtcError {
-    /// Returned when the given time-of-day is not a valid time in general (independent of the
-    /// exact time scale used).
-    InvalidTimeOfDay { hour: u8, minute: u8, second: u8 },
-    /// Returned when the requested datetime has a 61st second but is not actually situated at a
-    /// leap second insertion.
-    NoLeapSecondInsertion {
-        date: LocalDays<i64>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    },
-    /// Returned when the requested datetime does not exist because of a leap second deletion.
-    LeapSecondDeletion {
-        date: LocalDays<i64>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    },
-}
-
 impl TimeScale for Utc {
     fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
         let date = Date::new(1970, January, 1).unwrap();
@@ -188,16 +163,10 @@ impl TimeScale for Utc {
         second: u8,
     ) -> Result<TimePoint<Self, Representation>, DateTimeError<Representation>>
     where
-        Representation: NumCast
-            + From<u8>
-            + Sub<Representation, Output = Representation>
-            + Add<Representation, Output = Representation>
-            + Mul<Representation, Output = Representation>
-            + Div<Representation, Output = Representation>
-            + Clone,
-        (): IsValidConversion<Representation, LiteralRatio<86400>, LiteralRatio<1>>
-            + IsValidConversion<Representation, LiteralRatio<3600>, LiteralRatio<1>>
-            + IsValidConversion<Representation, LiteralRatio<60>, LiteralRatio<1>>,
+        Representation: NumCast + NumOps + From<u8> + Clone,
+        (): IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
     {
         // Verify that the time-of-day is valid. Leap seconds are always assumed to be valid at
         // this point - this is checked later.
@@ -217,7 +186,7 @@ impl TimeScale for Utc {
         // seconds are not incorporated, so we may compute it directly. Note that we do not compute
         // the seconds component, because that will require additional logic to handle leap
         // seconds.
-        let unix_time_minutes = match UnixTime::from_local_datetime(date.clone(), hour, minute, 0) {
+        let unix_time_minutes = match UnixTime::from_datetime(date.clone(), hour, minute, 0) {
             Ok(unix_time) => unix_time,
             _ => unreachable!(),
         };
@@ -284,6 +253,34 @@ impl TimeScale for Utc {
             }),
         }
     }
+
+    fn from_subsecond_local_datetime<Representation, Period>(
+        date: LocalDays<Representation>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
+    where
+        Period: Ratio,
+        Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
+        (): IsValidConversion<Representation, SecondsPerDay, Period>
+            + IsValidConversion<Representation, SecondsPerHour, Period>
+            + IsValidConversion<Representation, SecondsPerMinute, Period>
+            + IsValidConversion<Representation, LiteralRatio<1>, Period>
+            + IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+    {
+        let one = Seconds::new(Representation::one()).convert();
+        let zero = Duration::zero();
+        if subseconds < zero || subseconds >= one {
+            return Err(FineDateTimeError::InvalidSubseconds { subseconds });
+        }
+
+        let seconds = Self::from_local_datetime(date, hour, minute, second)?;
+        Ok(seconds.convert() + subseconds)
+    }
 }
 
 impl TimeScaleConversion<Tai, Utc> for () {}
@@ -291,7 +288,7 @@ impl TimeScaleConversion<Utc, Tai> for () {}
 
 /// Describes the evolution of leap seconds over time.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-pub struct LeapSecondsTable {
+struct LeapSecondsTable {
     table: ArrayVec<[LeapSecondsEntry; 128]>,
 }
 
@@ -342,6 +339,7 @@ impl LeapSecondsTable {
     /// Converts a given UTC timestamp to Unix time by removing the leap seconds. Rather than the
     /// reverse transformation, this one will always succeed: all UTC times map to a Unix time,
     /// even if the reverse is not true.
+    #[allow(dead_code)]
     pub fn to_unix(&self, utc_time: UtcTime<i64>) -> UnixTime<i64> {
         for leap_second in self.table.iter().rev() {
             if leap_second.utc_time <= utc_time {
@@ -390,7 +388,7 @@ impl LeapSecondsTable {
 /// time (where the entire UTC leap second is mapped to a single Unix time) and deletions to gaps
 /// (where a second of Unix time does not map to a real UTC time).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum LeapSecondsResult {
+enum LeapSecondsResult {
     Unambiguous(UtcTime<i64>),
     InsertionPoint {
         start: UtcTime<i64>,
@@ -402,7 +400,7 @@ pub enum LeapSecondsResult {
 /// Describes a leap second instance. Right after a leap second instance, the leap second offset
 /// is set to the given value.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct LeapSecondsEntry {
+struct LeapSecondsEntry {
     unix_time: UnixTime<i64>,
     utc_time: UtcTime<i64>,
     event: LeapSecondsEvent,
@@ -420,29 +418,13 @@ impl Default for LeapSecondsEntry {
     }
 }
 
-impl LeapSecondsEntry {
-    /// Constructs a new leap second entry.
-    pub fn new(
-        seconds_since_unix_epoch: Seconds<i64>,
-        total_leap_seconds: Seconds<i64>,
-        event: LeapSecondsEvent,
-    ) -> Self {
-        Self {
-            unix_time: UnixTime::from_time_since_epoch(seconds_since_unix_epoch),
-            utc_time: UtcTime::from_time_since_epoch(seconds_since_unix_epoch + total_leap_seconds),
-            event,
-            cumulative_offset: total_leap_seconds,
-        }
-    }
-}
-
 /// Two kinds of leap second changes are possible:
 /// - An insertion, as has historically always been the case. Here a 61st second is added to the
 ///   last minute of a day.
 /// - A deletion, up to now theoretical. Here, the 60th second of the last minute of a day is
 ///   deleted.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum LeapSecondsEvent {
+enum LeapSecondsEvent {
     Insertion,
     Deletion,
 }
@@ -555,8 +537,10 @@ mod proof_harness {
 // Load the leap seconds table as generated by the build script.
 include!(concat!(env!("OUT_DIR"), "/leap_seconds.rs"));
 
+/// Compares with some known timestamp values as computed manually from the Unix time and the known
+/// number of leap seconds.
 #[test]
-fn known_timestamps() {
+fn known_leap_seconds() {
     assert_eq!(
         UtcTime::from_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()
@@ -598,4 +582,15 @@ fn known_timestamps() {
             .elapsed_time_since_epoch(),
         Seconds::new(1752687391)
     );
+}
+
+/// Compares with a known timestamp as obtained from Vallado and McClain's "Fundamentals of
+/// Astrodynamics".
+#[test]
+fn known_timestamps() {
+    let utc = UtcTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 0).unwrap();
+    let tai = TaiTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
+        .unwrap()
+        .transform();
+    assert_eq!(utc, tai);
 }

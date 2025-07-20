@@ -6,21 +6,21 @@ use core::{
     ops::{Add, AddAssign, Div, Mul, Sub},
 };
 
-use num::{Bounded, Integer, NumCast};
+use num::{Bounded, Integer, NumCast, One, Zero, traits::NumOps};
 
 use crate::{
-    duration::{
-        Duration,
-        units::{IsValidConversion, LiteralRatio, Ratio},
+    DateTimeError, FineDateTimeError, TimeScaleConversion,
+    duration::Duration,
+    time_scale::{LocalDays, TimeScale},
+    units::{
+        IsValidConversion, LiteralRatio, Ratio, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
     },
-    time_scale::{TimeScale, local::LocalDays},
 };
 
 /// A time point indicates an elapsed duration with respect to the epoch of some time scale. It may
 /// utilize arbitrary units and arbitrary precision, defined by the underlying `Representation` and
 /// `Period`.
 #[derive(Debug)]
-#[repr(C)]
 pub struct TimePoint<TimeScale, Representation, Period = LiteralRatio<1>> {
     duration: Duration<Representation, Period>,
     time_scale: core::marker::PhantomData<TimeScale>,
@@ -42,6 +42,29 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     {
         self.duration
     }
+
+    /// Creates a `TimePoint` from some datetime and time-of-day, plus some additional subseconds.
+    pub fn from_subsecond_datetime(
+        date: impl Into<LocalDays<Representation>>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<Self, FineDateTimeError<Representation, Period>>
+    where
+        Scale: TimeScale,
+        Period: Ratio,
+        Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
+        (): IsValidConversion<Representation, SecondsPerDay, Period>
+            + IsValidConversion<Representation, SecondsPerHour, Period>
+            + IsValidConversion<Representation, SecondsPerMinute, Period>
+            + IsValidConversion<Representation, LiteralRatio<1>, Period>
+            + IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+    {
+        Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subseconds)
+    }
 }
 
 impl<Scale, Representation> TimePoint<Scale, Representation> {
@@ -54,50 +77,20 @@ impl<Scale, Representation> TimePoint<Scale, Representation> {
     ) -> Result<Self, DateTimeError<Representation>>
     where
         Scale: TimeScale,
-        Representation: NumCast
-            + From<u8>
-            + Sub<Representation, Output = Representation>
-            + Add<Representation, Output = Representation>
-            + Mul<Representation, Output = Representation>
-            + Div<Representation, Output = Representation>
-            + Clone,
-        (): IsValidConversion<Representation, LiteralRatio<86400>, LiteralRatio<1>>
-            + IsValidConversion<Representation, LiteralRatio<3600>, LiteralRatio<1>>
-            + IsValidConversion<Representation, LiteralRatio<60>, LiteralRatio<1>>,
+        Representation: NumCast + NumOps + From<u8> + Clone,
+        (): IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
     {
         Scale::from_local_datetime(date.into(), hour, minute, second)
     }
-
-    /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
-    /// time-of-day to it.
-    pub fn from_local_datetime(
-        date: LocalDays<Representation>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<Self, DateTimeError<Representation>>
-    where
-        Scale: TimeScale,
-        Representation: NumCast
-            + From<u8>
-            + Sub<Representation, Output = Representation>
-            + Add<Representation, Output = Representation>
-            + Mul<Representation, Output = Representation>
-            + Div<Representation, Output = Representation>
-            + Clone,
-        (): IsValidConversion<Representation, LiteralRatio<86400>, LiteralRatio<1>>
-            + IsValidConversion<Representation, LiteralRatio<3600>, LiteralRatio<1>>
-            + IsValidConversion<Representation, LiteralRatio<60>, LiteralRatio<1>>,
-    {
-        Scale::from_local_datetime(date, hour, minute, second)
-    }
 }
 
-impl<TimeScale, Representation, Period: Ratio> TimePoint<TimeScale, Representation, Period> {
+impl<Scale, Representation, Period: Ratio> TimePoint<Scale, Representation, Period> {
     /// Converts a `TimePoint` towards a different time unit. May only be used if the time unit is
     /// smaller than the current one (e.g., seconds to milliseconds) or if the representation of
     /// this `TimePoint` is a float.
-    pub fn convert<Target: Ratio>(self) -> TimePoint<TimeScale, Representation, Target>
+    pub fn convert<Target: Ratio>(self) -> TimePoint<Scale, Representation, Target>
     where
         (): IsValidConversion<Representation, Period, Target>,
         Representation: Mul<Representation, Output = Representation>
@@ -113,7 +106,7 @@ impl<TimeScale, Representation, Period: Ratio> TimePoint<TimeScale, Representati
     /// Tries to convert a `TimePoint` towards a different time unit. Only applies to integers (as
     /// all floats may be converted infallibly anyway). Will only return a result if the conversion
     /// is lossless.
-    pub fn try_convert<Target: Ratio>(self) -> Option<TimePoint<TimeScale, Representation, Target>>
+    pub fn try_convert<Target: Ratio>(self) -> Option<TimePoint<Scale, Representation, Target>>
     where
         Representation: NumCast + Integer + Bounded + Copy,
     {
@@ -124,7 +117,7 @@ impl<TimeScale, Representation, Period: Ratio> TimePoint<TimeScale, Representati
     }
 
     /// Infallibly converts towards a different representation.
-    pub fn cast<Target>(self) -> TimePoint<TimeScale, Target, Period>
+    pub fn cast<Target>(self) -> TimePoint<Scale, Target, Period>
     where
         Target: From<Representation>,
     {
@@ -136,7 +129,7 @@ impl<TimeScale, Representation, Period: Ratio> TimePoint<TimeScale, Representati
 
     /// Converts towards a different representation. If the underlying representation cannot store
     /// the result of this cast, returns `None`.
-    pub fn try_cast<Target>(self) -> Option<TimePoint<TimeScale, Target, Period>>
+    pub fn try_cast<Target>(self) -> Option<TimePoint<Scale, Target, Period>>
     where
         Representation: NumCast,
         Target: NumCast,
@@ -146,38 +139,17 @@ impl<TimeScale, Representation, Period: Ratio> TimePoint<TimeScale, Representati
             time_scale: core::marker::PhantomData,
         })
     }
-}
 
-/// Errors that may be returned when combining a calendar date with a time-of-day to create a
-/// `TimePoint`. Includes errors that
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum DateTimeError<T> {
-    /// Returned when the given time-of-day does not exist in general (independent of whether the
-    /// used time scale has leap seconds).
-    InvalidTimeOfDay { hour: u8, minute: u8, second: u8 },
-    /// Returned when the requested datetime has a 61st second but is not actually situated at a
-    /// leap second insertion.
-    NoLeapSecondInsertion {
-        date: LocalDays<T>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    },
-    /// Returned when the requested datetime does not exist because of a leap second deletion.
-    LeapSecondDeletion {
-        date: LocalDays<T>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    },
-    /// Returned when the requested datetime could not fit in a `TimePoint` with the given
-    /// `Representation`.
-    NotRepresentable {
-        date: LocalDays<T>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    },
+    /// Transforms a time point towards another time scale.
+    pub fn transform<Target>(self) -> TimePoint<Target, Representation, Period>
+    where
+        Target: TimeScale,
+        Scale: TimeScale,
+        Representation: Copy + NumCast + NumOps,
+        (): TimeScaleConversion<Scale, Target>,
+    {
+        <() as TimeScaleConversion<Scale, Target>>::convert(self)
+    }
 }
 
 impl<TimeScale, Representation, Period> Copy for TimePoint<TimeScale, Representation, Period> where
@@ -246,6 +218,21 @@ where
 
     fn sub(self, rhs: Self) -> Self::Output {
         self.duration - rhs.duration
+    }
+}
+
+impl<TimeScale, Representation, Period: Ratio> Sub<Duration<Representation, Period>>
+    for TimePoint<TimeScale, Representation, Period>
+where
+    Representation: Sub<Representation, Output = Representation>,
+{
+    type Output = TimePoint<TimeScale, Representation, Period>;
+
+    fn sub(self, rhs: Duration<Representation, Period>) -> Self::Output {
+        Self {
+            duration: self.duration - rhs,
+            time_scale: core::marker::PhantomData,
+        }
     }
 }
 

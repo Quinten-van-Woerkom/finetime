@@ -4,13 +4,14 @@ use num::NumCast;
 
 use crate::{
     calendar::{Date, Month},
-    duration::{Duration, units::LiteralRatio},
+    duration::Duration,
     time_point::TimePoint,
     time_scale::{
         TimeScale,
         local::LocalDays,
         tai::{Tai, TaiTime},
     },
+    units::{LiteralRatio, Milli},
 };
 
 /// `UnixTime` is a `TimePoint` that uses the `Unix` time scale.
@@ -47,15 +48,9 @@ impl Unix {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum UnixTimeError {
-    /// Returned when the requested time-of-day is not a valid timestamp.
-    TimeDoesNotExist { hour: u8, minute: u8, second: u8 },
-}
-
 impl TimeScale for Unix {
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
-    fn reference_epoch() -> crate::time_point::TimePoint<Tai, i64, crate::duration::units::Milli> {
+    fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
         let date = Date::new(1970, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10).unwrap().convert()
     }

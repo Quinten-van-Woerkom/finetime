@@ -1,13 +1,14 @@
 //! Implementation of the Terrestrial Time (TT) time scale.
 
 use crate::{
-    calendar::{Date, Month},
+    LocalDays, TimePoint,
     duration::MilliSeconds,
-    time_scale::{
-        TimeScale, TimeScaleConversion,
-        tai::{Tai, TaiTime},
-    },
+    time_scale::{Tai, TimeScale, TimeScaleConversion},
+    units::{LiteralRatio, Milli},
 };
+
+/// A time point that is expressed in Terrestrial Time.
+pub type TtTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tt, Representation, Period>;
 
 /// Terrestrial time is the proper time of a clock located on the Earth geoid. It is used in
 /// astronomical tables, mostly. Effectively, it is little more than a constant offset from TAI.
@@ -15,17 +16,13 @@ pub struct Tt;
 
 impl TimeScale for Tt {
     /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI.
-    fn reference_epoch()
-    -> crate::time_point::TimePoint<super::tai::Tai, i64, crate::duration::units::Milli> {
-        TaiTime::from_datetime(Date::new(1958, Month::January, 1).unwrap(), 0, 0, 0)
-            .unwrap()
-            .convert()
-            + MilliSeconds::new(32_184)
+    fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
+        Tai::reference_epoch().convert() - MilliSeconds::new(32_184)
     }
 
     /// Terrestrial time does not have an actual epoch associated with it. For practical purposes,
     /// it is useful to choose January 1, 1958, same as TAI.
-    fn epoch<T>() -> super::local::LocalDays<T>
+    fn epoch<T>() -> LocalDays<T>
     where
         T: num::NumCast,
     {
@@ -39,3 +36,22 @@ impl TimeScale for Tt {
 
 impl TimeScaleConversion<Tt, Tai> for () {}
 impl TimeScaleConversion<Tai, Tt> for () {}
+
+/// Compares with a known timestamp as obtained from Vallado and McClain's "Fundamentals of
+/// Astrodynamics".
+#[test]
+fn known_timestamps() {
+    use crate::{Date, Month, TaiTime};
+    let tai = TaiTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
+        .unwrap()
+        .convert();
+    let tt = TtTime::from_subsecond_datetime(
+        Date::new(2004, Month::May, 14).unwrap(),
+        16,
+        44,
+        4,
+        MilliSeconds::new(184),
+    )
+    .unwrap();
+    assert_eq!(tai, tt.transform());
+}

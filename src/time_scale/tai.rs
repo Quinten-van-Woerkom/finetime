@@ -4,12 +4,10 @@ use num::{NumCast, Zero};
 
 use crate::{
     calendar::{Date, Month},
-    duration::{
-        MilliSeconds,
-        units::{LiteralRatio, Milli},
-    },
+    duration::MilliSeconds,
     time_point::TimePoint,
     time_scale::{TimeScale, local::LocalDays},
+    units::{LiteralRatio, Milli},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
@@ -20,15 +18,6 @@ pub type TaiTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tai, Repr
 /// to build the rest of this library on.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Tai;
-
-/// Error that may be returned when creating a TAI time point from a calendar representation. Note
-/// that this calendar representation does not allow leap seconds, as opposed to the equivalent
-/// calendar representation of UTC time.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum TaiError {
-    /// Returned when the given time-of-day is not a valid timestamp.
-    TimeDoesNotExist { hour: u8, minute: u8, second: u8 },
-}
 
 impl TimeScale for Tai {
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.

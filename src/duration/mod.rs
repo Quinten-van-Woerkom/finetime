@@ -9,18 +9,17 @@ use core::{
 
 use num::{Bounded, Integer, NumCast, Signed, Zero, traits::ConstZero};
 
-use crate::duration::units::*;
-
-pub mod bytes;
-pub mod fraction;
-pub mod units;
+use crate::units::{
+    Atto, ConversionRatio, Femto, IsValidConversion, LiteralRatio, Micro, Milli, Nano, Pico, Ratio,
+    SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
+    SecondsPerYear,
+};
 
 /// A `Duration` represents the difference between two time points. It has an associated
 /// `Representation`, which determines how the count of elapsed ticks is stored. The `Period`
 /// determines the integer (!) ratio of each tick to seconds. This may be used to convert between
 /// `Duration`s of differing time units.
 #[derive(Debug)]
-#[repr(C)]
 pub struct Duration<Representation, Period = LiteralRatio<1>> {
     count: Representation,
     period: core::marker::PhantomData<Period>,
@@ -195,16 +194,27 @@ impl<Representation: kani::Arbitrary, Period> kani::Arbitrary for Duration<Repre
     }
 }
 
+/// A duration that is expressed in terms of attoseconds.
 pub type AttoSeconds<T> = Duration<T, Atto>;
+/// A duration that is expressed in units of femtoseconds.
 pub type FemtoSeconds<T> = Duration<T, Femto>;
+/// A duration that is expressed in units of picoseconds.
 pub type PicoSeconds<T> = Duration<T, Pico>;
+/// A duration that is expressed in units of nanoseconds.
 pub type NanoSeconds<T> = Duration<T, Nano>;
+/// A duration that is expressed in units of microseconds.
 pub type MicroSeconds<T> = Duration<T, Micro>;
+/// A duration that is expressed in units of milliseconds.
 pub type MilliSeconds<T> = Duration<T, Milli>;
+/// A duration that is expressed in units of seconds.
 pub type Seconds<T> = Duration<T, LiteralRatio<1>>;
+/// A duration that is expressed in units of minutes.
 pub type Minutes<T> = Duration<T, SecondsPerMinute>;
+/// A duration that is expressed in units of hours.
 pub type Hours<T> = Duration<T, SecondsPerHour>;
+/// A duration that is expressed in units of days.
 pub type Days<T> = Duration<T, SecondsPerDay>;
+/// A duration that is expressed in terms of weeks.
 pub type Weeks<T> = Duration<T, SecondsPerWeek>;
 /// The length of 1/12 of an average year in the Gregorian calendar.
 pub type Months<T> = Duration<T, SecondsPerMonth>;
@@ -415,10 +425,7 @@ fn convert_si_unit_seconds() {
 /// Verification of the fact that conversions to binary fractions result in the expected ratios.
 #[test]
 fn convert_binary_fraction_seconds() {
-    use crate::duration::units::{
-        BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5,
-        BinaryFraction6,
-    };
+    use crate::units::*;
     let seconds = Seconds::new(1u64);
     let fraction1: Duration<_, BinaryFraction1> = seconds.convert();
     let fraction2: Duration<_, BinaryFraction2> = seconds.convert();
@@ -438,6 +445,7 @@ fn convert_binary_fraction_seconds() {
 #[cfg(kani)]
 mod proof_harness {
     use super::*;
+    use crate::units::*;
     use paste::paste;
 
     /// Macro for the creation of proof harnesses that verify (formally) that a given integer

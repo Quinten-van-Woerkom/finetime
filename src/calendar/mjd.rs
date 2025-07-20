@@ -4,7 +4,7 @@
 
 use core::ops::{Add, Sub};
 
-use crate::{duration::Days, time_scale::local::LocalDays};
+use crate::{duration::Days, time_scale::LocalDays};
 
 /// The Modified Julian Day (MJD) representation of any given date.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]

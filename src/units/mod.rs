@@ -2,7 +2,8 @@
 //! types are little more than labels that are associated with a given ratio to SI seconds, as may
 //! be used to convert between arbitrary time periods.
 
-use crate::duration::fraction::Fraction;
+mod fraction;
+pub use fraction::*;
 
 /// Trait used to describe a time unit. Such units are always defined as an exact ratio to SI
 /// seconds. Based on this ratio, conversions to other units are defined.
@@ -54,14 +55,12 @@ impl<R: Ratio> IsValidConversion<i32, R, R> for () {}
 impl<R: Ratio> IsValidConversion<i64, R, R> for () {}
 impl<R: Ratio> IsValidConversion<i128, R, R> for () {}
 
-#[macro_export]
 macro_rules! is_valid_conversion {
     ($type:ty, $from:ty, $to:ty) => {
         impl IsValidConversion<$type, $from, $to> for () {}
     };
 }
 
-#[macro_export]
 macro_rules! is_valid_integer_conversion {
     ($from:ty, $to:ty) => {
         is_valid_conversion!(u8, $from, $to);
@@ -77,7 +76,6 @@ macro_rules! is_valid_integer_conversion {
     };
 }
 
-#[macro_export]
 macro_rules! valid_integer_conversions {
     (
         $from:ty => $( $to:ty ),+ $(,)?
@@ -165,9 +163,9 @@ valid_integer_conversions!(Giga => BinaryFraction1, BinaryFraction2, BinaryFract
 valid_integer_conversions!(Tera => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
 valid_integer_conversions!(Peta => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
 valid_integer_conversions!(Exa => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
-valid_integer_conversions!(LiteralRatio<60> => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
-valid_integer_conversions!(LiteralRatio<3600> => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
-valid_integer_conversions!(LiteralRatio<86400> => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
-valid_integer_conversions!(LiteralRatio<604800> => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
-valid_integer_conversions!(LiteralRatio<2629746> => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
-valid_integer_conversions!(LiteralRatio<31556952> => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
+valid_integer_conversions!(SecondsPerMinute => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
+valid_integer_conversions!(SecondsPerHour => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
+valid_integer_conversions!(SecondsPerDay => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
+valid_integer_conversions!(SecondsPerWeek => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
+valid_integer_conversions!(SecondsPerMonth => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
+valid_integer_conversions!(SecondsPerYear => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);

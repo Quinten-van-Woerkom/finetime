@@ -2,25 +2,30 @@
 //! link instances in time to a number of elapsed seconds since some epoch. The manner in which
 //! this relation is established differs per time scale.
 
-use core::ops::{Add, Div, Mul, Sub};
-
-use num::{NumCast, traits::NumOps};
+use num::{NumCast, One, Zero, traits::NumOps};
 
 use crate::{
-    duration::{
-        Duration, Hours, Minutes, Seconds,
-        units::{IsValidConversion, LiteralRatio, Milli, Ratio},
+    DateTimeError, FineDateTimeError,
+    duration::{Duration, Hours, Minutes, Seconds},
+    time_point::TimePoint,
+    units::{
+        IsValidConversion, LiteralRatio, Milli, Ratio, SecondsPerDay, SecondsPerHour,
+        SecondsPerMinute,
     },
-    time_point::{DateTimeError, TimePoint},
-    time_scale::{local::LocalDays, tai::Tai},
 };
 
-pub mod gps;
-pub mod local;
-pub mod tai;
-pub mod tt;
-pub mod unix;
-pub mod utc;
+mod gpst;
+pub use gpst::*;
+mod local;
+pub use local::*;
+mod tai;
+pub use tai::*;
+mod tt;
+pub use tt::*;
+mod unix;
+pub use unix::*;
+mod utc;
+pub use utc::*;
 
 /// A time scale is a specification for measuring time. In this implementation, we specify this by
 /// relating times to an elapsed duration since some reference epoch.
@@ -55,16 +60,10 @@ pub trait TimeScale: Sized {
         second: u8,
     ) -> Result<TimePoint<Self, Representation>, DateTimeError<Representation>>
     where
-        Representation: NumCast
-            + From<u8>
-            + Sub<Representation, Output = Representation>
-            + Add<Representation, Output = Representation>
-            + Mul<Representation, Output = Representation>
-            + Div<Representation, Output = Representation>
-            + Clone,
-        (): IsValidConversion<Representation, LiteralRatio<86400>, LiteralRatio<1>>
-            + IsValidConversion<Representation, LiteralRatio<3600>, LiteralRatio<1>>
-            + IsValidConversion<Representation, LiteralRatio<60>, LiteralRatio<1>>,
+        Representation: NumCast + NumOps + From<u8> + Clone,
+        (): IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
     {
         // First, we verify that the timestamp is valid.
         if hour >= 24 || minute >= 60 || second >= 60 {
@@ -86,6 +85,37 @@ pub trait TimeScale: Sized {
         Ok(TimePoint::from_time_since_epoch(
             days.convert() + hours.convert() + minutes.convert() + seconds,
         ))
+    }
+
+    /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
+    /// time-of-day and subsecond fraction to it.
+    fn from_subsecond_local_datetime<Representation, Period>(
+        date: LocalDays<Representation>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
+    where
+        Period: Ratio,
+        Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
+        (): IsValidConversion<Representation, SecondsPerDay, Period>
+            + IsValidConversion<Representation, SecondsPerHour, Period>
+            + IsValidConversion<Representation, SecondsPerMinute, Period>
+            + IsValidConversion<Representation, LiteralRatio<1>, Period>
+            + IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+    {
+        // We check that the number of subseconds does not exceed one second.
+        let one = Seconds::new(Representation::one()).convert();
+        let zero = Duration::zero();
+        if subseconds < zero || subseconds >= one {
+            return Err(FineDateTimeError::InvalidSubseconds { subseconds });
+        }
+
+        let seconds = Self::from_local_datetime(date, hour, minute, second)?;
+        Ok(seconds.convert() + subseconds)
     }
 
     /// Creates a time point in this time scale based on a time point in TAI. Note that some

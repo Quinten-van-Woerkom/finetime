@@ -3,7 +3,9 @@
 
 use core::ops::Sub;
 
-use crate::{calendar::Month, duration::Days, time_scale::local::LocalDays};
+use crate::{
+    DateDoesNotExist, YearDayDoesNotExist, calendar::Month, duration::Days, time_scale::LocalDays,
+};
 
 /// Implementation of a date in the historic calendar. After 15 October 1582, this coincides with
 /// the Gregorian calendar; until 4 October 1582, this is the Julian calendar. The days inbetween
@@ -216,25 +218,6 @@ impl Sub for Date {
         let days_rhs = rhs.to_local_days();
         days_lhs - days_rhs
     }
-}
-
-/// Error that is returned if a date is encountered that does not exist in the historic calendar.
-/// This may be either because the given day-of-month is not a valid day (for a given combination
-/// of month and year) or because the given date falls within the ranges of dates skipped during
-/// the Gregorian calendar reform (5 up to and including 14 October 1582).
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct DateDoesNotExist {
-    year: i32,
-    month: Month,
-    day: u8,
-}
-
-/// Returned when a date is being created from a year and a day, but an invalid day-of-year is
-/// passed.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct YearDayDoesNotExist {
-    year: i32,
-    day_of_year: u16,
 }
 
 /// Tests the day-of-year function using some examples from Meeus.
