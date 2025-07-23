@@ -129,7 +129,7 @@ fn roundtrip_near_leap_seconds() {
                 assert_eq!(LEAP_SECONDS.to_unix(end), time);
             }
             LeapSecondsResult::DeletionPoint => {
-                panic!("Unexpected deleted leap second found at {:?}", time)
+                panic!("Unexpected deleted leap second found at {time:?}")
             }
         }
     }
