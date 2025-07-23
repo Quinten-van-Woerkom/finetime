@@ -71,6 +71,19 @@ impl TimeScale for Unix {
     }
 }
 
+#[cfg(feature = "std")]
+impl From<std::time::SystemTime> for UnixTime<u128, crate::units::Nano> {
+    fn from(value: std::time::SystemTime) -> Self {
+        let nanoseconds_since_epoch = crate::NanoSeconds::new(
+            value
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos(),
+        );
+        Self::from_time_since_epoch(nanoseconds_since_epoch)
+    }
+}
+
 /// Verifies this implementation by computing the `UnixTime` for some known time stamps.
 #[test]
 fn known_timestamps() {

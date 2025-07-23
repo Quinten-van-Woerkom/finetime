@@ -1,13 +1,14 @@
 //! Implementation of international atomic time (TAI).
 
-use num::{NumCast, Zero};
+use num::{NumCast, Zero, traits::NumOps};
 
 use crate::{
+    TimeScaleConversion, TryTimeScaleConversion, Unix, Utc,
     calendar::{Date, Month},
     duration::MilliSeconds,
     time_point::TimePoint,
     time_scale::{TimeScale, local::LocalDays},
-    units::{LiteralRatio, Milli},
+    units::{LiteralRatio, Milli, Ratio},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
@@ -38,6 +39,23 @@ impl TimeScale for Tai {
 
     fn counts_leap_seconds() -> bool {
         false
+    }
+}
+
+impl<Representation, Period> TryTimeScaleConversion<Unix, Tai, Representation, Period> for ()
+where
+    (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
+    Period: Ratio,
+    Representation: Copy + NumCast + NumOps,
+{
+    type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
+
+    fn try_convert(
+        from: TimePoint<Unix, Representation, Period>,
+    ) -> Result<TimePoint<Tai, Representation, Period>, Self::Error> {
+        let utc =
+            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
+        Ok(<() as TimeScaleConversion<Utc, Tai>>::convert(utc))
     }
 }
 

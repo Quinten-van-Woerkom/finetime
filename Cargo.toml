@@ -5,6 +5,10 @@ edition = "2024"
 license = "AGPL-3.0-or-later"
 license-file = "LICENSE"
 
+[features]
+default = ["std"]
+std = []
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
 

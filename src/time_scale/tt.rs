@@ -1,10 +1,12 @@
 //! Implementation of the Terrestrial Time (TT) time scale.
 
+use num::{NumCast, traits::NumOps};
+
 use crate::{
-    LocalDays, TimePoint,
+    LocalDays, TimePoint, TryTimeScaleConversion, Unix, Utc,
     duration::MilliSeconds,
     time_scale::{Tai, TimeScale, TimeScaleConversion},
-    units::{LiteralRatio, Milli},
+    units::{LiteralRatio, Milli, Ratio},
 };
 
 /// A time point that is expressed in Terrestrial Time.
@@ -36,6 +38,25 @@ impl TimeScale for Tt {
 
 impl TimeScaleConversion<Tt, Tai> for () {}
 impl TimeScaleConversion<Tai, Tt> for () {}
+impl TimeScaleConversion<Tt, Utc> for () {}
+impl TimeScaleConversion<Utc, Tt> for () {}
+
+impl<Representation, Period> TryTimeScaleConversion<Unix, Tt, Representation, Period> for ()
+where
+    (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
+    Period: Ratio,
+    Representation: Copy + NumCast + NumOps,
+{
+    type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
+
+    fn try_convert(
+        from: TimePoint<Unix, Representation, Period>,
+    ) -> Result<TimePoint<Tt, Representation, Period>, Self::Error> {
+        let utc =
+            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
+        Ok(<() as TimeScaleConversion<Utc, Tt>>::convert(utc))
+    }
+}
 
 /// Compares with a known timestamp as obtained from Vallado and McClain's "Fundamentals of
 /// Astrodynamics".

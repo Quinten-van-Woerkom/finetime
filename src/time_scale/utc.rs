@@ -1,10 +1,10 @@
 //! Implementation of the Coordinated Universal Time (UTC) standard.
 
-use num::{NumCast, One, Zero, traits::NumOps};
+use num::{Integer, NumCast, One, Zero, traits::NumOps};
 use tinyvec::ArrayVec;
 
 use crate::{
-    DateTimeError, FineDateTimeError,
+    DateTimeError, FineDateTimeError, TryTimeScaleConversion, Unix,
     calendar::{
         Date,
         Month::{self, *},
@@ -286,9 +286,45 @@ impl TimeScale for Utc {
 impl TimeScaleConversion<Tai, Utc> for () {}
 impl TimeScaleConversion<Utc, Tai> for () {}
 
+impl<Representation, Period> TryTimeScaleConversion<Unix, Utc, Representation, Period> for ()
+where
+    Period: Ratio + core::fmt::Debug,
+    Representation: Copy + NumCast + NumOps + Integer + core::fmt::Debug,
+    (): IsValidConversion<Representation, LiteralRatio<1>, Period>,
+{
+    type Error = LeapSecondError<Representation, Period>;
+
+    fn try_convert(
+        from: TimePoint<Unix, Representation, Period>,
+    ) -> Result<TimePoint<Utc, Representation, Period>, Self::Error> {
+        let unix_time_seconds: crate::UnixTime<_> = from.floor();
+        let subseconds = from - unix_time_seconds.convert();
+        let unix_time_seconds = from.floor().try_cast().unwrap();
+        match LEAP_SECONDS.to_utc(unix_time_seconds) {
+            LeapSecondsResult::Unambiguous(utc_time) => {
+                Ok(utc_time.try_cast().unwrap().convert() + subseconds)
+            }
+            LeapSecondsResult::InsertionPoint { start, end } => Err(LeapSecondError::Ambiguous {
+                start: start.try_cast().unwrap().convert() + subseconds,
+                end: end.try_cast().unwrap().convert() + subseconds,
+            })?,
+            LeapSecondsResult::DeletionPoint => Err(LeapSecondError::Deletion),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum LeapSecondError<Representation, Period> {
+    Ambiguous {
+        start: UtcTime<Representation, Period>,
+        end: UtcTime<Representation, Period>,
+    },
+    Deletion,
+}
+
 /// Describes the evolution of leap seconds over time.
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
-struct LeapSecondsTable {
+pub(crate) struct LeapSecondsTable {
     table: ArrayVec<[LeapSecondsEntry; 128]>,
 }
 
@@ -388,7 +424,7 @@ impl LeapSecondsTable {
 /// time (where the entire UTC leap second is mapped to a single Unix time) and deletions to gaps
 /// (where a second of Unix time does not map to a real UTC time).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum LeapSecondsResult {
+pub(crate) enum LeapSecondsResult {
     Unambiguous(UtcTime<i64>),
     InsertionPoint {
         start: UtcTime<i64>,
@@ -400,7 +436,7 @@ enum LeapSecondsResult {
 /// Describes a leap second instance. Right after a leap second instance, the leap second offset
 /// is set to the given value.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-struct LeapSecondsEntry {
+pub(crate) struct LeapSecondsEntry {
     unix_time: UnixTime<i64>,
     utc_time: UtcTime<i64>,
     event: LeapSecondsEvent,

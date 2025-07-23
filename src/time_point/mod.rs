@@ -13,7 +13,8 @@ use crate::{
     duration::Duration,
     time_scale::{LocalDays, TimeScale},
     units::{
-        IsValidConversion, LiteralRatio, Ratio, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
+        IsValidConversion, LiteralRatio, Nano, Ratio, SecondsPerDay, SecondsPerHour,
+        SecondsPerMinute,
     },
 };
 
@@ -24,6 +25,43 @@ use crate::{
 pub struct TimePoint<TimeScale, Representation, Period = LiteralRatio<1>> {
     duration: Duration<Representation, Period>,
     time_scale: core::marker::PhantomData<TimeScale>,
+}
+
+impl<Scale> TimePoint<Scale, u128, Nano> {
+    /// Creates a `TimePoint` that represents the current epoch, as approximated by this machine's
+    /// system time. Returns a timestamp in nanosecond resolution, but does not need to be (and
+    /// most certainly will not be) accurate to nanoseconds.
+    ///
+    /// An error may be returned if the conversion from Unix time is ambiguous or undefined. This
+    /// may happen in particular around leap seconds, where the conversion from Unix time to
+    /// continuous time scales like TAI or UTC is impossible.
+    #[cfg(feature = "std")]
+    pub fn now()
+    -> Result<Self, <() as crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>>::Error>
+    where
+        Scale: TimeScale,
+        (): crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>,
+    {
+        let system_time = std::time::SystemTime::now();
+        let unix_time = crate::UnixTime::from(system_time);
+        <() as crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>>::try_convert(
+            unix_time,
+        )
+    }
+}
+
+/// Tests that it is possible to obtain the current time without crashing. We do not actually check
+/// for the resulting values, because we cannot make any guarantees about the time that we run
+/// these tests at: they may return errors when run during leap seconds.
+#[cfg(feature = "std")]
+#[test]
+fn get_current_time() {
+    use crate::{GpsTime, TaiTime, TtTime, UnixTime, UtcTime};
+    let _ = UnixTime::now().unwrap();
+    let _ = GpsTime::now();
+    let _ = TaiTime::now();
+    let _ = TtTime::now();
+    let _ = UtcTime::now();
 }
 
 impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
@@ -64,6 +102,47 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
             + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
     {
         Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subseconds)
+    }
+
+    /// Converts towards a different time unit, rounding towards the nearest whole unit.
+    pub fn round<Target>(self) -> TimePoint<Scale, Representation, Target>
+    where
+        Representation: NumCast + Integer + Copy,
+        Period: Ratio,
+        Target: Ratio,
+    {
+        TimePoint {
+            duration: self.duration.round(),
+            time_scale: core::marker::PhantomData,
+        }
+    }
+
+    /// Converts towards a different time unit, rounding towards positive infinity if the unit is
+    /// not entirely commensurate with the present unit.
+    pub fn ceil<Target>(self) -> TimePoint<Scale, Representation, Target>
+    where
+        Representation: NumCast + Integer + Copy,
+        Period: Ratio,
+        Target: Ratio,
+    {
+        TimePoint {
+            duration: self.duration.round(),
+            time_scale: core::marker::PhantomData,
+        }
+    }
+
+    /// Converts towards a different time unit, rounding towards negative infinity if the unit is
+    /// not entirely commensurate with the present unit.
+    pub fn floor<Target>(self) -> TimePoint<Scale, Representation, Target>
+    where
+        Representation: NumCast + Integer + Copy,
+        Period: Ratio,
+        Target: Ratio,
+    {
+        TimePoint {
+            duration: self.duration.floor(),
+            time_scale: core::marker::PhantomData,
+        }
     }
 }
 

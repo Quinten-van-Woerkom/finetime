@@ -1,14 +1,16 @@
 //! Implementation of the Global Positioning System (GPS) time scale, generally abbreviated as
 //! GPST.
 
+use num::{NumCast, traits::NumOps};
+
 use crate::{
-    LocalDays, TimePoint,
+    LocalDays, TimePoint, TryTimeScaleConversion, Unix, Utc,
     calendar::{Date, Month},
     time_scale::{
         TimeScale, TimeScaleConversion,
         tai::{Tai, TaiTime},
     },
-    units::{LiteralRatio, Milli},
+    units::{LiteralRatio, Milli, Ratio},
 };
 
 /// `GpsTime` is a time point that is expressed according to the GPS time scale.
@@ -45,6 +47,25 @@ impl TimeScale for Gpst {
 
 impl TimeScaleConversion<Tai, Gpst> for () {}
 impl TimeScaleConversion<Gpst, Tai> for () {}
+impl TimeScaleConversion<Gpst, Utc> for () {}
+impl TimeScaleConversion<Utc, Gpst> for () {}
+
+impl<Representation, Period> TryTimeScaleConversion<Unix, Gpst, Representation, Period> for ()
+where
+    (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
+    Period: Ratio,
+    Representation: Copy + NumCast + NumOps,
+{
+    type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
+
+    fn try_convert(
+        from: TimePoint<Unix, Representation, Period>,
+    ) -> Result<TimePoint<Gpst, Representation, Period>, Self::Error> {
+        let utc =
+            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
+        Ok(<() as TimeScaleConversion<Utc, Gpst>>::convert(utc))
+    }
+}
 
 /// Compares with a known timestamp as obtained from Vallado and McClain's "Fundamentals of
 /// Astrodynamics".

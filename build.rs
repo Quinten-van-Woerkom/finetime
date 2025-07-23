@@ -33,7 +33,7 @@ fn main() {
     // );
 
     output.push_str("lazy_static! {\n");
-    output.push_str("static ref LEAP_SECONDS: LeapSecondsTable = {\n");
+    output.push_str("pub(crate) static ref LEAP_SECONDS: LeapSecondsTable = {\n");
     output.push_str("    let mut leap_seconds = LeapSecondsTable::default();\n");
 
     for line in text.lines() {

@@ -177,11 +177,21 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
         // epochs is not representable by the chosen representation (e.g., a `u8` cannot store the
         // number of seconds between the `To` and `From` epoch). In such cases, this conversion will
         // panic.
-        let epoch_difference: Duration<Representation, Period> =
-            (to_epoch - from_epoch).round().try_cast().unwrap();
-        TimePoint::<To, Representation, Period>::from_time_since_epoch(
-            time_since_from_epoch - epoch_difference,
-        )
+        // We check which epoch is latest in time, and flip the signs based on that. This is needed
+        // so that we don't overflow (to below 0) when working with unsigned counts.
+        if to_epoch > from_epoch {
+            let epoch_difference: Duration<Representation, Period> =
+                (to_epoch - from_epoch).round().try_cast().unwrap();
+            TimePoint::<To, Representation, Period>::from_time_since_epoch(
+                time_since_from_epoch - epoch_difference,
+            )
+        } else {
+            let epoch_difference: Duration<Representation, Period> =
+                (from_epoch - to_epoch).round().try_cast().unwrap();
+            TimePoint::<To, Representation, Period>::from_time_since_epoch(
+                time_since_from_epoch + epoch_difference,
+            )
+        }
     }
 }
 
@@ -191,5 +201,36 @@ impl<T: TimeScale> TimeScaleConversion<T, T> for () {
         from: TimePoint<T, Representation, Period>,
     ) -> TimePoint<T, Representation, Period> {
         from
+    }
+}
+
+/// Used to indicate that it is possible to convert from one `TimeScale` to another, though it is
+/// allowed for this operation to fail. This is the case when applying leap seconds, for example:
+/// the result may then be ambiguous or undefined, based on folds and gaps in time.
+pub trait TryTimeScaleConversion<From: TimeScale, To: TimeScale, Representation, Period> {
+    type Error: core::fmt::Debug;
+
+    /// Tries to convert from one time scale to another. If this is not unambiguously possible,
+    /// returns an error indicating why it is not.
+    fn try_convert(
+        from: TimePoint<From, Representation, Period>,
+    ) -> Result<TimePoint<To, Representation, Period>, Self::Error>;
+}
+
+impl<From: TimeScale, To: TimeScale, Representation, Period>
+    TryTimeScaleConversion<From, To, Representation, Period> for ()
+where
+    (): TimeScaleConversion<From, To>,
+    Period: Ratio,
+    Representation: Copy + NumCast + NumOps,
+{
+    type Error = core::convert::Infallible;
+
+    /// Default implementation of a "try" conversion whenever two time scales can already be
+    /// converted infallibly.
+    fn try_convert(
+        from: TimePoint<From, Representation, Period>,
+    ) -> Result<TimePoint<To, Representation, Period>, Self::Error> {
+        Ok(<() as TimeScaleConversion<From, To>>::convert(from))
     }
 }
