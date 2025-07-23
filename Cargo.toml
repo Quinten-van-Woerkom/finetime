@@ -1,5 +1,6 @@
 [package]
 name = "finetime"
+description = "High-fidelity time library for applications where sub-nanosecond accuracy and exact arithmetic are needed"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
