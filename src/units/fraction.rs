@@ -155,7 +155,7 @@ impl Fraction {
         let numerator: T = T::from(self.numerator).unwrap();
         let denominator: T = T::from(self.denominator).unwrap();
         let intermediate = rhs * numerator;
-        intermediate.div_ceil(&denominator)
+        intermediate.div_floor(&denominator)
     }
 }
 
