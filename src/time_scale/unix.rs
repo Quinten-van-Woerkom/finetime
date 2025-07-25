@@ -151,3 +151,29 @@ fn known_timestamps() {
         Seconds::new(-10318834707),
     );
 }
+
+#[cfg(kani)]
+mod proof_harness {
+    use super::*;
+
+    /// Verifies that construction of a Unix time from a historic date and time stamp never panics.
+    #[kani::proof]
+    fn from_datetime_never_panics() {
+        let date: Date = kani::any();
+        let hour: u8 = kani::any();
+        let minute: u8 = kani::any();
+        let second: u8 = kani::any();
+        let _ = UnixTime::from_datetime(date, hour, minute, second);
+    }
+
+    /// Verifies that construction of a Unix time from a Gregorian date and time stamp never panics.
+    #[kani::proof]
+    fn from_gregorian_never_panics() {
+        use crate::calendar::GregorianDate;
+        let date: GregorianDate = kani::any();
+        let hour: u8 = kani::any();
+        let minute: u8 = kani::any();
+        let second: u8 = kani::any();
+        let _ = UnixTime::from_datetime(date, hour, minute, second);
+    }
+}

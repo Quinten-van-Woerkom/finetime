@@ -76,3 +76,47 @@ fn known_timestamps() {
     .unwrap();
     assert_eq!(tai, tt.transform());
 }
+
+#[cfg(kani)]
+mod proof_harness {
+    use super::*;
+    use crate::{Date, TaiTime};
+
+    /// Verifies that construction of a terrestrial time from a historic date and time stamp never panics.
+    #[kani::proof]
+    fn from_datetime_never_panics() {
+        let date: Date = kani::any();
+        let hour: u8 = kani::any();
+        let minute: u8 = kani::any();
+        let second: u8 = kani::any();
+        let _ = TtTime::from_datetime(date, hour, minute, second);
+    }
+
+    /// Verifies that construction of a terrestrial time from a Gregorian date and time stamp never panics.
+    #[kani::proof]
+    fn from_gregorian_never_panics() {
+        use crate::calendar::GregorianDate;
+        let date: GregorianDate = kani::any();
+        let hour: u8 = kani::any();
+        let minute: u8 = kani::any();
+        let second: u8 = kani::any();
+        let _ = TtTime::from_datetime(date, hour, minute, second);
+    }
+
+    /// Verifies that all valid terrestrial time datetimes can be losslessly converted to and from
+    /// the equivalent TAI time.
+    #[kani::proof]
+    fn datetime_tai_roundtrip() {
+        let date: Date = kani::any();
+        let hour: u8 = kani::any();
+        let minute: u8 = kani::any();
+        let second: u8 = kani::any();
+        kani::assume(hour < 24);
+        kani::assume(minute < 60);
+        kani::assume(second < 60);
+        let time1 = TtTime::from_datetime(date, hour, minute, second).unwrap();
+        let tai: TaiTime<_> = time1.transform();
+        let time2: TtTime<_> = tai.transform();
+        assert_eq!(time1, time2);
+    }
+}
