@@ -31,9 +31,7 @@ impl ModifiedJulianDate<i64> {
     /// Constructs a MJD from a given calendar date.
     pub fn from_date(date: impl Into<LocalDays<i64>>) -> Self {
         let local_days = date.into();
-        Self {
-            day: local_days.elapsed_time_since_epoch() + Days::new(40587),
-        }
+        Self::from(local_days)
     }
 }
 
