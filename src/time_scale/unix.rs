@@ -6,11 +6,7 @@ use crate::{
     calendar::{Date, Month},
     duration::Duration,
     time_point::TimePoint,
-    time_scale::{
-        TimeScale,
-        local::LocalDays,
-        tai::{Tai, TaiTime},
-    },
+    time_scale::{TimeScale, local::LocalDays, tai::TaiTime},
     units::LiteralRatio,
 };
 
@@ -52,7 +48,7 @@ impl TimeScale for Unix {
     type NativePeriod = LiteralRatio<1>;
 
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
-    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {

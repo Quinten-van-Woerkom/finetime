@@ -23,7 +23,7 @@ impl TimeScale for Tai {
     type NativePeriod = SecondsPerDay;
 
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
-    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {

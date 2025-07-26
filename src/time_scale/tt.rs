@@ -3,7 +3,7 @@
 use num::{NumCast, traits::NumOps};
 
 use crate::{
-    LocalDays, TimePoint, TryTimeScaleConversion, Unix, Utc,
+    LocalDays, TaiTime, TimePoint, TryTimeScaleConversion, Unix, Utc,
     duration::MilliSeconds,
     time_scale::{Tai, TimeScale, TimeScaleConversion},
     units::{IsValidConversion, LiteralRatio, Milli, Ratio},
@@ -20,7 +20,7 @@ impl TimeScale for Tt {
     type NativePeriod = Milli;
 
     /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI.
-    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {

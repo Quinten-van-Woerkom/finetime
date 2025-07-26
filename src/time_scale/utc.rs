@@ -137,7 +137,7 @@ fn roundtrip_near_leap_seconds() {
 impl TimeScale for Utc {
     type NativePeriod = LiteralRatio<1>;
 
-    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {

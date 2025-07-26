@@ -25,7 +25,7 @@ pub struct Gpst;
 impl TimeScale for Gpst {
     type NativePeriod = LiteralRatio<1>;
 
-    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {

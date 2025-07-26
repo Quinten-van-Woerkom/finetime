@@ -9,8 +9,7 @@ use crate::{
     duration::{Duration, Hours, Minutes, Seconds},
     time_point::TimePoint,
     units::{
-        IsValidConversion, LiteralRatio, Milli, Ratio, SecondsPerDay, SecondsPerHour,
-        SecondsPerMinute,
+        IsValidConversion, LiteralRatio, Ratio, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
     },
 };
 
@@ -40,7 +39,7 @@ pub trait TimeScale: Sized {
 
     /// Returns the epoch of this time scale but expressed in TAI. This is useful for performing
     /// conversions between different time scales.
-    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
         T: NumCast;
 
