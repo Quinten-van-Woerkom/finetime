@@ -47,7 +47,7 @@ pub trait TimeScale: Sized {
     /// result may be expressed in any type `T`, as long as this type can be constructed from some
     /// primitive. This function is allowed to panic if the epoch, expressed as `LocalDays`, cannot
     /// be represented by a value of type `T`.
-    fn epoch_local<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
         T: NumCast;
 
@@ -59,17 +59,20 @@ pub trait TimeScale: Sized {
 
     /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
     /// time-of-day to it.
-    fn from_local_datetime<Representation>(
-        date: LocalDays<Representation>,
+    fn from_local_datetime(
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<TimePoint<Self, Representation>, DateTimeError<Representation>>
+    ) -> Result<TimePoint<Self, i64, Self::NativePeriod>, DateTimeError>
     where
-        Representation: NumCast + NumOps + From<u8> + Clone,
-        (): IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+        (): IsValidConversion<i64, SecondsPerDay, Self::NativePeriod>
+            + IsValidConversion<i64, SecondsPerHour, Self::NativePeriod>
+            + IsValidConversion<i64, SecondsPerMinute, Self::NativePeriod>
+            + IsValidConversion<i64, LiteralRatio<1>, Self::NativePeriod>
+            + IsValidConversion<i64, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<i64, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<i64, SecondsPerMinute, LiteralRatio<1>>,
     {
         // First, we verify that the timestamp is valid.
         if hour >= 24 || minute >= 60 || second >= 60 {
@@ -80,23 +83,20 @@ pub trait TimeScale: Sized {
             });
         }
 
-        // Afterwards, we convert the date to its MJD equivalent. We do the same for the TAI epoch,
-        // but then at compile time already. Note that both dates are MJD, expressed in TAI.
-        let date_mjd = date;
-        let tai_epoch = Self::epoch_local::<Representation>();
-        let days = date_mjd - tai_epoch;
         let hours = Hours::new(hour).cast();
         let minutes = Minutes::new(minute).cast();
         let seconds = Seconds::new(second).cast();
-        Ok(TimePoint::from_time_since_epoch(
-            days.convert() + hours.convert() + minutes.convert() + seconds,
-        ))
+        let epoch = Self::epoch_local();
+        let local_time: LocalTime<i64> =
+            date.convert() + hours.convert() + minutes.convert() + seconds;
+        let time_since_epoch = local_time.convert() - epoch;
+        Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
 
     /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
     /// time-of-day and subsecond fraction to it.
     fn from_subsecond_local_datetime<Representation, Period>(
-        date: LocalDays<Representation>,
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -109,9 +109,11 @@ pub trait TimeScale: Sized {
             + IsValidConversion<Representation, SecondsPerHour, Period>
             + IsValidConversion<Representation, SecondsPerMinute, Period>
             + IsValidConversion<Representation, LiteralRatio<1>, Period>
-            + IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+            + IsValidConversion<i64, SecondsPerDay, Self::NativePeriod>
+            + IsValidConversion<i64, SecondsPerHour, Self::NativePeriod>
+            + IsValidConversion<i64, SecondsPerMinute, Self::NativePeriod>
+            + IsValidConversion<i64, LiteralRatio<1>, Self::NativePeriod>
+            + IsValidConversion<Representation, Self::NativePeriod, Period>,
     {
         // We check that the number of subseconds does not exceed one second.
         let one = Seconds::new(Representation::one()).convert();
@@ -120,7 +122,9 @@ pub trait TimeScale: Sized {
             return Err(FineDateTimeError::InvalidSubseconds { subseconds });
         }
 
-        let seconds = Self::from_local_datetime(date, hour, minute, second)?;
+        let seconds = Self::from_local_datetime(date, hour, minute, second)?
+            .try_cast()
+            .unwrap();
         Ok(seconds.convert() + subseconds)
     }
 

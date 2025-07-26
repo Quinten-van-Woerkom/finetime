@@ -4,7 +4,7 @@ use num::{Integer, NumCast, One, Zero, traits::NumOps};
 use tinyvec::ArrayVec;
 
 use crate::{
-    DateTimeError, FineDateTimeError, TryTimeScaleConversion, Unix,
+    DateTimeError, FineDateTimeError, LocalTime, TryTimeScaleConversion, Unix,
     calendar::{
         Date,
         Month::{self, *},
@@ -33,7 +33,7 @@ pub type UtcTime<Representation, Period = LiteralRatio<1>> = TimePoint<Utc, Repr
 /// The reason for choosing to do this over passing a pointer to this table every time is that it
 /// would add a pointer of overhead to any UTC time stamp. Additionally, it would make UTC the only
 /// stateful time scale, which would make generic code harder to work with.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Utc;
 
 impl Utc {
@@ -151,11 +151,12 @@ impl TimeScale for Utc {
 
     /// Because the UTC epoch coincides with the `LocalDays` epoch, it can be constructed simply
     /// as a zero value.
-    fn epoch_local<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {
         LocalDays::from_time_since_epoch(Duration::new(0u8))
+            .convert()
             .try_cast()
             .unwrap()
     }
@@ -164,17 +165,17 @@ impl TimeScale for Utc {
         true
     }
 
-    fn from_local_datetime<Representation>(
-        date: LocalDays<Representation>,
+    fn from_local_datetime(
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<TimePoint<Self, Representation>, DateTimeError<Representation>>
+    ) -> Result<TimePoint<Self, i64>, DateTimeError>
     where
-        Representation: NumCast + NumOps + From<u8> + Clone,
-        (): IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+        (): IsValidConversion<i64, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<i64, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<i64, SecondsPerMinute, LiteralRatio<1>>
+            + IsValidConversion<i64, LiteralRatio<1>, LiteralRatio<1>>,
     {
         // Verify that the time-of-day is valid. Leap seconds are always assumed to be valid at
         // this point - this is checked later.
@@ -194,7 +195,7 @@ impl TimeScale for Utc {
         // seconds are not incorporated, so we may compute it directly. Note that we do not compute
         // the seconds component, because that will require additional logic to handle leap
         // seconds.
-        let unix_time_minutes = match UnixTime::from_datetime(date.clone(), hour, minute, 0) {
+        let unix_time_minutes = match UnixTime::from_datetime(date, hour, minute, 0) {
             Ok(unix_time) => unix_time,
             _ => unreachable!(),
         };
@@ -204,7 +205,7 @@ impl TimeScale for Utc {
         let unix_time = unix_time
             .try_cast()
             .ok_or(DateTimeError::NotRepresentable {
-                date: date.clone(),
+                date,
                 hour,
                 minute,
                 second,
@@ -216,7 +217,7 @@ impl TimeScale for Utc {
             // UTC time point back from the leap second table.
             LeapSecondsResult::Unambiguous(utc_time) if !expect_leap_second => {
                 utc_time.try_cast().ok_or(DateTimeError::NotRepresentable {
-                    date: date.clone(),
+                    date,
                     hour,
                     minute,
                     second,
@@ -226,7 +227,7 @@ impl TimeScale for Utc {
             // Hence, if we still find an unambiguous time stamp, that means that the requested
             // datetime does not actually exist, because there is no 61st second there.
             LeapSecondsResult::Unambiguous(_) => Err(DateTimeError::NoLeapSecondInsertion {
-                date: date.clone(),
+                date,
                 hour,
                 minute,
                 second,
@@ -263,7 +264,7 @@ impl TimeScale for Utc {
     }
 
     fn from_subsecond_local_datetime<Representation, Period>(
-        date: LocalDays<Representation>,
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -276,9 +277,10 @@ impl TimeScale for Utc {
             + IsValidConversion<Representation, SecondsPerHour, Period>
             + IsValidConversion<Representation, SecondsPerMinute, Period>
             + IsValidConversion<Representation, LiteralRatio<1>, Period>
-            + IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+            + IsValidConversion<i64, SecondsPerDay, Self::NativePeriod>
+            + IsValidConversion<i64, SecondsPerHour, Self::NativePeriod>
+            + IsValidConversion<i64, SecondsPerMinute, Self::NativePeriod>
+            + IsValidConversion<i64, LiteralRatio<1>, Self::NativePeriod>,
     {
         let one = Seconds::new(Representation::one()).convert();
         let zero = Duration::zero();
@@ -286,7 +288,9 @@ impl TimeScale for Utc {
             return Err(FineDateTimeError::InvalidSubseconds { subseconds });
         }
 
-        let seconds = Self::from_local_datetime(date, hour, minute, second)?;
+        let seconds = Self::from_local_datetime(date, hour, minute, second)?
+            .try_cast()
+            .unwrap();
         Ok(seconds.convert() + subseconds)
     }
 }

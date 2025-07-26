@@ -34,21 +34,21 @@ pub struct GregorianDateDoesNotExist {
 /// Errors that may be returned when combining a calendar date with a time-of-day to create a
 /// `TimePoint`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum DateTimeError<T> {
+pub enum DateTimeError {
     /// Returned when the given time-of-day does not exist in general (independent of whether the
     /// used time scale has leap seconds).
     InvalidTimeOfDay { hour: u8, minute: u8, second: u8 },
     /// Returned when the requested datetime has a 61st second but is not actually situated at a
     /// leap second insertion.
     NoLeapSecondInsertion {
-        date: LocalDays<T>,
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
     },
     /// Returned when the requested datetime does not exist because of a leap second deletion.
     LeapSecondDeletion {
-        date: LocalDays<T>,
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -56,7 +56,7 @@ pub enum DateTimeError<T> {
     /// Returned when the requested datetime could not fit in a `TimePoint` with the given
     /// `Representation`.
     NotRepresentable {
-        date: LocalDays<T>,
+        date: LocalDays<i64>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -68,16 +68,16 @@ pub enum DateTimeError<T> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FineDateTimeError<T, P: Ratio> {
     /// Wrapper for regular date time errors that are not specific to subsecond precision.
-    DateTimeError(DateTimeError<T>),
+    DateTimeError(DateTimeError),
     /// The number of subseconds must be 0 or larger but also may not exceed 1 second.
     InvalidSubseconds { subseconds: Duration<T, P> },
 }
 
-impl<T, P> From<DateTimeError<T>> for FineDateTimeError<T, P>
+impl<T, P> From<DateTimeError> for FineDateTimeError<T, P>
 where
     P: Ratio,
 {
-    fn from(value: DateTimeError<T>) -> Self {
+    fn from(value: DateTimeError) -> Self {
         Self::DateTimeError(value)
     }
 }

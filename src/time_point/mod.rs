@@ -85,7 +85,7 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
 
     /// Creates a `TimePoint` from some datetime and time-of-day, plus some additional subseconds.
     pub fn from_subsecond_datetime(
-        date: impl Into<LocalDays<Representation>>,
+        date: impl Into<LocalDays<i64>>,
         hour: u8,
         minute: u8,
         second: u8,
@@ -99,9 +99,11 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
             + IsValidConversion<Representation, SecondsPerHour, Period>
             + IsValidConversion<Representation, SecondsPerMinute, Period>
             + IsValidConversion<Representation, LiteralRatio<1>, Period>
-            + IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+            + IsValidConversion<i64, SecondsPerDay, Scale::NativePeriod>
+            + IsValidConversion<i64, SecondsPerHour, Scale::NativePeriod>
+            + IsValidConversion<i64, SecondsPerMinute, Scale::NativePeriod>
+            + IsValidConversion<i64, LiteralRatio<1>, Scale::NativePeriod>
+            + IsValidConversion<Representation, Scale::NativePeriod, Period>,
     {
         Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subseconds)
     }
@@ -148,20 +150,26 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     }
 }
 
-impl<Scale, Representation> TimePoint<Scale, Representation> {
+impl<Scale> TimePoint<Scale, i64, <Scale as TimeScale>::NativePeriod>
+where
+    Scale: TimeScale,
+{
     /// Creates a `TimePoint` from a historic date and an associated time-of-day.
     pub fn from_datetime(
-        date: impl Into<LocalDays<Representation>>,
+        date: impl Into<LocalDays<i64>>,
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, DateTimeError<Representation>>
+    ) -> Result<Self, DateTimeError>
     where
         Scale: TimeScale,
-        Representation: NumCast + NumOps + From<u8> + Clone,
-        (): IsValidConversion<Representation, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<Representation, SecondsPerMinute, LiteralRatio<1>>,
+        (): IsValidConversion<i64, SecondsPerDay, LiteralRatio<1>>
+            + IsValidConversion<i64, SecondsPerHour, LiteralRatio<1>>
+            + IsValidConversion<i64, SecondsPerMinute, LiteralRatio<1>>
+            + IsValidConversion<i64, SecondsPerDay, Scale::NativePeriod>
+            + IsValidConversion<i64, SecondsPerHour, Scale::NativePeriod>
+            + IsValidConversion<i64, SecondsPerMinute, Scale::NativePeriod>
+            + IsValidConversion<i64, LiteralRatio<1>, Scale::NativePeriod>,
     {
         Scale::from_local_datetime(date.into(), hour, minute, second)
     }

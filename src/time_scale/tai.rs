@@ -3,11 +3,11 @@
 use num::{NumCast, Zero, traits::NumOps};
 
 use crate::{
-    Days, TimeScaleConversion, TryTimeScaleConversion, Unix, Utc,
+    LocalTime, Seconds, TimeScaleConversion, TryTimeScaleConversion, Unix, Utc,
     calendar::{Date, Month},
     time_point::TimePoint,
-    time_scale::{TimeScale, local::LocalDays},
-    units::{IsValidConversion, LiteralRatio, Ratio, SecondsPerDay},
+    time_scale::TimeScale,
+    units::{IsValidConversion, LiteralRatio, Ratio},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
@@ -16,27 +16,28 @@ pub type TaiTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tai, Repr
 /// Time scale representing the international atomic time standard (TAI). TAI has no leap seconds
 /// and increases monotonically at a constant interval, making it useful as fundamental time scale
 /// to build the rest of this library on.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tai;
 
 impl TimeScale for Tai {
-    type NativePeriod = SecondsPerDay;
+    type NativePeriod = LiteralRatio<1>;
 
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {
-        TimePoint::from_time_since_epoch(Days::<u8>::zero().try_cast().unwrap())
+        TimePoint::from_time_since_epoch(Seconds::<u8>::zero().try_cast().unwrap())
     }
 
-    fn epoch_local<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {
         Date::new(1958, Month::January, 1)
             .unwrap()
             .to_local_days()
+            .convert()
             .try_cast()
             .unwrap()
     }

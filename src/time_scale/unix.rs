@@ -3,6 +3,7 @@
 use num::NumCast;
 
 use crate::{
+    LocalTime,
     calendar::{Date, Month},
     duration::Duration,
     time_point::TimePoint,
@@ -33,7 +34,7 @@ pub type UnixTime<Representation, Period = LiteralRatio<1>> =
 /// consequence. This implementation follows `hifitime`, because it is the easiest to implement.
 /// Practically, it permits the Unix timescale to be implemented as a constant offset from TAI with
 /// an epoch at exactly midnight 1970-01-01.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Unix;
 
 impl Unix {
@@ -62,11 +63,12 @@ impl TimeScale for Unix {
 
     /// Because the Unix epoch coincides with the `LocalDays` epoch, it can be constructed simply
     /// as a zero value.
-    fn epoch_local<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {
-        LocalDays::from_time_since_epoch(Duration::new(0u8))
+        LocalDays::from_time_since_epoch(Duration::new(0))
+            .convert()
             .try_cast()
             .unwrap()
     }

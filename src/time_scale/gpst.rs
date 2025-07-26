@@ -4,7 +4,7 @@
 use num::{NumCast, traits::NumOps};
 
 use crate::{
-    LocalDays, TimePoint, TryTimeScaleConversion, Unix, Utc,
+    LocalTime, TimePoint, TryTimeScaleConversion, Unix, Utc,
     calendar::{Date, Month},
     time_scale::{
         TimeScale, TimeScaleConversion,
@@ -20,6 +20,7 @@ pub type GpsTime<Representation, Period = LiteralRatio<1>> =
 /// The Global Positioning System (GPS) time scale is broadcast by GPS satellites. It is based on
 /// internal atomic clocks that are synchronized with TAI. The signal is defined to be a constant
 /// 19 seconds behind TAI.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Gpst;
 
 impl TimeScale for Gpst {
@@ -36,13 +37,14 @@ impl TimeScale for Gpst {
             .unwrap()
     }
 
-    fn epoch_local<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
         T: num::NumCast,
     {
         Date::new(1980, Month::January, 6)
             .unwrap()
             .to_local_days()
+            .convert()
             .try_cast()
             .unwrap()
     }

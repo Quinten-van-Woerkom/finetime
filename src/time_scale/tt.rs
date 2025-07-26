@@ -3,7 +3,7 @@
 use num::{NumCast, traits::NumOps};
 
 use crate::{
-    LocalDays, TaiTime, TimePoint, TryTimeScaleConversion, Unix, Utc,
+    Date, LocalTime, Month, TaiTime, TimePoint, TryTimeScaleConversion, Unix, Utc,
     duration::MilliSeconds,
     time_scale::{Tai, TimeScale, TimeScaleConversion},
     units::{IsValidConversion, LiteralRatio, Milli, Ratio},
@@ -14,28 +14,35 @@ pub type TtTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tt, Repres
 
 /// Terrestrial time is the proper time of a clock located on the Earth geoid. It is used in
 /// astronomical tables, mostly. Effectively, it is little more than a constant offset from TAI.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tt;
 
 impl TimeScale for Tt {
     type NativePeriod = Milli;
 
-    /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI.
+    /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI. This means that
+    /// its epoch is precisely 1977-01-01T00:00:00 TAI.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {
-        (Tai::epoch_tai().convert() - MilliSeconds::new(32_184))
+        let date = Date::new(1977, Month::January, 1).unwrap();
+        TaiTime::from_datetime(date, 0, 0, 0)
+            .unwrap()
+            .convert()
             .try_cast()
             .unwrap()
     }
 
-    /// Terrestrial time does not have an actual epoch associated with it. For practical purposes,
-    /// it is useful to choose January 1, 1958, same as TAI.
-    fn epoch_local<T>() -> LocalDays<T>
+    /// For practical reasons (conversion to and from TCG), it is convenient to set the TT epoch to
+    /// 1977-01-01T00:00:32.184: at this time, TT and TCG match exactly (by definition).
+    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
         T: NumCast,
     {
-        Tai::epoch_local()
+        let date = Date::new(1977, Month::January, 1).unwrap();
+        let epoch = date.to_local_days().convert() + MilliSeconds::new(32_184);
+        epoch.try_cast().unwrap()
     }
 
     fn counts_leap_seconds() -> bool {
@@ -93,17 +100,23 @@ mod proof_harness {
     use super::*;
     use crate::{Date, TaiTime};
 
-    /// Verifies that construction of a terrestrial time from a historic date and time stamp never panics.
+    /// Verifies that construction of a terrestrial time from a historic date and time stamp never
+    /// panics. An assumption is made on the input range because some dates result in a count of
+    /// milliseconds from the TT epoch that is too large to store in an `i64`.
     #[kani::proof]
     fn from_datetime_never_panics() {
         let date: Date = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
+        kani::assume(date > Date::new(i32::MIN / 8, Month::January, 1).unwrap());
+        kani::assume(date < Date::new(i32::MAX / 8, Month::December, 31).unwrap());
         let _ = TtTime::from_datetime(date, hour, minute, second);
     }
 
-    /// Verifies that construction of a terrestrial time from a Gregorian date and time stamp never panics.
+    /// Verifies that construction of a terrestrial time from a Gregorian date and time stamp never
+    /// panics. An assumption is made on the input range because some dates result in a count of
+    /// milliseconds from the TT epoch that is too large to store in an `i64`.
     #[kani::proof]
     fn from_gregorian_never_panics() {
         use crate::calendar::GregorianDate;
@@ -111,26 +124,28 @@ mod proof_harness {
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
+        kani::assume(date > GregorianDate::new(i32::MIN / 8, Month::January, 1).unwrap());
+        kani::assume(date < GregorianDate::new(i32::MAX / 8, Month::December, 31).unwrap());
         let _ = TtTime::from_datetime(date, hour, minute, second);
     }
 
     /// Verifies that all valid terrestrial time datetimes can be losslessly converted to and from
-    /// the equivalent TAI time.
+    /// the equivalent TAI time. An assumption is made on the input range because some dates result
+    /// in a count of milliseconds from the TT epoch that is too large to store in an `i64`.
     #[kani::proof]
     fn datetime_tai_roundtrip() {
         let date: Date = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
+        kani::assume(date > Date::new(i32::MIN / 8, Month::January, 1).unwrap());
+        kani::assume(date < Date::new(i32::MAX / 8, Month::December, 31).unwrap());
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1: TtTime<i128, Milli> = TtTime::from_datetime(date, hour, minute, second)
-            .unwrap()
-            .cast()
-            .convert();
-        let tai: TaiTime<i128, Milli> = time1.transform();
-        let time2: TtTime<i128, Milli> = tai.transform();
+        let time1 = TtTime::from_datetime(date, hour, minute, second).unwrap();
+        let tai: TaiTime<_, _> = time1.transform();
+        let time2: TtTime<_, _> = tai.transform();
         assert_eq!(time1, time2);
     }
 }
