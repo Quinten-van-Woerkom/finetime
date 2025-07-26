@@ -6,7 +6,7 @@ use crate::{
     LocalDays, TimePoint, TryTimeScaleConversion, Unix, Utc,
     duration::MilliSeconds,
     time_scale::{Tai, TimeScale, TimeScaleConversion},
-    units::{LiteralRatio, Milli, Ratio},
+    units::{IsValidConversion, LiteralRatio, Milli, Ratio},
 };
 
 /// A time point that is expressed in Terrestrial Time.
@@ -17,16 +17,23 @@ pub type TtTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tt, Repres
 pub struct Tt;
 
 impl TimeScale for Tt {
+    type NativePeriod = Milli;
+
     /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI.
-    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
-        Tai::epoch_tai().convert() - MilliSeconds::new(32_184)
+    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    where
+        T: NumCast,
+    {
+        (Tai::epoch_tai().convert() - MilliSeconds::new(32_184))
+            .try_cast()
+            .unwrap()
     }
 
     /// Terrestrial time does not have an actual epoch associated with it. For practical purposes,
     /// it is useful to choose January 1, 1958, same as TAI.
     fn epoch_local<T>() -> LocalDays<T>
     where
-        T: num::NumCast,
+        T: NumCast,
     {
         Tai::epoch_local()
     }
@@ -51,7 +58,11 @@ where
 
     fn try_convert(
         from: TimePoint<Unix, Representation, Period>,
-    ) -> Result<TimePoint<Tt, Representation, Period>, Self::Error> {
+    ) -> Result<TimePoint<Tt, Representation, Period>, Self::Error>
+    where
+        (): IsValidConversion<i64, <Unix as TimeScale>::NativePeriod, Period>
+            + IsValidConversion<i64, <Tt as TimeScale>::NativePeriod, Period>,
+    {
         let utc =
             <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
         Ok(<() as TimeScaleConversion<Utc, Tt>>::transform(utc))
@@ -114,9 +125,12 @@ mod proof_harness {
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1 = TtTime::from_datetime(date, hour, minute, second).unwrap();
-        let tai: TaiTime<_> = time1.transform();
-        let time2: TtTime<_> = tai.transform();
+        let time1: TtTime<i128, Milli> = TtTime::from_datetime(date, hour, minute, second)
+            .unwrap()
+            .cast()
+            .convert();
+        let tai: TaiTime<i128, Milli> = time1.transform();
+        let time2: TtTime<i128, Milli> = tai.transform();
         assert_eq!(time1, time2);
     }
 }

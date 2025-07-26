@@ -33,9 +33,16 @@ pub use utc::*;
 /// Additionally, all `TimeScale`s shall be able to convert `TimePoint`s from their scale to TAI
 /// and the other way around. This is used to fundamentally connect all clocks.
 pub trait TimeScale: Sized {
+    /// The native `Period` in which a time scale's time points are expressed. This is the minimum
+    /// unit needed to represent both its TAI and local time epochs. For most time scales, this is
+    /// simply a day.
+    type NativePeriod: Ratio;
+
     /// Returns the epoch of this time scale but expressed in TAI. This is useful for performing
     /// conversions between different time scales.
-    fn epoch_tai() -> TimePoint<Tai, i64, Milli>;
+    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    where
+        T: NumCast;
 
     /// Returns the epoch of a time scale, expressed as a `LocalTime` in its own time scale. The
     /// result may be expressed in any type `T`, as long as this type can be constructed from some
@@ -124,7 +131,9 @@ pub trait TimeScale: Sized {
         time_point: TimePoint<Tai, Representation, Period>,
     ) -> TimePoint<Self, Representation, Period>
     where
-        (): TimeScaleConversion<Tai, Self>,
+        (): TimeScaleConversion<Tai, Self>
+            + IsValidConversion<i64, Self::NativePeriod, Period>
+            + IsValidConversion<i64, <Tai as TimeScale>::NativePeriod, Period>,
         Period: Ratio,
         Representation: Copy + NumCast + NumOps,
     {
@@ -137,7 +146,9 @@ pub trait TimeScale: Sized {
         time_point: TimePoint<Self, Representation, Period>,
     ) -> TimePoint<Tai, Representation, Period>
     where
-        (): TimeScaleConversion<Self, Tai>,
+        (): TimeScaleConversion<Self, Tai>
+            + IsValidConversion<i64, Self::NativePeriod, Period>
+            + IsValidConversion<i64, <Tai as TimeScale>::NativePeriod, Period>,
         Period: Ratio,
         Representation: Copy + NumCast + NumOps,
     {
@@ -168,10 +179,12 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
     where
         Period: Ratio,
         Representation: Copy + NumCast + NumOps,
+        (): IsValidConversion<i64, <From as TimeScale>::NativePeriod, Period>
+            + IsValidConversion<i64, <To as TimeScale>::NativePeriod, Period>,
     {
         let time_since_from_epoch = from.elapsed_time_since_epoch();
-        let from_epoch = From::epoch_tai();
-        let to_epoch = To::epoch_tai();
+        let from_epoch = From::epoch_tai().convert();
+        let to_epoch = To::epoch_tai().convert();
         // Note that this operation first rounds and then casts the epoch differences into the
         // proper units and representation. The representation cast may fail, if the difference in
         // epochs is not representable by the chosen representation (e.g., a `u8` cannot store the
@@ -207,14 +220,17 @@ impl<T: TimeScale> TimeScaleConversion<T, T> for () {
 /// Used to indicate that it is possible to convert from one `TimeScale` to another, though it is
 /// allowed for this operation to fail. This is the case when applying leap seconds, for example:
 /// the result may then be ambiguous or undefined, based on folds and gaps in time.
-pub trait TryTimeScaleConversion<From: TimeScale, To: TimeScale, Representation, Period> {
+pub trait TryTimeScaleConversion<From: TimeScale, To: TimeScale, Representation, Period: Ratio> {
     type Error: core::fmt::Debug;
 
     /// Tries to convert from one time scale to another. If this is not unambiguously possible,
     /// returns an error indicating why it is not.
     fn try_convert(
         from: TimePoint<From, Representation, Period>,
-    ) -> Result<TimePoint<To, Representation, Period>, Self::Error>;
+    ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
+    where
+        (): IsValidConversion<i64, <From as TimeScale>::NativePeriod, Period>
+            + IsValidConversion<i64, <To as TimeScale>::NativePeriod, Period>;
 }
 
 impl<From: TimeScale, To: TimeScale, Representation, Period>
@@ -230,7 +246,11 @@ where
     /// converted infallibly.
     fn try_convert(
         from: TimePoint<From, Representation, Period>,
-    ) -> Result<TimePoint<To, Representation, Period>, Self::Error> {
+    ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
+    where
+        (): IsValidConversion<i64, <From as TimeScale>::NativePeriod, Period>
+            + IsValidConversion<i64, <To as TimeScale>::NativePeriod, Period>,
+    {
         Ok(<() as TimeScaleConversion<From, To>>::transform(from))
     }
 }

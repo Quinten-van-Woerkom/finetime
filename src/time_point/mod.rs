@@ -40,7 +40,9 @@ impl<Scale> TimePoint<Scale, u128, Nano> {
     -> Result<Self, <() as crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>>::Error>
     where
         Scale: TimeScale,
-        (): crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>,
+        (): crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>
+            + IsValidConversion<i64, <crate::Unix as TimeScale>::NativePeriod, Nano>
+            + IsValidConversion<i64, <Scale as TimeScale>::NativePeriod, Nano>,
     {
         let system_time = std::time::SystemTime::now();
         let unix_time = crate::UnixTime::from(system_time);
@@ -225,7 +227,9 @@ impl<Scale, Representation, Period: Ratio> TimePoint<Scale, Representation, Peri
         Target: TimeScale,
         Scale: TimeScale,
         Representation: Copy + NumCast + NumOps,
-        (): TimeScaleConversion<Scale, Target>,
+        (): TimeScaleConversion<Scale, Target>
+            + IsValidConversion<i64, <Scale as TimeScale>::NativePeriod, Period>
+            + IsValidConversion<i64, <Target as TimeScale>::NativePeriod, Period>,
     {
         <() as TimeScaleConversion<Scale, Target>>::transform(self)
     }

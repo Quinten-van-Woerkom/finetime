@@ -10,7 +10,7 @@ use crate::{
         TimeScale, TimeScaleConversion,
         tai::{Tai, TaiTime},
     },
-    units::{LiteralRatio, Milli, Ratio},
+    units::{IsValidConversion, LiteralRatio, Ratio},
 };
 
 /// `GpsTime` is a time point that is expressed according to the GPS time scale.
@@ -23,10 +23,17 @@ pub type GpsTime<Representation, Period = LiteralRatio<1>> =
 pub struct Gpst;
 
 impl TimeScale for Gpst {
-    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
+    type NativePeriod = LiteralRatio<1>;
+
+    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    where
+        T: NumCast,
+    {
         TaiTime::from_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
             .unwrap()
             .convert()
+            .try_cast()
+            .unwrap()
     }
 
     fn epoch_local<T>() -> LocalDays<T>
@@ -60,7 +67,11 @@ where
 
     fn try_convert(
         from: TimePoint<Unix, Representation, Period>,
-    ) -> Result<TimePoint<Gpst, Representation, Period>, Self::Error> {
+    ) -> Result<TimePoint<Gpst, Representation, Period>, Self::Error>
+    where
+        (): IsValidConversion<i64, <Unix as TimeScale>::NativePeriod, Period>
+            + IsValidConversion<i64, <Gpst as TimeScale>::NativePeriod, Period>,
+    {
         let utc =
             <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
         Ok(<() as TimeScaleConversion<Utc, Gpst>>::transform(utc))

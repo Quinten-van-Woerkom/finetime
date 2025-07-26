@@ -3,12 +3,11 @@
 use num::{NumCast, Zero, traits::NumOps};
 
 use crate::{
-    TimeScaleConversion, TryTimeScaleConversion, Unix, Utc,
+    Days, TimeScaleConversion, TryTimeScaleConversion, Unix, Utc,
     calendar::{Date, Month},
-    duration::MilliSeconds,
     time_point::TimePoint,
     time_scale::{TimeScale, local::LocalDays},
-    units::{LiteralRatio, Milli, Ratio},
+    units::{IsValidConversion, LiteralRatio, Ratio, SecondsPerDay},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
@@ -21,9 +20,14 @@ pub type TaiTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tai, Repr
 pub struct Tai;
 
 impl TimeScale for Tai {
+    type NativePeriod = SecondsPerDay;
+
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
-    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
-        TimePoint::from_time_since_epoch(MilliSeconds::zero())
+    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    where
+        T: NumCast,
+    {
+        TimePoint::from_time_since_epoch(Days::<u8>::zero().try_cast().unwrap())
     }
 
     fn epoch_local<T>() -> LocalDays<T>
@@ -52,7 +56,11 @@ where
 
     fn try_convert(
         from: TimePoint<Unix, Representation, Period>,
-    ) -> Result<TimePoint<Tai, Representation, Period>, Self::Error> {
+    ) -> Result<TimePoint<Tai, Representation, Period>, Self::Error>
+    where
+        (): IsValidConversion<i64, <Unix as TimeScale>::NativePeriod, Period>
+            + IsValidConversion<i64, <Tai as TimeScale>::NativePeriod, Period>,
+    {
         let utc =
             <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
         Ok(<() as TimeScaleConversion<Utc, Tai>>::transform(utc))

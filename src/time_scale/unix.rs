@@ -11,7 +11,7 @@ use crate::{
         local::LocalDays,
         tai::{Tai, TaiTime},
     },
-    units::{LiteralRatio, Milli},
+    units::LiteralRatio,
 };
 
 /// `UnixTime` is a `TimePoint` that uses the `Unix` time scale.
@@ -49,10 +49,19 @@ impl Unix {
 }
 
 impl TimeScale for Unix {
+    type NativePeriod = LiteralRatio<1>;
+
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
-    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
+    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    where
+        T: NumCast,
+    {
         let date = Date::new(1970, Month::January, 1).unwrap();
-        TaiTime::from_datetime(date, 0, 0, 10).unwrap().convert()
+        TaiTime::from_datetime(date, 0, 0, 10)
+            .unwrap()
+            .convert()
+            .try_cast()
+            .unwrap()
     }
 
     /// Because the Unix epoch coincides with the `LocalDays` epoch, it can be constructed simply

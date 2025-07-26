@@ -18,8 +18,7 @@ use crate::{
         unix::UnixTime,
     },
     units::{
-        IsValidConversion, LiteralRatio, Milli, Ratio, SecondsPerDay, SecondsPerHour,
-        SecondsPerMinute,
+        IsValidConversion, LiteralRatio, Ratio, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
     },
 };
 
@@ -136,9 +135,18 @@ fn roundtrip_near_leap_seconds() {
 }
 
 impl TimeScale for Utc {
-    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
+    type NativePeriod = LiteralRatio<1>;
+
+    fn epoch_tai<T>() -> TimePoint<Tai, T, Self::NativePeriod>
+    where
+        T: NumCast,
+    {
         let date = Date::new(1970, January, 1).unwrap();
-        TaiTime::from_datetime(date, 0, 0, 10).unwrap().convert()
+        TaiTime::from_datetime(date, 0, 0, 10)
+            .unwrap()
+            .convert()
+            .try_cast()
+            .unwrap()
     }
 
     /// Because the UTC epoch coincides with the `LocalDays` epoch, it can be constructed simply
