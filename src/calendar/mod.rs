@@ -2,10 +2,12 @@
 
 mod gregorian;
 mod historic;
+mod jd;
 mod mjd;
 
 pub use gregorian::*;
 pub use historic::*;
+pub use jd::*;
 pub use mjd::*;
 
 /// Months as known in the Gregorian and Julian calendars.
