@@ -128,7 +128,7 @@ pub trait TimeScale: Sized {
         Period: Ratio,
         Representation: Copy + NumCast + NumOps,
     {
-        <() as TimeScaleConversion<Tai, Self>>::convert(time_point)
+        <() as TimeScaleConversion<Tai, Self>>::transform(time_point)
     }
 
     /// Creates a TAI time point based on a time point in this time scale. Rounding is permitted,
@@ -141,7 +141,7 @@ pub trait TimeScale: Sized {
         Period: Ratio,
         Representation: Copy + NumCast + NumOps,
     {
-        <() as TimeScaleConversion<Self, Tai>>::convert(time_point)
+        <() as TimeScaleConversion<Self, Tai>>::transform(time_point)
     }
 }
 
@@ -162,7 +162,7 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
     /// that have the same time tick rate but that differ in epoch. This means that this
     /// implementation is valid, for example, for the TAI, UTC, Unix, and GPS clocks. It will not
     /// be valid for dynamic clocks.
-    fn convert<Representation, Period>(
+    fn transform<Representation, Period>(
         from: TimePoint<From, Representation, Period>,
     ) -> TimePoint<To, Representation, Period>
     where
@@ -197,7 +197,7 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
 
 impl<T: TimeScale> TimeScaleConversion<T, T> for () {
     /// Conversion from a clock to itself is always possible and a no-op.
-    fn convert<Representation, Period>(
+    fn transform<Representation, Period>(
         from: TimePoint<T, Representation, Period>,
     ) -> TimePoint<T, Representation, Period> {
         from
@@ -231,6 +231,6 @@ where
     fn try_convert(
         from: TimePoint<From, Representation, Period>,
     ) -> Result<TimePoint<To, Representation, Period>, Self::Error> {
-        Ok(<() as TimeScaleConversion<From, To>>::convert(from))
+        Ok(<() as TimeScaleConversion<From, To>>::transform(from))
     }
 }

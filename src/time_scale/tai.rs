@@ -55,7 +55,7 @@ where
     ) -> Result<TimePoint<Tai, Representation, Period>, Self::Error> {
         let utc =
             <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
-        Ok(<() as TimeScaleConversion<Utc, Tai>>::convert(utc))
+        Ok(<() as TimeScaleConversion<Utc, Tai>>::transform(utc))
     }
 }
 

@@ -63,7 +63,7 @@ where
     ) -> Result<TimePoint<Gpst, Representation, Period>, Self::Error> {
         let utc =
             <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
-        Ok(<() as TimeScaleConversion<Utc, Gpst>>::convert(utc))
+        Ok(<() as TimeScaleConversion<Utc, Gpst>>::transform(utc))
     }
 }
 

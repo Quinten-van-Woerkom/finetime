@@ -227,7 +227,7 @@ impl<Scale, Representation, Period: Ratio> TimePoint<Scale, Representation, Peri
         Representation: Copy + NumCast + NumOps,
         (): TimeScaleConversion<Scale, Target>,
     {
-        <() as TimeScaleConversion<Scale, Target>>::convert(self)
+        <() as TimeScaleConversion<Scale, Target>>::transform(self)
     }
 }
 
