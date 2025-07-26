@@ -50,14 +50,14 @@ impl Unix {
 
 impl TimeScale for Unix {
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
-    fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
+    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
         let date = Date::new(1970, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10).unwrap().convert()
     }
 
     /// Because the Unix epoch coincides with the `LocalDays` epoch, it can be constructed simply
     /// as a zero value.
-    fn epoch<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalDays<T>
     where
         T: NumCast,
     {

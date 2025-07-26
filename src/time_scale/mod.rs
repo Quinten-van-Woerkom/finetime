@@ -33,15 +33,15 @@ pub use utc::*;
 /// Additionally, all `TimeScale`s shall be able to convert `TimePoint`s from their scale to TAI
 /// and the other way around. This is used to fundamentally connect all clocks.
 pub trait TimeScale: Sized {
-    /// Returns the reference epoch of a time scale, expressed in number of seconds since the TAI
-    /// epoch.
-    fn reference_epoch() -> TimePoint<Tai, i64, Milli>;
+    /// Returns the epoch of this time scale but expressed in TAI. This is useful for performing
+    /// conversions between different time scales.
+    fn epoch_tai() -> TimePoint<Tai, i64, Milli>;
 
     /// Returns the epoch of a time scale, expressed as a `LocalTime` in its own time scale. The
     /// result may be expressed in any type `T`, as long as this type can be constructed from some
     /// primitive. This function is allowed to panic if the epoch, expressed as `LocalDays`, cannot
     /// be represented by a value of type `T`.
-    fn epoch<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalDays<T>
     where
         T: NumCast;
 
@@ -77,7 +77,7 @@ pub trait TimeScale: Sized {
         // Afterwards, we convert the date to its MJD equivalent. We do the same for the TAI epoch,
         // but then at compile time already. Note that both dates are MJD, expressed in TAI.
         let date_mjd = date;
-        let tai_epoch = Self::epoch::<Representation>();
+        let tai_epoch = Self::epoch_local::<Representation>();
         let days = date_mjd - tai_epoch;
         let hours = Hours::new(hour).cast();
         let minutes = Minutes::new(minute).cast();
@@ -170,8 +170,8 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
         Representation: Copy + NumCast + NumOps,
     {
         let time_since_from_epoch = from.elapsed_time_since_epoch();
-        let from_epoch = From::reference_epoch();
-        let to_epoch = To::reference_epoch();
+        let from_epoch = From::epoch_tai();
+        let to_epoch = To::epoch_tai();
         // Note that this operation first rounds and then casts the epoch differences into the
         // proper units and representation. The representation cast may fail, if the difference in
         // epochs is not representable by the chosen representation (e.g., a `u8` cannot store the

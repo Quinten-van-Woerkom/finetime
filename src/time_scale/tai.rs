@@ -22,11 +22,11 @@ pub struct Tai;
 
 impl TimeScale for Tai {
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
-    fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
+    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
         TimePoint::from_time_since_epoch(MilliSeconds::zero())
     }
 
-    fn epoch<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalDays<T>
     where
         T: NumCast,
     {

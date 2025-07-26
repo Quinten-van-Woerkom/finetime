@@ -18,17 +18,17 @@ pub struct Tt;
 
 impl TimeScale for Tt {
     /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI.
-    fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
-        Tai::reference_epoch().convert() - MilliSeconds::new(32_184)
+    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
+        Tai::epoch_tai().convert() - MilliSeconds::new(32_184)
     }
 
     /// Terrestrial time does not have an actual epoch associated with it. For practical purposes,
     /// it is useful to choose January 1, 1958, same as TAI.
-    fn epoch<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalDays<T>
     where
         T: num::NumCast,
     {
-        Tai::epoch()
+        Tai::epoch_local()
     }
 
     fn counts_leap_seconds() -> bool {

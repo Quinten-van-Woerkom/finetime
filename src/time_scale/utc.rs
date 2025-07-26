@@ -136,14 +136,14 @@ fn roundtrip_near_leap_seconds() {
 }
 
 impl TimeScale for Utc {
-    fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
+    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
         let date = Date::new(1970, January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10).unwrap().convert()
     }
 
     /// Because the UTC epoch coincides with the `LocalDays` epoch, it can be constructed simply
     /// as a zero value.
-    fn epoch<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalDays<T>
     where
         T: NumCast,
     {

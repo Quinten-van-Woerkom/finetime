@@ -23,13 +23,13 @@ pub type GpsTime<Representation, Period = LiteralRatio<1>> =
 pub struct Gpst;
 
 impl TimeScale for Gpst {
-    fn reference_epoch() -> TimePoint<Tai, i64, Milli> {
+    fn epoch_tai() -> TimePoint<Tai, i64, Milli> {
         TaiTime::from_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
             .unwrap()
             .convert()
     }
 
-    fn epoch<T>() -> LocalDays<T>
+    fn epoch_local<T>() -> LocalDays<T>
     where
         T: num::NumCast,
     {
