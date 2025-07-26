@@ -19,6 +19,8 @@ mod local;
 pub use local::*;
 mod tai;
 pub use tai::*;
+mod tcg;
+pub use tcg::*;
 mod tt;
 pub use tt::*;
 mod unix;

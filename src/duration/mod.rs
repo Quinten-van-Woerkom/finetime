@@ -7,7 +7,10 @@ use core::{
     ops::{Add, AddAssign, Div, Mul, Neg, Sub},
 };
 
-use num::{Bounded, Integer, NumCast, Signed, Zero, traits::ConstZero};
+use num::{
+    Bounded, Integer, NumCast, Signed, Zero,
+    traits::{ConstZero, NumOps},
+};
 
 use crate::units::{
     Atto, ConversionRatio, Femto, IsValidConversion, LiteralRatio, Micro, Milli, Nano, Pico, Ratio,
@@ -129,6 +132,25 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
         Representation: NumCast,
     {
         Some(Duration::new(Target::from(self.count)?))
+    }
+
+    /// Multiplies by a floating-point value. If the underlying representation cannot store
+    /// fractional values, applies rounding-to-nearest.
+    pub fn multiply_float(self, float: f64) -> Self
+    where
+        Representation: Copy + NumCast + NumOps,
+    {
+        let count: Duration<f64, Period> = self.try_cast::<f64>().unwrap() * float;
+        let truncated: Self = count.try_cast().unwrap();
+        let fraction: Duration<f64, Period> = count - truncated.try_cast::<f64>().unwrap();
+        let one: Self = Duration::new(1).try_cast().unwrap();
+        if fraction >= Duration::new(0.5) {
+            truncated + one
+        } else if fraction <= -Duration::new(0.5) {
+            truncated - one
+        } else {
+            truncated
+        }
     }
 }
 

@@ -161,7 +161,7 @@ impl Date {
 
     /// Returns the number of days in a given month of a year. Also considers whether the given
     /// year-month combination would fall in the Gregorian or Julian calendar.
-    const fn days_in_month(year: i32, month: Month) -> u8 {
+    pub const fn days_in_month(year: i32, month: Month) -> u8 {
         use crate::calendar::Month::*;
         match month {
             January | March | May | July | August | October | December => 31,
