@@ -182,10 +182,9 @@ fn datetime_tt_tcg_conversion() {
     assert_eq!(time1, time2.transform());
 
     // 10_000_000_000 seconds after that epoch, there should be a difference of 6.969290134 seconds
-    // based on the known rate difference of L_G = 6.969290134e-10. We check this to microsecond
-    // precision: the offset shall be exactly 6.969290134000 seconds (to picosecond accuracy), but
-    // the float encoding of the rate difference results in a difference on the order of tens of
-    // nanoseconds.
+    // based on the known rate difference of L_G = 6.969290134e-10. We check this to picosecond
+    // precision: the offset shall be exactly 6.969290134000 seconds (to picosecond accuracy),
+    // since this rate difference is a defining constant (not just an approximation).
     let time1 = time1.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).convert();
     let time2 = time2.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).convert()
         - NanoSeconds::new(6_969_290_134i128).convert();
