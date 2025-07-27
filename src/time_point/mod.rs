@@ -130,7 +130,7 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
         Target: Ratio,
     {
         TimePoint {
-            duration: self.duration.round(),
+            duration: self.duration.ceil(),
             time_scale: core::marker::PhantomData,
         }
     }
