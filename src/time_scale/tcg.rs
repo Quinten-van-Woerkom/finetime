@@ -173,13 +173,15 @@ fn datetime_tt_tcg_conversion() {
     assert_eq!(time1, time2.transform());
 
     // 10_000_000_000 seconds after that epoch, there should be a difference of 6.969290134 seconds
+    // based on the known rate difference of L_G = 6.969290134e-10.
     use crate::{MicroSeconds, Seconds};
     let time1 = time1.convert() + Seconds::new(10_000_000_000i64).convert();
     let time2 =
         time2.convert() + Seconds::new(10_000_000_000i64).convert() - MicroSeconds::new(6969290i64);
     assert_eq!(time1.transform(), time2);
 
-    // At J2000, the difference should be about 505 ms.
+    // At J2000, the difference should be about 505.833 ms (see "Report of the IAU WGAS Sub-group
+    // on Issues on Time", P.K. Seidelmann).
     let time1 = TtTime::from_datetime(Date::new(2000, Month::January, 1).unwrap(), 12, 0, 0)
         .unwrap()
         .convert::<crate::units::Micro>();
