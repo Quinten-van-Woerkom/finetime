@@ -6,7 +6,7 @@ use crate::{
     Date, LocalTime, Month, TaiTime, TimePoint, TryTimeScaleConversion, Unix, Utc,
     duration::MilliSeconds,
     time_scale::{Tai, TimeScale, TimeScaleConversion},
-    units::{IsValidConversion, LiteralRatio, Milli, Ratio},
+    units::{IsValidConversion, LiteralRatio, Milli, MulExact, Ratio},
 };
 
 /// A time point that is expressed in Terrestrial Time.
@@ -59,7 +59,7 @@ impl<Representation, Period> TryTimeScaleConversion<Unix, Tt, Representation, Pe
 where
     (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
     Period: Ratio,
-    Representation: Copy + NumCast + NumOps,
+    Representation: Copy + NumCast + NumOps + MulExact,
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
 

@@ -10,7 +10,7 @@ use crate::{
         TimeScale, TimeScaleConversion,
         tai::{Tai, TaiTime},
     },
-    units::{IsValidConversion, LiteralRatio, Ratio},
+    units::{IsValidConversion, LiteralRatio, MulExact, Ratio},
 };
 
 /// `GpsTime` is a time point that is expressed according to the GPS time scale.
@@ -63,7 +63,7 @@ impl<Representation, Period> TryTimeScaleConversion<Unix, Gpst, Representation, 
 where
     (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
     Period: Ratio,
-    Representation: Copy + NumCast + NumOps,
+    Representation: Copy + NumCast + NumOps + MulExact,
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
 

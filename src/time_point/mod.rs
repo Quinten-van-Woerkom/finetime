@@ -13,7 +13,7 @@ use crate::{
     duration::Duration,
     time_scale::{LocalDays, TimeScale},
     units::{
-        IsValidConversion, LiteralRatio, Nano, Ratio, SecondsPerDay, SecondsPerHour,
+        IsValidConversion, LiteralRatio, MulExact, Nano, Ratio, SecondsPerDay, SecondsPerHour,
         SecondsPerMinute,
     },
 };
@@ -111,7 +111,7 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     /// Converts towards a different time unit, rounding towards the nearest whole unit.
     pub fn round<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
-        Representation: NumCast + Integer + Copy,
+        Representation: NumCast + Integer + Copy + MulExact,
         Period: Ratio,
         Target: Ratio,
     {
@@ -234,7 +234,7 @@ impl<Scale, Representation, Period: Ratio> TimePoint<Scale, Representation, Peri
     where
         Target: TimeScale,
         Scale: TimeScale,
-        Representation: Copy + NumCast + NumOps,
+        Representation: Copy + NumCast + NumOps + MulExact,
         (): TimeScaleConversion<Scale, Target>
             + IsValidConversion<i64, <Scale as TimeScale>::NativePeriod, Period>
             + IsValidConversion<i64, <Target as TimeScale>::NativePeriod, Period>,

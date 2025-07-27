@@ -7,7 +7,7 @@ use crate::{
     calendar::{Date, Month},
     time_point::TimePoint,
     time_scale::TimeScale,
-    units::{IsValidConversion, LiteralRatio, Ratio},
+    units::{IsValidConversion, LiteralRatio, MulExact, Ratio},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
@@ -51,7 +51,7 @@ impl<Representation, Period> TryTimeScaleConversion<Unix, Tai, Representation, P
 where
     (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
     Period: Ratio,
-    Representation: Copy + NumCast + NumOps,
+    Representation: Copy + NumCast + NumOps + MulExact,
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
 

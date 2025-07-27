@@ -16,9 +16,11 @@ pub trait Ratio {
 
 /// Time unit that is described as an exact ratio with respect to seconds.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct LiteralRatio<const NUMERATOR: u64, const DENOMINATOR: u64 = 1> {}
+pub struct LiteralRatio<const NUMERATOR: i128, const DENOMINATOR: i128 = 1> {}
 
-impl<const NUMERATOR: u64, const DENOMINATOR: u64> Ratio for LiteralRatio<NUMERATOR, DENOMINATOR> {
+impl<const NUMERATOR: i128, const DENOMINATOR: i128> Ratio
+    for LiteralRatio<NUMERATOR, DENOMINATOR>
+{
     const RATIO: Fraction = Fraction::new(NUMERATOR, DENOMINATOR);
 }
 

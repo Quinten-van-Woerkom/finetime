@@ -9,7 +9,8 @@ use crate::{
     duration::{Duration, Hours, Minutes, Seconds},
     time_point::TimePoint,
     units::{
-        IsValidConversion, LiteralRatio, Ratio, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
+        IsValidConversion, LiteralRatio, MulExact, Ratio, SecondsPerDay, SecondsPerHour,
+        SecondsPerMinute,
     },
 };
 
@@ -140,7 +141,7 @@ pub trait TimeScale: Sized {
             + IsValidConversion<i64, Self::NativePeriod, Period>
             + IsValidConversion<i64, <Tai as TimeScale>::NativePeriod, Period>,
         Period: Ratio,
-        Representation: Copy + NumCast + NumOps,
+        Representation: Copy + NumCast + NumOps + MulExact,
     {
         <() as TimeScaleConversion<Tai, Self>>::transform(time_point)
     }
@@ -155,7 +156,7 @@ pub trait TimeScale: Sized {
             + IsValidConversion<i64, Self::NativePeriod, Period>
             + IsValidConversion<i64, <Tai as TimeScale>::NativePeriod, Period>,
         Period: Ratio,
-        Representation: Copy + NumCast + NumOps,
+        Representation: Copy + NumCast + NumOps + MulExact,
     {
         <() as TimeScaleConversion<Self, Tai>>::transform(time_point)
     }
@@ -183,7 +184,7 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
     ) -> TimePoint<To, Representation, Period>
     where
         Period: Ratio,
-        Representation: Copy + NumCast + NumOps,
+        Representation: Copy + NumCast + NumOps + MulExact,
         (): IsValidConversion<i64, <From as TimeScale>::NativePeriod, Period>
             + IsValidConversion<i64, <To as TimeScale>::NativePeriod, Period>,
     {
@@ -243,7 +244,7 @@ impl<From: TimeScale, To: TimeScale, Representation, Period>
 where
     (): TimeScaleConversion<From, To>,
     Period: Ratio,
-    Representation: Copy + NumCast + NumOps,
+    Representation: Copy + NumCast + NumOps + MulExact,
 {
     type Error = core::convert::Infallible;
 

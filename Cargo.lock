@@ -59,6 +59,7 @@ dependencies = [
 name = "finetime"
 version = "0.1.0"
 dependencies = [
+ "i256",
  "lazy_static",
  "num",
  "paste",
@@ -94,6 +95,15 @@ dependencies = [
  "cfg-if",
  "libc",
  "wasi",
+]
+
+[[package]]
+name = "i256"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d33e2469f814f46f104fc4641cba20f3ba3b2b902e7d3c12db5bab37b33f6ac9"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]

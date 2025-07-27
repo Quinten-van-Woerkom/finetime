@@ -5,7 +5,7 @@ use num::{NumCast, traits::NumOps};
 use crate::{
     Date, LocalTime, MilliSeconds, Month, TaiTime, TimePoint, TimeScale, TimeScaleConversion, Tt,
     TtTime,
-    units::{IsValidConversion, LiteralRatio, Milli, Ratio},
+    units::{Fraction, IsValidConversion, LiteralRatio, Milli, MulExact, Ratio},
 };
 
 /// `TcgTime` is a specialization of `TimePoint` that uses the Geocentric Coordinate Time (TCG)
@@ -56,17 +56,18 @@ impl TimeScaleConversion<Tcg, Tt> for () {
     ) -> TimePoint<Tt, Representation, Period>
     where
         Period: Ratio,
-        Representation: Copy + NumCast + NumOps,
+        Representation: Copy + NumCast + NumOps + MulExact,
         (): IsValidConversion<i64, <Tcg as TimeScale>::NativePeriod, Period>
             + IsValidConversion<i64, <Tt as TimeScale>::NativePeriod, Period>,
     {
-        // We implement the underlying rate transformation in double-precision arithmetic. This may
-        // introduce some floating point error, but the alternative is to try and implement exact
-        // integer division, which would significantly complexify the procedure.
+        // We encode the conversion factor (= (1.0 - 6.969290134e-10)) as an exact fraction, such
+        // that integer arithmetic can be done to exact precision, even when some rounding is
+        // needed at the end of the conversion. This exactness is warranted by the fact that this
+        // is a defining constant: hence, analytic exactness is actually meaningful and not an
+        // approximation.
+        const CONVERSION_FACTOR: Fraction = Fraction::new(4999999996515354933, 5000000000000000000);
         let tcg_time_since_epoch = from.elapsed_time_since_epoch();
-        const CONVERSION_FACTOR: f64 = -6.969290134e-10;
-        let tt_time_since_epoch =
-            tcg_time_since_epoch + tcg_time_since_epoch.multiply_float(CONVERSION_FACTOR);
+        let tt_time_since_epoch = tcg_time_since_epoch.multiply_fraction(CONVERSION_FACTOR);
         TtTime::from_time_since_epoch(tt_time_since_epoch)
     }
 }
@@ -77,17 +78,18 @@ impl TimeScaleConversion<Tt, Tcg> for () {
     ) -> TimePoint<Tcg, Representation, Period>
     where
         Period: Ratio,
-        Representation: Copy + NumCast + NumOps,
+        Representation: Copy + NumCast + NumOps + MulExact,
         (): IsValidConversion<i64, <Tt as TimeScale>::NativePeriod, Period>
             + IsValidConversion<i64, <Tcg as TimeScale>::NativePeriod, Period>,
     {
-        // We implement the underlying rate transformation in double-precision arithmetic. This may
-        // introduce some floating point error, but the alternative is to try and implement exact
-        // integer division, which would significantly complexify the procedure.
+        // We encode the conversion factor (= (1.0 - 6.969290134e-10)) as an exact fraction, such
+        // that integer arithmetic can be done to exact precision, even when some rounding is
+        // needed at the end of the conversion. This exactness is warranted by the fact that this
+        // is a defining constant: hence, analytic exactness is actually meaningful and not an
+        // approximation.
+        const CONVERSION_FACTOR: Fraction = Fraction::new(5000000000000000000, 4999999996515354933);
         let tt_time_since_epoch = from.elapsed_time_since_epoch();
-        const CONVERSION_FACTOR: f64 = 6.969290134e-10 / (1.0 - 6.969290134e-10);
-        let tcg_time_since_epoch =
-            tt_time_since_epoch + tt_time_since_epoch.multiply_float(CONVERSION_FACTOR);
+        let tcg_time_since_epoch = tt_time_since_epoch.multiply_fraction(CONVERSION_FACTOR);
         TcgTime::from_time_since_epoch(tcg_time_since_epoch)
     }
 }
@@ -153,46 +155,73 @@ mod proof_harness {
 /// Verifies the TT-TCG conversion using some known values.
 #[test]
 fn datetime_tt_tcg_conversion() {
-    // At the epoch 1977-01-01T00:00:32.184, both time stamps should be exactly equivalent.
+    use crate::Month::*;
+    use crate::units::{Atto, Micro, Pico};
+    use crate::{MicroSeconds, NanoSeconds, Seconds};
+
+    // At the epoch 1977-01-01T00:00:32.184, both time stamps should be exactly equivalent. We
+    // check this to attosecond precision, because there should be no overflow anyway at the epoch.
     let time1 = TcgTime::from_subsecond_datetime(
-        Date::new(1977, Month::January, 1).unwrap(),
+        Date::new(1977, January, 1).unwrap(),
         0,
         0,
         32,
-        MilliSeconds::new(184),
+        MilliSeconds::new(184i64),
     )
-    .unwrap();
+    .unwrap()
+    .convert::<Atto>();
     let time2 = TtTime::from_subsecond_datetime(
-        Date::new(1977, Month::January, 1).unwrap(),
+        Date::new(1977, January, 1).unwrap(),
         0,
         0,
         32,
-        MilliSeconds::new(184),
+        MilliSeconds::new(184i64),
     )
-    .unwrap();
+    .unwrap()
+    .convert::<Atto>();
     assert_eq!(time1, time2.transform());
 
     // 10_000_000_000 seconds after that epoch, there should be a difference of 6.969290134 seconds
-    // based on the known rate difference of L_G = 6.969290134e-10.
-    use crate::{MicroSeconds, Seconds};
-    let time1 = time1.convert() + Seconds::new(10_000_000_000i64).convert();
-    let time2 =
-        time2.convert() + Seconds::new(10_000_000_000i64).convert() - MicroSeconds::new(6969290i64);
+    // based on the known rate difference of L_G = 6.969290134e-10. We check this to microsecond
+    // precision: the offset shall be exactly 6.969290134000 seconds (to picosecond accuracy), but
+    // the float encoding of the rate difference results in a difference on the order of tens of
+    // nanoseconds.
+    let time1 = time1.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).convert();
+    let time2 = time2.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).convert()
+        - NanoSeconds::new(6_969_290_134i128).convert();
     assert_eq!(time1.transform(), time2);
 
     // At J2000, the difference should be about 505.833 ms (see "Report of the IAU WGAS Sub-group
     // on Issues on Time", P.K. Seidelmann).
-    let time1 = TtTime::from_datetime(Date::new(2000, Month::January, 1).unwrap(), 12, 0, 0)
+    let time1 = TtTime::from_datetime(Date::new(2000, January, 1).unwrap(), 12, 0, 0)
         .unwrap()
-        .convert::<crate::units::Micro>();
+        .convert::<Micro>();
     let time2 = TcgTime::from_subsecond_datetime(
-        Date::new(2000, Month::January, 1).unwrap(),
+        Date::new(2000, January, 1).unwrap(),
         12,
         0,
         0,
-        crate::MicroSeconds::new(505833),
+        MicroSeconds::new(505_833),
     )
     .unwrap()
     .convert();
+    assert_eq!(time1.transform(), time2);
+
+    // At J2100 (2100-01-01T12:00:00 TT), the difference should be 2.70517411 seconds (see "Report
+    // of the IAU WGAS Sub-group on Issues on Time", P.K. Seidelmann). Redoing the math using
+    // exact arithmetic leads to an expected result of 2.705173778 seconds (which is also our
+    // result), so we only check this to microsecond precision.
+    let time1 = TtTime::from_datetime(Date::new(2100, January, 1).unwrap(), 12, 0, 0)
+        .unwrap()
+        .convert::<Micro>();
+    let time2 = TcgTime::from_subsecond_datetime(
+        Date::new(2100, January, 1).unwrap(),
+        12,
+        0,
+        2,
+        NanoSeconds::new(705_174_110),
+    )
+    .unwrap()
+    .round::<Micro>();
     assert_eq!(time1.transform(), time2);
 }

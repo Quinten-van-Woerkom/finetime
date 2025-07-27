@@ -7,15 +7,12 @@ use core::{
     ops::{Add, AddAssign, Div, Mul, Neg, Sub},
 };
 
-use num::{
-    Bounded, Integer, NumCast, Signed, Zero,
-    traits::{ConstZero, NumOps},
-};
+use num::{Bounded, Integer, NumCast, Signed, Zero, traits::ConstZero};
 
 use crate::units::{
-    Atto, ConversionRatio, Femto, IsValidConversion, LiteralRatio, Micro, Milli, Nano, Pico, Ratio,
-    SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
-    SecondsPerYear,
+    Atto, ConversionRatio, Femto, Fraction, IsValidConversion, LiteralRatio, Micro, Milli,
+    MulExact, Nano, Pico, Ratio, SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth,
+    SecondsPerWeek, SecondsPerYear,
 };
 
 /// A `Duration` represents the difference between two time points. It has an associated
@@ -82,7 +79,7 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
     /// Converts towards a different time unit, rounding towards the nearest whole unit.
     pub fn round<Target: Ratio>(self) -> Duration<Representation, Target>
     where
-        Representation: NumCast + Integer + Copy,
+        Representation: NumCast + Integer + Copy + MulExact,
     {
         let conversion_ratio = <() as ConversionRatio<Period, Target>>::CONVERSION_RATIO;
         Duration {
@@ -134,22 +131,15 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
         Some(Duration::new(Target::from(self.count)?))
     }
 
-    /// Multiplies by a floating-point value. If the underlying representation cannot store
-    /// fractional values, applies rounding-to-nearest.
-    pub fn multiply_float(self, float: f64) -> Self
+    /// Multiplies by a fraction. If the underlying representation cannot store fractional values,
+    /// applies rounding-to-nearest.
+    pub fn multiply_fraction(self, fraction: Fraction) -> Self
     where
-        Representation: Copy + NumCast + NumOps,
+        Representation: MulExact,
     {
-        let count: Duration<f64, Period> = self.try_cast::<f64>().unwrap() * float;
-        let truncated: Self = count.try_cast().unwrap();
-        let fraction: Duration<f64, Period> = count - truncated.try_cast::<f64>().unwrap();
-        let one: Self = Duration::new(1).try_cast().unwrap();
-        if fraction >= Duration::new(0.5) {
-            truncated + one
-        } else if fraction <= -Duration::new(0.5) {
-            truncated - one
-        } else {
-            truncated
+        Self {
+            count: self.count.mul_exact(fraction),
+            period: core::marker::PhantomData,
         }
     }
 }
