@@ -23,7 +23,7 @@ impl TimeScale for Gpst {
     type NativeRepresentation = i64;
 
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
+        TaiTime::from_generic_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -72,9 +72,10 @@ impl TryFromTimeScale<Unix> for Gpst {
 /// Astrodynamics".
 #[test]
 fn known_timestamps() {
-    let tai = TaiTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32).unwrap();
-    let gpst =
-        GpsTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 13).unwrap();
+    let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
+        .unwrap();
+    let gpst = GpsTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 13)
+        .unwrap();
     assert_eq!(tai, gpst.into_time_scale());
 }
 
@@ -86,22 +87,25 @@ mod proof_harness {
     /// Verifies that construction of a GPS time from a historic date and time stamp never panics.
     #[kani::proof]
     fn from_datetime_never_panics() {
-        let date: Date = kani::any();
+        let year: i32 = kani::any();
+        let month: Month = kani::any();
+        let day: u8 = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = GpsTime::from_datetime(date, hour, minute, second);
+        let _ = GpsTime::from_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that construction of a GPS time from a Gregorian date and time stamp never panics.
     #[kani::proof]
     fn from_gregorian_never_panics() {
-        use crate::calendar::GregorianDate;
-        let date: GregorianDate = kani::any();
+        let year: i32 = kani::any();
+        let month: Month = kani::any();
+        let day: u8 = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = GpsTime::from_datetime(date, hour, minute, second);
+        let _ = GpsTime::from_gregorian_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that all valid GPS time datetimes can be losslessly converted to and from
@@ -109,13 +113,16 @@ mod proof_harness {
     #[kani::proof]
     fn datetime_tai_roundtrip() {
         let date: Date = kani::any();
+        let year: i32 = date.year();
+        let month: Month = date.month();
+        let day: u8 = date.day();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1 = GpsTime::from_datetime(date, hour, minute, second).unwrap();
+        let time1 = GpsTime::from_datetime(year, month, day, hour, minute, second).unwrap();
         let tai: TaiTime<_> = time1.into_time_scale();
         let time2: GpsTime<_> = tai.into_time_scale();
         assert_eq!(time1, time2);

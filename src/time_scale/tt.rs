@@ -24,7 +24,7 @@ impl TimeScale for Tt {
     /// its epoch is precisely 1977-01-01T00:00:00 TAI.
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1977, Month::January, 1).unwrap();
-        TaiTime::from_datetime(date, 0, 0, 0)
+        TaiTime::from_generic_datetime(date, 0, 0, 0)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -73,10 +73,10 @@ impl TryFromTimeScale<Unix> for Tt {
 #[test]
 fn known_timestamps() {
     use crate::{Date, Month, TaiTime};
-    let tai = TaiTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
+    let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
         .unwrap()
         .into_unit();
-    let tt = TtTime::from_subsecond_datetime(
+    let tt = TtTime::from_subsecond_generic_datetime(
         Date::new(2004, Month::May, 14).unwrap(),
         16,
         44,
@@ -90,20 +90,20 @@ fn known_timestamps() {
 #[cfg(kani)]
 mod proof_harness {
     use super::*;
-    use crate::{Date, TaiTime};
+    use crate::TaiTime;
 
     /// Verifies that construction of a terrestrial time from a historic date and time stamp never
     /// panics. An assumption is made on the input range because some dates result in a count of
     /// milliseconds from the TT epoch that is too large to store in an `i64`.
     #[kani::proof]
     fn from_datetime_never_panics() {
-        let date: Date = kani::any();
+        let year: i32 = kani::any();
+        let month: Month = kani::any();
+        let day: u8 = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        kani::assume(date > Date::new(i32::MIN / 8, Month::January, 1).unwrap());
-        kani::assume(date < Date::new(i32::MAX / 8, Month::December, 31).unwrap());
-        let _ = TtTime::from_datetime(date, hour, minute, second);
+        let _ = TtTime::from_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that construction of a terrestrial time from a Gregorian date and time stamp never
@@ -111,14 +111,13 @@ mod proof_harness {
     /// milliseconds from the TT epoch that is too large to store in an `i64`.
     #[kani::proof]
     fn from_gregorian_never_panics() {
-        use crate::calendar::GregorianDate;
-        let date: GregorianDate = kani::any();
+        let year: i32 = kani::any();
+        let month: Month = kani::any();
+        let day: u8 = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        kani::assume(date > GregorianDate::new(i32::MIN / 8, Month::January, 1).unwrap());
-        kani::assume(date < GregorianDate::new(i32::MAX / 8, Month::December, 31).unwrap());
-        let _ = TtTime::from_datetime(date, hour, minute, second);
+        let _ = TtTime::from_gregorian_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that all valid terrestrial time datetimes can be losslessly converted to and from
@@ -127,15 +126,16 @@ mod proof_harness {
     #[kani::proof]
     fn datetime_tai_roundtrip() {
         let date: Date = kani::any();
+        let year: i32 = date.year();
+        let month: Month = date.month();
+        let day: u8 = date.day();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        kani::assume(date > Date::new(i32::MIN / 8, Month::January, 1).unwrap());
-        kani::assume(date < Date::new(i32::MAX / 8, Month::December, 31).unwrap());
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1 = TtTime::from_datetime(date, hour, minute, second).unwrap();
+        let time1 = TtTime::from_datetime(year, month, day, hour, minute, second).unwrap();
         let tai: TaiTime<_, _> = time1.into_time_scale();
         let time2: TtTime<_, _> = tai.into_time_scale();
         assert_eq!(time1, time2);

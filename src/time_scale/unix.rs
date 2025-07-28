@@ -50,7 +50,7 @@ impl TimeScale for Unix {
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1970, Month::January, 1).unwrap();
-        TaiTime::from_datetime(date, 0, 0, 10)
+        TaiTime::from_generic_datetime(date, 0, 0, 10)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -89,63 +89,63 @@ impl From<std::time::SystemTime> for UnixTime<u128, crate::arithmetic::Nano> {
 fn known_timestamps() {
     use crate::duration::Seconds;
     assert_eq!(
-        UnixTime::from_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
+        UnixTime::from_generic_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(0)
     );
 
     assert_eq!(
-        UnixTime::from_datetime(Date::new(1970, Month::January, 2).unwrap(), 0, 0, 0)
+        UnixTime::from_generic_datetime(Date::new(1970, Month::January, 2).unwrap(), 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(24 * 60 * 60),
     );
 
     assert_eq!(
-        UnixTime::from_datetime(Date::new(1972, Month::January, 1).unwrap(), 0, 0, 0)
+        UnixTime::from_generic_datetime(Date::new(1972, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(2 * 365 * 24 * 60 * 60),
     );
 
     assert_eq!(
-        UnixTime::from_datetime(Date::new(1973, Month::January, 1).unwrap(), 0, 0, 0)
+        UnixTime::from_generic_datetime(Date::new(1973, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new((3 * 365 + 1) * 24 * 60 * 60),
     );
 
     assert_eq!(
-        UnixTime::from_datetime(Date::new(1976, Month::January, 1).unwrap(), 0, 0, 0)
+        UnixTime::from_generic_datetime(Date::new(1976, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(189302400),
     );
 
     assert_eq!(
-        UnixTime::from_datetime(Date::new(2025, Month::July, 16).unwrap(), 16, 23, 24)
+        UnixTime::from_generic_datetime(Date::new(2025, Month::July, 16).unwrap(), 16, 23, 24)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(1752683004),
     );
 
     assert_eq!(
-        UnixTime::from_datetime(Date::new(2034, Month::December, 26).unwrap(), 8, 2, 37)
+        UnixTime::from_generic_datetime(Date::new(2034, Month::December, 26).unwrap(), 8, 2, 37)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(2050732957),
     );
 
     assert_eq!(
-        UnixTime::from_datetime(Date::new(2760, Month::April, 1).unwrap(), 21, 59, 58)
+        UnixTime::from_generic_datetime(Date::new(2760, Month::April, 1).unwrap(), 21, 59, 58)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(24937883998),
     );
 
     assert_eq!(
-        UnixTime::from_datetime(Date::new(1643, Month::January, 4).unwrap(), 1, 1, 33)
+        UnixTime::from_generic_datetime(Date::new(1643, Month::January, 4).unwrap(), 1, 1, 33)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(-10318834707),
@@ -159,21 +159,24 @@ mod proof_harness {
     /// Verifies that construction of a Unix time from a historic date and time stamp never panics.
     #[kani::proof]
     fn from_datetime_never_panics() {
-        let date: Date = kani::any();
+        let year: i32 = kani::any();
+        let month: Month = kani::any();
+        let day: u8 = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = UnixTime::from_datetime(date, hour, minute, second);
+        let _ = UnixTime::from_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that construction of a Unix time from a Gregorian date and time stamp never panics.
     #[kani::proof]
     fn from_gregorian_never_panics() {
-        use crate::calendar::GregorianDate;
-        let date: GregorianDate = kani::any();
+        let year: i32 = kani::any();
+        let month: Month = kani::any();
+        let day: u8 = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = UnixTime::from_datetime(date, hour, minute, second);
+        let _ = UnixTime::from_gregorian_datetime(year, month, day, hour, minute, second);
     }
 }

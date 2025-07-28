@@ -11,7 +11,7 @@ use crate::{
 /// of month and year) or because the given date falls within the ranges of dates skipped during
 /// the Gregorian calendar reform (5 up to and including 14 October 1582).
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct DateDoesNotExist {
+pub struct InvalidHistoricDate {
     pub year: i32,
     pub month: Month,
     pub day: u8,
@@ -20,7 +20,7 @@ pub struct DateDoesNotExist {
 /// Returned when a date is being created from a year and a day, but an invalid day-of-year is
 /// passed.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct YearDayDoesNotExist {
+pub struct InvalidDayOfYear {
     pub year: i32,
     pub day_of_year: u16,
 }
@@ -28,7 +28,7 @@ pub struct YearDayDoesNotExist {
 /// Error returned when the requested Gregorian date does not exist, because the requested
 /// combination of month and year does not have the requested number of days.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct GregorianDateDoesNotExist {
+pub struct InvalidGregorianDate {
     pub year: i32,
     pub month: Month,
     pub day: u8,
@@ -64,6 +64,12 @@ pub enum DateTimeError {
         minute: u8,
         second: u8,
     },
+    /// Returned when the requested date is not a valid historic date.
+    InvalidHistoricDate { year: i32, month: Month, day: u8 },
+    /// Returned when the requested date is not a valid Gregorian date.
+    InvalidGregorianDate { year: i32, month: Month, day: u8 },
+    /// Returned when the requested day-of-year does not exist in the given year.
+    InvalidDayOfYear { year: i32, day_of_year: u16 },
 }
 
 /// Errors that may be returned when combining a calendar date with a time-of-day and some given
@@ -83,5 +89,64 @@ where
 {
     fn from(value: DateTimeError) -> Self {
         Self::DateTimeError(value)
+    }
+}
+
+impl From<InvalidHistoricDate> for DateTimeError {
+    fn from(value: InvalidHistoricDate) -> Self {
+        DateTimeError::InvalidHistoricDate {
+            year: value.year,
+            month: value.month,
+            day: value.day,
+        }
+    }
+}
+
+impl<T, P> From<InvalidHistoricDate> for FineDateTimeError<T, P>
+where
+    P: Unit,
+    T: TimeRepresentation,
+{
+    fn from(value: InvalidHistoricDate) -> Self {
+        Self::DateTimeError(value.into())
+    }
+}
+
+impl From<InvalidGregorianDate> for DateTimeError {
+    fn from(value: InvalidGregorianDate) -> Self {
+        DateTimeError::InvalidHistoricDate {
+            year: value.year,
+            month: value.month,
+            day: value.day,
+        }
+    }
+}
+
+impl<T, P> From<InvalidGregorianDate> for FineDateTimeError<T, P>
+where
+    P: Unit,
+    T: TimeRepresentation,
+{
+    fn from(value: InvalidGregorianDate) -> Self {
+        Self::DateTimeError(value.into())
+    }
+}
+
+impl From<InvalidDayOfYear> for DateTimeError {
+    fn from(value: InvalidDayOfYear) -> Self {
+        DateTimeError::InvalidDayOfYear {
+            year: value.year,
+            day_of_year: value.day_of_year,
+        }
+    }
+}
+
+impl<T, P> From<InvalidDayOfYear> for FineDateTimeError<T, P>
+where
+    P: Unit,
+    T: TimeRepresentation,
+{
+    fn from(value: InvalidDayOfYear) -> Self {
+        Self::DateTimeError(value.into())
     }
 }

@@ -54,34 +54,34 @@ impl Utc {
 fn calendar_dates_near_insertion() {
     // Leap second insertion of June 2015.
     let date = Date::new(2015, June, 30).unwrap();
-    let regular_second1 = UtcTime::from_datetime(date, 23, 59, 58).unwrap();
-    let regular_second2 = UtcTime::from_datetime(date, 23, 59, 59).unwrap();
+    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
+    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
     assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
-    let leap_second = UtcTime::from_datetime(date, 23, 59, 60).unwrap();
+    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60).unwrap();
     assert_eq!(leap_second - regular_second2, Seconds::new(1i64));
     assert_eq!(leap_second - regular_second1, Seconds::new(2i64));
     let date2 = Date::new(2015, July, 1).unwrap();
-    let regular_second3 = UtcTime::from_datetime(date2, 0, 0, 0).unwrap();
+    let regular_second3 = UtcTime::from_generic_datetime(date2, 0, 0, 0).unwrap();
     assert_eq!(regular_second3 - leap_second, Seconds::new(1i64));
 
     // Leap second insertion of December 2016.
     let date = Date::new(2016, December, 31).unwrap();
-    let regular_second1 = UtcTime::from_datetime(date, 23, 59, 58).unwrap();
-    let regular_second2 = UtcTime::from_datetime(date, 23, 59, 59).unwrap();
+    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
+    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
     assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
-    let leap_second = UtcTime::from_datetime(date, 23, 59, 60).unwrap();
+    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60).unwrap();
     assert_eq!(leap_second - regular_second2, Seconds::new(1i64));
     assert_eq!(leap_second - regular_second1, Seconds::new(2i64));
     let date2 = Date::new(2017, January, 1).unwrap();
-    let regular_second3 = UtcTime::from_datetime(date2, 0, 0, 0).unwrap();
+    let regular_second3 = UtcTime::from_generic_datetime(date2, 0, 0, 0).unwrap();
     assert_eq!(regular_second3 - leap_second, Seconds::new(1i64));
 
     // Non-leap second date: June 2016
     let date = Date::new(2016, June, 30).unwrap();
-    let regular_second1 = UtcTime::from_datetime(date, 23, 59, 58).unwrap();
-    let regular_second2 = UtcTime::from_datetime(date, 23, 59, 59).unwrap();
+    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
+    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
     assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
-    let leap_second = UtcTime::from_datetime(date, 23, 59, 60);
+    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60);
     assert_eq!(
         leap_second,
         Err(DateTimeError::NoLeapSecondInsertion {
@@ -105,15 +105,15 @@ fn roundtrip_near_leap_seconds() {
     let date5 = Date::new(2016, June, 30).unwrap();
 
     let times = [
-        UnixTime::from_datetime(date, 23, 59, 58).unwrap(),
-        UnixTime::from_datetime(date, 23, 59, 59).unwrap(),
-        UnixTime::from_datetime(date2, 0, 0, 0).unwrap(),
-        UnixTime::from_datetime(date2, 0, 0, 1).unwrap(),
-        UnixTime::from_datetime(date3, 23, 59, 58).unwrap(),
-        UnixTime::from_datetime(date3, 23, 59, 59).unwrap(),
-        UnixTime::from_datetime(date4, 0, 0, 0).unwrap(),
-        UnixTime::from_datetime(date5, 23, 59, 58).unwrap(),
-        UnixTime::from_datetime(date5, 23, 59, 59).unwrap(),
+        UnixTime::from_generic_datetime(date, 23, 59, 58).unwrap(),
+        UnixTime::from_generic_datetime(date, 23, 59, 59).unwrap(),
+        UnixTime::from_generic_datetime(date2, 0, 0, 0).unwrap(),
+        UnixTime::from_generic_datetime(date2, 0, 0, 1).unwrap(),
+        UnixTime::from_generic_datetime(date3, 23, 59, 58).unwrap(),
+        UnixTime::from_generic_datetime(date3, 23, 59, 59).unwrap(),
+        UnixTime::from_generic_datetime(date4, 0, 0, 0).unwrap(),
+        UnixTime::from_generic_datetime(date5, 23, 59, 58).unwrap(),
+        UnixTime::from_generic_datetime(date5, 23, 59, 59).unwrap(),
     ];
 
     for &time in times.iter() {
@@ -139,7 +139,7 @@ impl TimeScale for Utc {
 
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1970, January, 1).unwrap();
-        TaiTime::from_datetime(date, 0, 0, 10)
+        TaiTime::from_generic_datetime(date, 0, 0, 10)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -189,7 +189,7 @@ impl TimeScale for Utc {
         // seconds are not incorporated, so we may compute it directly. Note that we do not compute
         // the seconds component, because that will require additional logic to handle leap
         // seconds.
-        let unix_time_minutes = match UnixTime::from_datetime(date, hour, minute, 0) {
+        let unix_time_minutes = match UnixTime::from_generic_datetime(date, hour, minute, 0) {
             Ok(unix_time) => unix_time,
             _ => unreachable!(),
         };
@@ -587,42 +587,42 @@ include!(concat!(env!("OUT_DIR"), "/leap_seconds.rs"));
 #[test]
 fn known_leap_seconds() {
     assert_eq!(
-        UtcTime::from_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
+        UtcTime::from_generic_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(0)
     );
 
     assert_eq!(
-        UtcTime::from_datetime(Date::new(1973, Month::December, 31).unwrap(), 23, 59, 59)
+        UtcTime::from_generic_datetime(Date::new(1973, Month::December, 31).unwrap(), 23, 59, 59)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(126230401)
     );
 
     assert_eq!(
-        UtcTime::from_datetime(Date::new(1973, Month::December, 31).unwrap(), 23, 59, 60)
+        UtcTime::from_generic_datetime(Date::new(1973, Month::December, 31).unwrap(), 23, 59, 60)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(126230402)
     );
 
     assert_eq!(
-        UtcTime::from_datetime(Date::new(1974, Month::January, 1).unwrap(), 0, 0, 0)
+        UtcTime::from_generic_datetime(Date::new(1974, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(126230403)
     );
 
     assert_eq!(
-        UtcTime::from_datetime(Date::new(2025, Month::July, 16).unwrap(), 0, 0, 0)
+        UtcTime::from_generic_datetime(Date::new(2025, Month::July, 16).unwrap(), 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(1752624027)
     );
 
     assert_eq!(
-        UtcTime::from_datetime(Date::new(2025, Month::July, 16).unwrap(), 17, 36, 4)
+        UtcTime::from_generic_datetime(Date::new(2025, Month::July, 16).unwrap(), 17, 36, 4)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(1752687391)
@@ -633,8 +633,9 @@ fn known_leap_seconds() {
 /// Astrodynamics".
 #[test]
 fn known_timestamps() {
-    let utc = UtcTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 0).unwrap();
-    let tai = TaiTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
+    let utc = UtcTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 0)
+        .unwrap();
+    let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
         .unwrap()
         .into_time_scale();
     assert_eq!(utc, tai);

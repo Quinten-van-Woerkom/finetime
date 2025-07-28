@@ -23,7 +23,7 @@ impl TimeScale for Tcg {
     /// its epoch is precisely 1977-01-01T00:00:00 TAI.
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1977, Month::January, 1).unwrap();
-        TaiTime::from_datetime(date, 0, 0, 0)
+        TaiTime::from_generic_datetime(date, 0, 0, 0)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -95,20 +95,19 @@ impl FromTimeScale<Tt> for Tcg {
 #[cfg(kani)]
 mod proof_harness {
     use super::*;
-    use crate::Date;
 
     /// Verifies that construction of a TCG time from a historic date and time stamp never panics.
     /// An assumption is made on the input range because some dates result in a count of
     /// milliseconds from the TCG epoch that is too large to store in an `i64`.
     #[kani::proof]
     fn from_datetime_never_panics() {
-        let date: Date = kani::any();
+        let year: i32 = kani::any();
+        let month: Month = kani::any();
+        let day: u8 = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        kani::assume(date > Date::new(i32::MIN / 8, Month::January, 1).unwrap());
-        kani::assume(date < Date::new(i32::MAX / 8, Month::December, 31).unwrap());
-        let _ = TcgTime::from_datetime(date, hour, minute, second);
+        let _ = TcgTime::from_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that construction of a TCG time from a Gregorian date and time stamp never panics.
@@ -116,14 +115,13 @@ mod proof_harness {
     /// milliseconds from the TCG epoch that is too large to store in an `i64`.
     #[kani::proof]
     fn from_gregorian_never_panics() {
-        use crate::calendar::GregorianDate;
-        let date: GregorianDate = kani::any();
+        let year: i32 = kani::any();
+        let month: Month = kani::any();
+        let day: u8 = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        kani::assume(date > GregorianDate::new(i32::MIN / 8, Month::January, 1).unwrap());
-        kani::assume(date < GregorianDate::new(i32::MAX / 8, Month::December, 31).unwrap());
-        let _ = TcgTime::from_datetime(date, hour, minute, second);
+        let _ = TcgTime::from_gregorian_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that all valid TCG time datetimes can be converted to and from the equivalent TT
@@ -132,16 +130,17 @@ mod proof_harness {
     #[kani::proof]
     fn datetime_tt_tcg_roundtrip() {
         let date: Date = kani::any();
+        let year: i32 = date.year();
+        let month: Month = date.month();
+        let day: u8 = date.day();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        kani::assume(date > Date::new(i32::MIN / 32, Month::January, 1).unwrap());
-        kani::assume(date < Date::new(i32::MAX / 32, Month::December, 31).unwrap());
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
         let time1: TcgTime<i128, crate::arithmetic::Nano> =
-            TcgTime::from_datetime(date, hour, minute, second)
+            TcgTime::from_datetime(year, month, day, hour, minute, second)
                 .unwrap()
                 .cast()
                 .into_unit();
@@ -159,7 +158,7 @@ fn datetime_tt_tcg_conversion() {
 
     // At the epoch 1977-01-01T00:00:32.184, both time stamps should be exactly equivalent. We
     // check this to attosecond precision, because there should be no overflow anyway at the epoch.
-    let time1 = TcgTime::from_subsecond_datetime(
+    let time1 = TcgTime::from_subsecond_generic_datetime(
         Date::new(1977, January, 1).unwrap(),
         0,
         0,
@@ -168,7 +167,7 @@ fn datetime_tt_tcg_conversion() {
     )
     .unwrap()
     .into_unit::<Atto>();
-    let time2 = TtTime::from_subsecond_datetime(
+    let time2 = TtTime::from_subsecond_generic_datetime(
         Date::new(1977, January, 1).unwrap(),
         0,
         0,
@@ -190,10 +189,10 @@ fn datetime_tt_tcg_conversion() {
 
     // At J2000, the difference should be about 505.833 ms (see "Report of the IAU WGAS Sub-group
     // on Issues on Time", P.K. Seidelmann).
-    let time1 = TtTime::from_datetime(Date::new(2000, January, 1).unwrap(), 12, 0, 0)
+    let time1 = TtTime::from_generic_datetime(Date::new(2000, January, 1).unwrap(), 12, 0, 0)
         .unwrap()
         .into_unit::<Micro>();
-    let time2 = TcgTime::from_subsecond_datetime(
+    let time2 = TcgTime::from_subsecond_generic_datetime(
         Date::new(2000, January, 1).unwrap(),
         12,
         0,
@@ -208,10 +207,10 @@ fn datetime_tt_tcg_conversion() {
     // of the IAU WGAS Sub-group on Issues on Time", P.K. Seidelmann). Redoing the math using
     // exact arithmetic leads to an expected result of 2.705173778 seconds (which is also our
     // result), so we only check this to microsecond precision.
-    let time1 = TtTime::from_datetime(Date::new(2100, January, 1).unwrap(), 12, 0, 0)
+    let time1 = TtTime::from_generic_datetime(Date::new(2100, January, 1).unwrap(), 12, 0, 0)
         .unwrap()
         .into_unit::<Micro>();
-    let time2 = TcgTime::from_subsecond_datetime(
+    let time2 = TcgTime::from_subsecond_generic_datetime(
         Date::new(2100, January, 1).unwrap(),
         12,
         0,

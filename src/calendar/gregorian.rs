@@ -5,7 +5,7 @@
 use core::ops::Sub;
 
 use crate::{
-    GregorianDateDoesNotExist, calendar::Month, duration::Days, time_point::TimePoint,
+    InvalidGregorianDate, calendar::Month, duration::Days, time_point::TimePoint,
     time_scale::LocalDays,
 };
 
@@ -28,11 +28,11 @@ impl GregorianDate {
     /// requested date does not exist in the proleptic Gregorian calendar.
     ///
     /// This function will never panic.
-    pub const fn new(year: i32, month: Month, day: u8) -> Result<Self, GregorianDateDoesNotExist> {
+    pub const fn new(year: i32, month: Month, day: u8) -> Result<Self, InvalidGregorianDate> {
         if Self::is_valid_date(year, month, day) {
             Ok(Self { year, month, day })
         } else {
-            Err(GregorianDateDoesNotExist { year, month, day })
+            Err(InvalidGregorianDate { year, month, day })
         }
     }
 

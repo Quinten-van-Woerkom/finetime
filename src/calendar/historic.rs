@@ -4,7 +4,7 @@
 use core::ops::Sub;
 
 use crate::{
-    DateDoesNotExist, YearDayDoesNotExist, calendar::Month, duration::Days, time_scale::LocalDays,
+    InvalidDayOfYear, InvalidHistoricDate, calendar::Month, duration::Days, time_scale::LocalDays,
 };
 
 /// Implementation of a date in the historic calendar. After 15 October 1582, this coincides with
@@ -27,11 +27,11 @@ impl Date {
     /// requested date does not exist.
     ///
     /// This function will never panic.
-    pub const fn new(year: i32, month: Month, day: u8) -> Result<Self, DateDoesNotExist> {
+    pub const fn new(year: i32, month: Month, day: u8) -> Result<Self, InvalidHistoricDate> {
         if Self::is_valid_date(year, month, day) {
             Ok(Self { year, month, day })
         } else {
-            Err(DateDoesNotExist { year, month, day })
+            Err(InvalidHistoricDate { year, month, day })
         }
     }
 
@@ -39,11 +39,11 @@ impl Date {
     /// algorithm found by A. Pouplier and reported by Jean Meeus in Astronomical Algorithms.
     ///
     /// This function will never panic.
-    pub const fn from_year_day(year: i32, day_of_year: u16) -> Result<Self, YearDayDoesNotExist> {
+    pub const fn from_year_day(year: i32, day_of_year: u16) -> Result<Self, InvalidDayOfYear> {
         // Validate the input
         let is_leap_year = Self::is_leap_year(year);
         if day_of_year == 0 || day_of_year > 366 || (day_of_year == 366 && !is_leap_year) {
-            return Err(YearDayDoesNotExist { year, day_of_year });
+            return Err(InvalidDayOfYear { year, day_of_year });
         }
 
         // Compute the month and day-of-month.
@@ -83,7 +83,7 @@ impl Date {
         // including 14 October 1582, which don't exist).
         match Date::new(year, month, day) {
             Ok(date) => Ok(date),
-            Err(_) => Err(YearDayDoesNotExist { year, day_of_year }),
+            Err(_) => Err(InvalidDayOfYear { year, day_of_year }),
         }
     }
 

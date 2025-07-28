@@ -9,7 +9,7 @@ use core::{
 use num::Integer;
 
 use crate::{
-    DateTimeError, FineDateTimeError, FromTimeScale, TryIntoTimeScale,
+    Date, DateTimeError, FineDateTimeError, FromTimeScale, GregorianDate, Month, TryIntoTimeScale,
     arithmetic::{
         IntoUnit, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
         TimeRepresentation, TryFromExact, TryIntoExact, Unit,
@@ -92,7 +92,7 @@ where
     }
 
     /// Creates a `TimePoint` from some datetime and time-of-day, plus some additional subseconds.
-    pub fn from_subsecond_datetime(
+    pub fn from_subsecond_generic_datetime(
         date: impl Into<LocalDays<i64>>,
         hour: u8,
         minute: u8,
@@ -101,13 +101,83 @@ where
     ) -> Result<Self, FineDateTimeError<Representation, Period>>
     where
         Scale: TimeScale,
-        Period: Unit,
         Representation: TimeRepresentation + TryFromExact<Scale::NativeRepresentation>,
         Period: Unit + FromDate<Representation> + FromUnit<Scale::NativePeriod, Representation>,
         Second: FromDate<Scale::NativeRepresentation>,
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
     {
         Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subseconds)
+    }
+
+    /// Creates a `TimePoint` from a historic calendar date and an associated subsecond
+    /// time-of-day. Uses the historic calendar, i.e., Julian before the Gregorian reform in
+    /// October 1582 and Gregorian after.
+    ///
+    /// This is the calendar that is also used by IAU SOFA and NAIF SPICE, as well as Meeus in his
+    /// Astronomical Algorithms book. Hence, most users probably expect it to be the calendar of
+    /// choice.
+    pub fn from_subsecond_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subsecond: Duration<Representation, Period>,
+    ) -> Result<Self, FineDateTimeError<Representation, Period>>
+    where
+        Scale: TimeScale,
+        Representation: TimeRepresentation + TryFromExact<Scale::NativeRepresentation>,
+        Period: Unit + FromDate<Representation> + FromUnit<Scale::NativePeriod, Representation>,
+        Second: FromDate<Scale::NativeRepresentation>,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
+    {
+        let date = Date::new(year, month, day)?;
+        Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
+    }
+
+    /// Creates a `TimePoint` from a Gregorian calendar date and an associated subsecond
+    /// time-of-day. Uses the proleptic Gregorian calendar.
+    /// choice.
+    pub fn from_subsecond_gregorian_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subsecond: Duration<Representation, Period>,
+    ) -> Result<Self, FineDateTimeError<Representation, Period>>
+    where
+        Scale: TimeScale,
+        Representation: TimeRepresentation + TryFromExact<Scale::NativeRepresentation>,
+        Period: Unit + FromDate<Representation> + FromUnit<Scale::NativePeriod, Representation>,
+        Second: FromDate<Scale::NativeRepresentation>,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
+    {
+        let date = GregorianDate::new(year, month, day)?;
+        Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
+    }
+
+    /// Creates a `TimePoint` from a given year and day-of-year, with an associated time-of-day.
+    /// Uses the historic calendar to determine the number of days in a year.
+    pub fn from_subsecond_year_day_time(
+        year: i32,
+        day_of_year: u16,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subsecond: Duration<Representation, Period>,
+    ) -> Result<Self, FineDateTimeError<Representation, Period>>
+    where
+        Scale: TimeScale,
+        Representation: TimeRepresentation + TryFromExact<Scale::NativeRepresentation>,
+        Period: Unit + FromDate<Representation> + FromUnit<Scale::NativePeriod, Representation>,
+        Second: FromDate<Scale::NativeRepresentation>,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
+    {
+        let date = Date::from_year_day(year, day_of_year)?;
+        Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
     }
 
     /// Converts towards a different time unit, rounding towards the nearest whole unit.
@@ -154,8 +224,9 @@ impl<Scale>
 where
     Scale: TimeScale,
 {
-    /// Creates a `TimePoint` from a historic date and an associated time-of-day.
-    pub fn from_datetime(
+    /// Creates a `TimePoint` from a historic date and an associated time-of-day. This is a generic
+    /// method that accepts any kind of calendar: when in doubt, use `from_datetime` instead.
+    pub fn from_generic_datetime(
         date: impl Into<LocalDays<i64>>,
         hour: u8,
         minute: u8,
@@ -166,6 +237,67 @@ where
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
         Second: FromDate<Scale::NativeRepresentation>,
     {
+        Scale::from_local_datetime(date.into(), hour, minute, second)
+    }
+
+    /// Creates a `TimePoint` from a historic calendar date and an associated time-of-day. Uses the
+    /// historic calendar, i.e., Julian before the Gregorian reform in October 1582 and Gregorian
+    /// after.
+    ///
+    /// This is the calendar that is also used by IAU SOFA and NAIF SPICE, as well as Meeus in his
+    /// Astronomical Algorithms book. Hence, most users probably expect it to be the calendar of
+    /// choice.
+    pub fn from_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, DateTimeError>
+    where
+        Scale: TimeScale,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
+        Second: FromDate<Scale::NativeRepresentation>,
+    {
+        let date = Date::new(year, month, day)?;
+        Scale::from_local_datetime(date.into(), hour, minute, second)
+    }
+
+    /// Creates a `TimePoint` from a Gregorian calendar date and an associated time-of-day. Uses
+    /// the proleptic Gregorian calendar, i.e., also before 1582.
+    pub fn from_gregorian_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, DateTimeError>
+    where
+        Scale: TimeScale,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
+        Second: FromDate<Scale::NativeRepresentation>,
+    {
+        let date = GregorianDate::new(year, month, day)?;
+        Scale::from_local_datetime(date.into(), hour, minute, second)
+    }
+
+    /// Creates a `TimePoint` from a given year and day-of-year, with an associated time-of-day.
+    /// Uses the historic calendar to determine the number of days in a year.
+    pub fn from_day_of_year_time(
+        year: i32,
+        day_of_year: u16,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, DateTimeError>
+    where
+        Scale: TimeScale,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
+        Second: FromDate<Scale::NativeRepresentation>,
+    {
+        let date = Date::from_year_day(year, day_of_year)?;
         Scale::from_local_datetime(date.into(), hour, minute, second)
     }
 }
