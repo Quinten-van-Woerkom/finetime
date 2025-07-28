@@ -36,6 +36,7 @@ pub trait TimeRepresentation:
     + FromPrimitive
     + TryFromExact<i64>
     + TryIntoExact<i64>
+    + TryFromExact<u8>
 {
 }
 
@@ -52,5 +53,6 @@ impl<T> TimeRepresentation for T where
         + FromPrimitive
         + TryFromExact<i64>
         + TryIntoExact<i64>
+        + TryFromExact<u8>
 {
 }

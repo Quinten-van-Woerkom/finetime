@@ -4,7 +4,7 @@
 use crate::{
     FromTimeScale, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
     TryFromTimeScale, Tt, Unix, Utc,
-    arithmetic::{FromUnit, Second, TimeRepresentation, Unit},
+    arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
 
@@ -20,10 +20,9 @@ pub struct Gpst;
 impl TimeScale for Gpst {
     type NativePeriod = Second;
 
-    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    type NativeRepresentation = i64;
+
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         TaiTime::from_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
             .unwrap()
             .into_unit()
@@ -31,10 +30,7 @@ impl TimeScale for Gpst {
             .unwrap()
     }
 
-    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         Date::new(1980, Month::January, 6)
             .unwrap()
             .to_local_days()
@@ -60,9 +56,12 @@ impl TryFromTimeScale<Unix> for Gpst {
     ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
         Period: Unit
-            + FromUnit<<Unix as TimeScale>::NativePeriod, Representation>
-            + FromUnit<Self::NativePeriod, Representation>,
-        Representation: TimeRepresentation,
+            + FromUnit<<Unix as TimeScale>::NativePeriod, <Unix as TimeScale>::NativeRepresentation>
+            + FromUnit<Self::NativePeriod, Self::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<<Unix as TimeScale>::NativeRepresentation>
+            + TryFromExact<Self::NativeRepresentation>,
     {
         let utc_time = Utc::try_from_time_scale(from)?;
         Ok(utc_time.into_time_scale())

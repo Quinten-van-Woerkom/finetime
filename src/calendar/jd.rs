@@ -65,8 +65,8 @@ where
     fn from(value: LocalTime<Representation, Period>) -> Self {
         Self {
             day: value.elapsed_time_since_epoch()
-                + Days::new(2440587).cast().into_unit()
-                + Hours::new(12).cast().into_unit(),
+                + Days::new(2440587i64).cast().into_unit()
+                + Hours::new(12i64).cast().into_unit(),
         }
     }
 }
@@ -83,7 +83,9 @@ where
     /// nothing more than a constant offset of the number of days between the two epochs.
     fn from(value: JulianDate<Representation, Period>) -> Self {
         Self::from_time_since_epoch(
-            value.day - Days::new(2440587).cast().into_unit() - Hours::new(12).cast().into_unit(),
+            value.day
+                - Days::new(2440587i64).cast().into_unit()
+                - Hours::new(12i64).cast().into_unit(),
         )
     }
 }

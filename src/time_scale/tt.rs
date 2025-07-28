@@ -3,7 +3,7 @@
 use crate::{
     Date, FromTimeScale, Gpst, LeapSecondError, LocalTime, Month, Tai, TaiTime, TimePoint,
     TimeScale, TryFromTimeScale, Unix, Utc,
-    arithmetic::{FromUnit, Milli, Second, TimeRepresentation, Unit},
+    arithmetic::{FromUnit, Milli, Second, TimeRepresentation, TryFromExact, Unit},
     duration::MilliSeconds,
 };
 
@@ -18,12 +18,11 @@ pub struct Tt;
 impl TimeScale for Tt {
     type NativePeriod = Milli;
 
+    type NativeRepresentation = i128;
+
     /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI. This means that
     /// its epoch is precisely 1977-01-01T00:00:00 TAI.
-    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1977, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 0)
             .unwrap()
@@ -34,10 +33,7 @@ impl TimeScale for Tt {
 
     /// For practical reasons (conversion to and from TCG), it is convenient to set the TT epoch to
     /// 1977-01-01T00:00:32.184: at this time, TT and TCG match exactly (by definition).
-    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1977, Month::January, 1).unwrap();
         let epoch = date.to_local_days().into_unit() + MilliSeconds::new(32_184);
         epoch.try_cast().unwrap()
@@ -60,9 +56,12 @@ impl TryFromTimeScale<Unix> for Tt {
     ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
         Period: Unit
-            + FromUnit<<Unix as TimeScale>::NativePeriod, Representation>
-            + FromUnit<Self::NativePeriod, Representation>,
-        Representation: TimeRepresentation,
+            + FromUnit<<Unix as TimeScale>::NativePeriod, <Unix as TimeScale>::NativeRepresentation>
+            + FromUnit<Self::NativePeriod, Self::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<<Unix as TimeScale>::NativeRepresentation>
+            + TryFromExact<Self::NativeRepresentation>,
     {
         let utc_time = Utc::try_from_time_scale(from)?;
         Ok(utc_time.into_time_scale())

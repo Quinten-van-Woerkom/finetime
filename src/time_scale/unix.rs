@@ -2,7 +2,7 @@
 
 use crate::{
     LocalTime,
-    arithmetic::{Second, TimeRepresentation},
+    arithmetic::Second,
     calendar::{Date, Month},
     duration::Duration,
     time_point::TimePoint,
@@ -45,11 +45,10 @@ impl Unix {
 impl TimeScale for Unix {
     type NativePeriod = Second;
 
+    type NativeRepresentation = i64;
+
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
-    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1970, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10)
             .unwrap()
@@ -60,10 +59,7 @@ impl TimeScale for Unix {
 
     /// Because the Unix epoch coincides with the `LocalDays` epoch, it can be constructed simply
     /// as a zero value.
-    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         LocalDays::from_time_since_epoch(Duration::new(0))
             .into_unit()
             .try_cast()

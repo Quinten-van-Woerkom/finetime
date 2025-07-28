@@ -4,7 +4,7 @@ use num::Zero;
 
 use crate::{
     FromTimeScale, Gpst, LeapSecondError, LocalTime, Seconds, TryFromTimeScale, Tt, Unix, Utc,
-    arithmetic::{FromUnit, Second, TimeRepresentation, Unit},
+    arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
     time_point::TimePoint,
     time_scale::TimeScale,
@@ -22,18 +22,14 @@ pub struct Tai;
 impl TimeScale for Tai {
     type NativePeriod = Second;
 
+    type NativeRepresentation = i64;
+
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
-    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         TimePoint::from_time_since_epoch(Seconds::<i64>::zero().try_cast().unwrap())
     }
 
-    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         Date::new(1958, Month::January, 1)
             .unwrap()
             .to_local_days()
@@ -59,9 +55,12 @@ impl TryFromTimeScale<Unix> for Tai {
     ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
         Period: Unit
-            + FromUnit<<Unix as TimeScale>::NativePeriod, Representation>
-            + FromUnit<Self::NativePeriod, Representation>,
-        Representation: TimeRepresentation,
+            + FromUnit<<Unix as TimeScale>::NativePeriod, <Unix as TimeScale>::NativeRepresentation>
+            + FromUnit<Self::NativePeriod, Self::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<<Unix as TimeScale>::NativeRepresentation>
+            + TryFromExact<Self::NativeRepresentation>,
     {
         let utc_time = Utc::try_from_time_scale(from)?;
         Ok(utc_time.into_time_scale())

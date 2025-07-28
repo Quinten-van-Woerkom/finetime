@@ -10,7 +10,7 @@ use crate::{
     TimeScale, TryFromTimeScale, Tt, Unix, UnixTime,
     arithmetic::{
         FromUnit, IntoUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
-        TimeRepresentation, TryIntoExact, Unit,
+        TimeRepresentation, TryFromExact, Unit,
     },
     calendar::{
         Date,
@@ -135,10 +135,9 @@ fn roundtrip_near_leap_seconds() {
 impl TimeScale for Utc {
     type NativePeriod = Second;
 
-    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    type NativeRepresentation = i64;
+
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1970, January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10)
             .unwrap()
@@ -149,10 +148,7 @@ impl TimeScale for Utc {
 
     /// Because the UTC epoch coincides with the `LocalDays` epoch, it can be constructed simply
     /// as a zero value.
-    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation,
-    {
+    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         LocalDays::from_time_since_epoch(Duration::new(0i64))
             .into_unit()
             .try_cast()
@@ -301,9 +297,12 @@ impl TryFromTimeScale<Unix> for Utc {
     ) -> Result<UtcTime<Representation, Period>, Self::Error>
     where
         Period: Unit
-            + FromUnit<Self::NativePeriod, Representation>
-            + FromUnit<<Unix as TimeScale>::NativePeriod, Representation>,
-        Representation: TimeRepresentation + TryIntoExact<i64>,
+            + FromUnit<<Unix as TimeScale>::NativePeriod, <Unix as TimeScale>::NativeRepresentation>
+            + FromUnit<Self::NativePeriod, Self::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<<Unix as TimeScale>::NativeRepresentation>
+            + TryFromExact<Self::NativeRepresentation>,
     {
         let utc = {
             let unix_time_seconds: UnixTime<_> = from.clone().floor();

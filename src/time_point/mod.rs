@@ -9,7 +9,7 @@ use core::{
 use num::Integer;
 
 use crate::{
-    DateTimeError, FineDateTimeError, IntoTimeScale, TryIntoTimeScale,
+    DateTimeError, FineDateTimeError, FromTimeScale, TryIntoTimeScale,
     arithmetic::{
         IntoUnit, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
         TimeRepresentation, TryFromExact, TryIntoExact, Unit,
@@ -46,8 +46,9 @@ impl<Scale> TimePoint<Scale, u128, Nano> {
     pub fn now() -> Result<Self, <Scale as TryFromTimeScale<Unix>>::Error>
     where
         Scale: TimeScale + TryFromTimeScale<Unix>,
-        Nano: FromUnit<<Unix as TimeScale>::NativePeriod, u128>
-            + FromUnit<<Scale as TimeScale>::NativePeriod, u128>,
+        Nano: FromUnit<<Unix as TimeScale>::NativePeriod, <Unix as TimeScale>::NativeRepresentation>
+            + FromUnit<<Scale as TimeScale>::NativePeriod, <Scale as TimeScale>::NativeRepresentation>,
+        u128: TryFromExact<<Scale as TimeScale>::NativeRepresentation>,
     {
         let system_time = std::time::SystemTime::now();
         let unix_time = UnixTime::from(system_time);
@@ -101,11 +102,10 @@ where
     where
         Scale: TimeScale,
         Period: Unit,
-        SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
-        SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
-        SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
-        Second: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
-        Scale::NativePeriod: IntoUnit<Period, Representation>,
+        Representation: TimeRepresentation + TryFromExact<Scale::NativeRepresentation>,
+        Period: Unit + FromDate<Representation> + FromUnit<Scale::NativePeriod, Representation>,
+        Second: FromDate<Scale::NativeRepresentation>,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
     {
         Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subseconds)
     }
@@ -149,7 +149,8 @@ where
     }
 }
 
-impl<Scale> TimePoint<Scale, i64, <Scale as TimeScale>::NativePeriod>
+impl<Scale>
+    TimePoint<Scale, <Scale as TimeScale>::NativeRepresentation, <Scale as TimeScale>::NativePeriod>
 where
     Scale: TimeScale,
 {
@@ -162,10 +163,8 @@ where
     ) -> Result<Self, DateTimeError>
     where
         Scale: TimeScale,
-        SecondsPerDay: IntoUnit<Second, i64> + IntoUnit<Scale::NativePeriod, i64>,
-        SecondsPerHour: IntoUnit<Second, i64> + IntoUnit<Scale::NativePeriod, i64>,
-        SecondsPerMinute: IntoUnit<Second, i64> + IntoUnit<Scale::NativePeriod, i64>,
-        Second: IntoUnit<Scale::NativePeriod, i64>,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
+        Second: FromDate<Scale::NativeRepresentation>,
     {
         Scale::from_local_datetime(date.into(), hour, minute, second)
     }
@@ -232,12 +231,16 @@ where
     /// Transforms a time point towards another time scale.
     pub fn into_time_scale<Target>(self) -> TimePoint<Target, Representation, Period>
     where
-        Target: TimeScale,
-        Scale: TimeScale + IntoTimeScale<Target>,
-        Period: FromUnit<Scale::NativePeriod, Representation>
-            + FromUnit<Target::NativePeriod, Representation>,
+        Scale: TimeScale,
+        Target: TimeScale + FromTimeScale<Scale>,
+        Period: Unit
+            + FromUnit<Scale::NativePeriod, Scale::NativeRepresentation>
+            + FromUnit<Target::NativePeriod, Target::NativeRepresentation>,
+        Representation: TimeRepresentation
+            + TryFromExact<Scale::NativeRepresentation>
+            + TryFromExact<Target::NativeRepresentation>,
     {
-        <Scale as IntoTimeScale<Target>>::into_time_scale(self)
+        <Target as FromTimeScale<Scale>>::from_time_scale(self)
     }
 
     /// Tries to transform a time point into another time scale.
@@ -248,11 +251,34 @@ where
     where
         Scale: TimeScale,
         Target: TryFromTimeScale<Scale> + TimeScale,
-        Period: FromUnit<Scale::NativePeriod, Representation>
-            + FromUnit<Target::NativePeriod, Representation>,
+        Period: FromUnit<Scale::NativePeriod, Scale::NativeRepresentation>
+            + FromUnit<Target::NativePeriod, Target::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<Scale::NativeRepresentation>
+            + TryFromExact<Target::NativeRepresentation>,
     {
         Target::try_from_time_scale(self)
     }
+}
+
+/// Helper trait that is used to indicate that a certain unit can be used to express datetimes. In
+/// practice, that just means that it must be able to convert from days, hours, minutes, and
+/// seconds.
+pub trait FromDate<Representation>:
+    FromUnit<SecondsPerDay, Representation>
+    + FromUnit<SecondsPerHour, Representation>
+    + FromUnit<SecondsPerMinute, Representation>
+    + FromUnit<Second, Representation>
+{
+}
+
+impl<Representation, Period> FromDate<Representation> for Period where
+    Period: FromUnit<SecondsPerDay, Representation>
+        + FromUnit<SecondsPerHour, Representation>
+        + FromUnit<SecondsPerMinute, Representation>
+        + FromUnit<Second, Representation>
+{
 }
 
 impl<TimeScale, Representation, Period> Copy for TimePoint<TimeScale, Representation, Period>

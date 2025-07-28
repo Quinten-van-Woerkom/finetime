@@ -5,10 +5,10 @@
 use num::Zero;
 
 use crate::{
-    DateTimeError, FineDateTimeError,
+    DateTimeError, FineDateTimeError, FromDate,
     arithmetic::{
-        FromUnit, IntoUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
-        TimeRepresentation, Unit,
+        FromUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, TimeRepresentation,
+        TryFromExact, Unit,
     },
     duration::{Duration, Hours, Minutes, Seconds},
     time_point::TimePoint,
@@ -40,19 +40,20 @@ pub trait TimeScale: Sized {
     /// simply a day.
     type NativePeriod: Unit;
 
+    /// The native `Representation` in which a time scale's time points are expressed. This is the
+    /// minimum representation needed to be able to represent all possible `Date` values in the
+    /// `NativePeriod` unit.
+    type NativeRepresentation: TimeRepresentation;
+
     /// Returns the epoch of this time scale but expressed in TAI. This is useful for performing
     /// conversions between different time scales.
-    fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation;
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod>;
 
     /// Returns the epoch of a time scale, expressed as a `LocalTime` in its own time scale. The
     /// result may be expressed in any type `T`, as long as this type can be constructed from some
     /// primitive. This function is allowed to panic if the epoch, expressed as `LocalDays`, cannot
     /// be represented by a value of type `T`.
-    fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
-    where
-        T: TimeRepresentation;
+    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod>;
 
     /// Returns whether this time scales incorporates leap seconds, i.e., whether the underlying
     /// "seconds since epoch" count also increases one second when a leap second is inserted.
@@ -67,15 +68,16 @@ pub trait TimeScale: Sized {
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<TimePoint<Self, i64, Self::NativePeriod>, DateTimeError>
+    ) -> Result<TimePoint<Self, Self::NativeRepresentation, Self::NativePeriod>, DateTimeError>
     where
-        SecondsPerDay: IntoUnit<Self::NativePeriod, i64>,
-        SecondsPerHour: IntoUnit<Self::NativePeriod, i64>,
-        SecondsPerMinute: IntoUnit<Self::NativePeriod, i64>,
-        Second: IntoUnit<Self::NativePeriod, i64>,
-        SecondsPerDay: IntoUnit<Second, i64>,
-        SecondsPerHour: IntoUnit<Second, i64>,
-        SecondsPerMinute: IntoUnit<Second, i64>,
+        Self::NativePeriod: FromUnit<SecondsPerDay, Self::NativeRepresentation>
+            + FromUnit<SecondsPerHour, Self::NativeRepresentation>
+            + FromUnit<SecondsPerMinute, Self::NativeRepresentation>
+            + FromUnit<Second, Self::NativeRepresentation>,
+        Second: FromUnit<SecondsPerDay, Self::NativeRepresentation>
+            + FromUnit<SecondsPerHour, Self::NativeRepresentation>
+            + FromUnit<SecondsPerMinute, Self::NativeRepresentation>
+            + FromUnit<Second, Self::NativeRepresentation>,
     {
         // First, we verify that the timestamp is valid.
         if hour >= 24 || minute >= 60 || second >= 60 {
@@ -86,12 +88,15 @@ pub trait TimeScale: Sized {
             });
         }
 
-        let hours = Hours::new(hour).cast();
-        let minutes = Minutes::new(minute).cast();
-        let seconds = Seconds::new(second).cast();
+        let hours = Hours::new(hour).try_cast().unwrap();
+        let minutes = Minutes::new(minute).try_cast().unwrap();
+        let seconds = Seconds::new(second).try_cast().unwrap();
         let epoch = Self::epoch_local();
-        let local_time: LocalTime<i64> =
-            date.into_unit() + hours.into_unit() + minutes.into_unit() + seconds;
+        let local_time: LocalTime<Self::NativeRepresentation> =
+            date.try_cast().unwrap().into_unit()
+                + hours.into_unit()
+                + minutes.into_unit()
+                + seconds;
         let time_since_epoch = local_time.into_unit() - epoch;
         Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
@@ -106,13 +111,10 @@ pub trait TimeScale: Sized {
         subseconds: Duration<Representation, Period>,
     ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
     where
-        Period: Unit,
-        Representation: TimeRepresentation,
-        SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
-        SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
-        SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
-        Second: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
-        Self::NativePeriod: IntoUnit<Period, Representation>,
+        Representation: TimeRepresentation + TryFromExact<Self::NativeRepresentation>,
+        Period: Unit + FromDate<Representation> + FromUnit<Self::NativePeriod, Representation>,
+        Second: FromDate<Self::NativeRepresentation>,
+        Self::NativePeriod: FromDate<Self::NativeRepresentation>,
     {
         // We check that the number of subseconds does not exceed one second.
         let one = Seconds::new(Representation::one()).into_unit();
@@ -122,9 +124,10 @@ pub trait TimeScale: Sized {
         }
 
         let seconds = Self::from_local_datetime(date, hour, minute, second)?
-            .try_cast()
-            .unwrap();
-        Ok(seconds.into_unit() + subseconds)
+            .try_cast::<Representation>()
+            .unwrap()
+            .into_unit();
+        Ok(seconds + subseconds)
     }
 }
 
@@ -150,13 +153,21 @@ pub trait FromTimeScale<From: TimeScale>: TimeScale {
     ) -> TimePoint<Self, Representation, Period>
     where
         Period: Unit,
-        Representation: TimeRepresentation,
-        Period: FromUnit<From::NativePeriod, Representation>,
-        Period: FromUnit<Self::NativePeriod, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<From::NativeRepresentation>
+            + TryFromExact<Self::NativeRepresentation>,
+        Period: FromUnit<From::NativePeriod, From::NativeRepresentation>,
+        Period: FromUnit<Self::NativePeriod, Self::NativeRepresentation>,
     {
         let time_since_from_epoch = from.elapsed_time_since_epoch();
-        let from_epoch = From::epoch_tai::<Representation>().into_unit::<Period>();
-        let to_epoch = Self::epoch_tai::<Representation>().into_unit::<Period>();
+        let from_epoch = From::epoch_tai()
+            .into_unit::<Period>()
+            .try_cast::<Representation>()
+            .unwrap();
+        let to_epoch = Self::epoch_tai()
+            .into_unit::<Period>()
+            .try_cast::<Representation>()
+            .unwrap();
         // Note that this operation first rounds and then casts the epoch differences into the
         // proper units and representation. The representation cast may fail, if the difference in
         // epochs is not representable by the chosen representation (e.g., a `u8` cannot store the
@@ -179,7 +190,7 @@ pub trait FromTimeScale<From: TimeScale>: TimeScale {
 }
 
 /// Used to indicate that it is possible to convert from one `TimeScale` to another.
-pub trait IntoTimeScale<To: TimeScale>: TimeScale {
+pub trait IntoTimeScale<Into: TimeScale>: TimeScale {
     /// Converts from a `TimePoint` in the `Self` `TimeScale` to an equivalent `TimePoint` in the
     /// `To` `TimeScale`. Note that the representations shall be the same between both
     /// `TimeScales`. Due to some time scale conversions being inexact relations (e.g., TAI to
@@ -197,28 +208,32 @@ pub trait IntoTimeScale<To: TimeScale>: TimeScale {
     /// be valid for dynamic clocks.
     fn into_time_scale<Representation, Period>(
         from: TimePoint<Self, Representation, Period>,
-    ) -> TimePoint<To, Representation, Period>
+    ) -> TimePoint<Into, Representation, Period>
     where
-        Period: Unit
-            + FromUnit<To::NativePeriod, Representation>
-            + FromUnit<Self::NativePeriod, Representation>,
-        Representation: TimeRepresentation;
+        Period: Unit,
+        Representation: TimeRepresentation
+            + TryFromExact<Self::NativeRepresentation>
+            + TryFromExact<Into::NativeRepresentation>,
+        Period: FromUnit<Self::NativePeriod, Self::NativeRepresentation>,
+        Period: FromUnit<Into::NativePeriod, Into::NativeRepresentation>;
 }
 
-impl<From: TimeScale, To: TimeScale> IntoTimeScale<To> for From
+impl<From: TimeScale, Into: TimeScale> IntoTimeScale<Into> for From
 where
-    To: FromTimeScale<From>,
+    Into: FromTimeScale<From>,
 {
     fn into_time_scale<Representation, Period>(
         from: TimePoint<Self, Representation, Period>,
-    ) -> TimePoint<To, Representation, Period>
+    ) -> TimePoint<Into, Representation, Period>
     where
-        Period: Unit
-            + FromUnit<To::NativePeriod, Representation>
-            + FromUnit<Self::NativePeriod, Representation>,
-        Representation: TimeRepresentation,
+        Period: Unit,
+        Representation: TimeRepresentation
+            + TryFromExact<Self::NativeRepresentation>
+            + TryFromExact<Into::NativeRepresentation>,
+        Period: FromUnit<Self::NativePeriod, Self::NativeRepresentation>,
+        Period: FromUnit<Into::NativePeriod, Into::NativeRepresentation>,
     {
-        To::from_time_scale(from)
+        Into::from_time_scale(from)
     }
 }
 
@@ -251,32 +266,38 @@ pub trait TryFromTimeScale<From: TimeScale>: TimeScale {
     ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
         Period: Unit
-            + FromUnit<From::NativePeriod, Representation>
-            + FromUnit<Self::NativePeriod, Representation>,
-        Representation: TimeRepresentation;
+            + FromUnit<From::NativePeriod, From::NativeRepresentation>
+            + FromUnit<Self::NativePeriod, Self::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<From::NativeRepresentation>
+            + TryFromExact<Self::NativeRepresentation>;
 }
 
 /// Used to indicate that it is possible to convert from one `TimeScale` to another, though it is
 /// allowed for this operation to fail. This is the case when applying leap seconds, for example:
 /// the result may then be ambiguous or undefined, based on folds and gaps in time.
-pub trait TryIntoTimeScale<To: TimeScale>: TimeScale {
+pub trait TryIntoTimeScale<Into: TimeScale>: TimeScale {
     type Error: core::fmt::Debug;
 
     /// Tries to convert from one time scale to another. If this is not unambiguously possible,
     /// returns an error indicating why it is not.
     fn try_into_time_scale<Representation, Period>(
         from: TimePoint<Self, Representation, Period>,
-    ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
+    ) -> Result<TimePoint<Into, Representation, Period>, Self::Error>
     where
         Period: Unit
-            + FromUnit<To::NativePeriod, Representation>
-            + FromUnit<Self::NativePeriod, Representation>,
-        Representation: TimeRepresentation;
+            + FromUnit<Self::NativePeriod, Self::NativeRepresentation>
+            + FromUnit<Into::NativePeriod, Into::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<Self::NativeRepresentation>
+            + TryFromExact<Into::NativeRepresentation>;
 }
 
-impl<From: TimeScale, To: TimeScale> TryFromTimeScale<From> for To
+impl<From: TimeScale, Into: TimeScale> TryFromTimeScale<From> for Into
 where
-    To: FromTimeScale<From>,
+    Into: FromTimeScale<From>,
 {
     type Error = core::convert::Infallible;
 
@@ -284,32 +305,38 @@ where
     /// converted infallibly.
     fn try_from_time_scale<Representation, Period>(
         from: TimePoint<From, Representation, Period>,
-    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
+    ) -> Result<TimePoint<Into, Representation, Period>, Self::Error>
     where
         Period: Unit
-            + FromUnit<From::NativePeriod, Representation>
-            + FromUnit<To::NativePeriod, Representation>,
-        Representation: TimeRepresentation,
+            + FromUnit<From::NativePeriod, From::NativeRepresentation>
+            + FromUnit<Into::NativePeriod, Into::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<From::NativeRepresentation>
+            + TryFromExact<Into::NativeRepresentation>,
     {
         Ok(Self::from_time_scale(from))
     }
 }
 
-impl<From: TimeScale, To: TimeScale> TryIntoTimeScale<To> for From
+impl<From: TimeScale, Into: TimeScale> TryIntoTimeScale<Into> for From
 where
-    To: TryFromTimeScale<From>,
+    Into: TryFromTimeScale<From>,
 {
-    type Error = <To as TryFromTimeScale<From>>::Error;
+    type Error = <Into as TryFromTimeScale<From>>::Error;
 
     fn try_into_time_scale<Representation, Period>(
         from: TimePoint<From, Representation, Period>,
-    ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
+    ) -> Result<TimePoint<Into, Representation, Period>, Self::Error>
     where
         Period: Unit
-            + FromUnit<From::NativePeriod, Representation>
-            + FromUnit<To::NativePeriod, Representation>,
-        Representation: TimeRepresentation,
+            + FromUnit<From::NativePeriod, From::NativeRepresentation>
+            + FromUnit<Into::NativePeriod, Into::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<From::NativeRepresentation>
+            + TryFromExact<Into::NativeRepresentation>,
     {
-        To::try_from_time_scale(from)
+        Into::try_from_time_scale(from)
     }
 }

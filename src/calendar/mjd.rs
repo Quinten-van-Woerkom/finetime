@@ -51,7 +51,7 @@ where
     /// nothing more than a constant offset of the number of days between the two epochs.
     fn from(value: LocalTime<Representation, Period>) -> Self {
         Self {
-            day: value.elapsed_time_since_epoch() + Days::new(40587).cast().into_unit(),
+            day: value.elapsed_time_since_epoch() + Days::new(40587i64).cast().into_unit(),
         }
     }
 }
@@ -66,7 +66,7 @@ where
     /// Transforming to `LocalDays` (since Unix epoch) from the equivalent `ModifiedJulianDate` is
     /// nothing more than a constant offset of the number of days between the two epochs.
     fn from(value: ModifiedJulianDate<Representation, Period>) -> Self {
-        Self::from_time_since_epoch(value.day - Days::new(40587).cast().into_unit())
+        Self::from_time_since_epoch(value.day - Days::new(40587i64).cast().into_unit())
     }
 }
 
