@@ -1,13 +1,11 @@
 //! Representation of some calendrical time point as the elapsed number of (potentially fractional)
 //! days since the start of the Julian period.
 
-use core::ops::{Add, Div, Mul, Sub};
-
-use num::NumCast;
+use core::ops::{Add, Sub};
 
 use crate::{
     Days, Duration, Hours, LocalDays, LocalTime,
-    units::{IntoUnit, Unit, SecondsPerDay, SecondsPerHour},
+    arithmetic::{IntoUnit, SecondsPerDay, SecondsPerHour, TimeRepresentation, Unit},
 };
 
 /// Representation of calendrical dates in terms of Julian Days (JD). A Julian date is the number
@@ -25,11 +23,19 @@ use crate::{
 /// is actually ambiguous. Indeed, it may only indicate a calendrical date, but not an actual point
 /// in time.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct JulianDate<T, Period = SecondsPerDay> {
+pub struct JulianDate<T, Period = SecondsPerDay>
+where
+    T: TimeRepresentation,
+    Period: Unit,
+{
     day: Duration<T, Period>,
 }
 
-impl<T, Period> JulianDate<T, Period> {
+impl<T, Period> JulianDate<T, Period>
+where
+    T: TimeRepresentation,
+    Period: Unit,
+{
     /// Constructs a new Julian date directly from some duration since the start of the Julian
     /// period.
     pub const fn new(duration: Duration<T, Period>) -> Self {
@@ -42,7 +48,7 @@ impl JulianDate<i64, SecondsPerHour> {
     pub fn from_date(date: impl Into<LocalDays<i64>>) -> Self {
         let local_days: LocalTime<i64, SecondsPerDay> = date.into();
         let local_hours: LocalTime<i64, SecondsPerHour> = local_days.into_unit();
-        Self::from(local_hours)
+        local_hours.into()
     }
 }
 
@@ -50,12 +56,7 @@ impl<Representation, Period> From<LocalTime<Representation, Period>>
     for JulianDate<Representation, Period>
 where
     Period: Unit,
-    Representation: Copy
-        + From<i64>
-        + Add<Representation, Output = Representation>
-        + Mul<Representation, Output = Representation>
-        + Div<Representation, Output = Representation>
-        + NumCast,
+    Representation: Copy + From<i64> + TimeRepresentation,
     SecondsPerDay: IntoUnit<Period, Representation>,
     SecondsPerHour: IntoUnit<Period, Representation>,
 {
@@ -74,12 +75,7 @@ impl<Representation, Period> From<JulianDate<Representation, Period>>
     for LocalTime<Representation, Period>
 where
     Period: Unit,
-    Representation: Copy
-        + From<i64>
-        + Sub<Representation, Output = Representation>
-        + Mul<Representation, Output = Representation>
-        + Div<Representation, Output = Representation>
-        + NumCast,
+    Representation: TimeRepresentation + From<i64>,
     SecondsPerDay: IntoUnit<Period, Representation>,
     SecondsPerHour: IntoUnit<Period, Representation>,
 {
@@ -167,7 +163,7 @@ fn historic_dates_from_meeus() {
 
 impl<Representation, Period> Sub for JulianDate<Representation, Period>
 where
-    Representation: Sub<Output = Representation>,
+    Representation: TimeRepresentation,
     Period: Unit,
 {
     type Output = Duration<Representation, Period>;
@@ -182,7 +178,7 @@ where
 impl<Representation, Period> Add<Duration<Representation, Period>>
     for JulianDate<Representation, Period>
 where
-    Representation: Add<Output = Representation>,
+    Representation: TimeRepresentation,
     Period: Unit,
 {
     type Output = JulianDate<Representation, Period>;

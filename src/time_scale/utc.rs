@@ -1,23 +1,23 @@
 //! Implementation of the Coordinated Universal Time (UTC) standard.
 
-use num::{Integer, NumCast, One, Zero, traits::NumOps};
+use core::fmt::Debug;
+
+use num::Zero;
 use tinyvec::ArrayVec;
 
 use crate::{
-    DateTimeError, FineDateTimeError, LocalTime, TryTimeScaleConversion, Unix,
+    DateTimeError, FineDateTimeError, FromTimeScale, Gpst, LocalDays, LocalTime, Tai, TaiTime,
+    TimeScale, TryFromTimeScale, Tt, Unix, UnixTime,
+    arithmetic::{
+        FromUnit, IntoUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
+        TimeRepresentation, TryIntoExact, Unit,
+    },
     calendar::{
         Date,
         Month::{self, *},
     },
     duration::Duration,
     time_point::TimePoint,
-    time_scale::{
-        TimeScale, TimeScaleConversion,
-        local::LocalDays,
-        tai::{Tai, TaiTime},
-        unix::UnixTime,
-    },
-    units::{IntoUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Unit},
 };
 
 /// `UtcTime` is a specialization of `TimePoint` that uses the UTC time scale.
@@ -137,7 +137,7 @@ impl TimeScale for Utc {
 
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         let date = Date::new(1970, January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10)
@@ -151,9 +151,9 @@ impl TimeScale for Utc {
     /// as a zero value.
     fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
-        LocalDays::from_time_since_epoch(Duration::new(0u8))
+        LocalDays::from_time_since_epoch(Duration::new(0i64))
             .into_unit()
             .try_cast()
             .unwrap()
@@ -270,7 +270,7 @@ impl TimeScale for Utc {
     ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
     where
         Period: Unit,
-        Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
+        Representation: TimeRepresentation,
         SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
         SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
         SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
@@ -289,41 +289,45 @@ impl TimeScale for Utc {
     }
 }
 
-impl TimeScaleConversion<Tai, Utc> for () {}
-impl TimeScaleConversion<Utc, Tai> for () {}
+impl FromTimeScale<Tai> for Utc {}
+impl FromTimeScale<Tt> for Utc {}
+impl FromTimeScale<Gpst> for Utc {}
 
-impl<Representation, Period> TryTimeScaleConversion<Unix, Utc, Representation, Period> for ()
-where
-    Period: Unit + core::fmt::Debug,
-    Representation: Copy + NumCast + NumOps + Integer + core::fmt::Debug,
-    Second: IntoUnit<Period, Representation>,
-{
-    type Error = LeapSecondError<Representation, Period>;
+impl TryFromTimeScale<Unix> for Utc {
+    type Error = LeapSecondError;
 
-    fn try_into_time_scale(
-        from: TimePoint<Unix, Representation, Period>,
-    ) -> Result<TimePoint<Utc, Representation, Period>, Self::Error> {
-        let unix_time_seconds: crate::UnixTime<_> = from.floor();
-        let subseconds = from - unix_time_seconds.into_unit();
-        let unix_time_seconds = from.floor().try_cast().unwrap();
-        match LEAP_SECONDS.to_utc(unix_time_seconds) {
-            LeapSecondsResult::Unambiguous(utc_time) => {
-                Ok(utc_time.try_cast().unwrap().into_unit() + subseconds)
+    fn try_from_time_scale<Representation, Period>(
+        from: UnixTime<Representation, Period>,
+    ) -> Result<UtcTime<Representation, Period>, Self::Error>
+    where
+        Period: Unit
+            + FromUnit<Self::NativePeriod, Representation>
+            + FromUnit<<Unix as TimeScale>::NativePeriod, Representation>,
+        Representation: TimeRepresentation + TryIntoExact<i64>,
+    {
+        let utc = {
+            let unix_time_seconds: UnixTime<_> = from.clone().floor();
+            let subseconds = from - unix_time_seconds.clone().into_unit();
+            let unix_time_seconds = unix_time_seconds.try_cast().unwrap();
+            match LEAP_SECONDS.to_utc(unix_time_seconds) {
+                LeapSecondsResult::Unambiguous(utc_time) => {
+                    utc_time.try_cast().unwrap().into_unit() + subseconds
+                }
+                LeapSecondsResult::InsertionPoint { start, end } => {
+                    return Err(LeapSecondError::Ambiguous { start, end })?;
+                }
+                LeapSecondsResult::DeletionPoint => return Err(LeapSecondError::Deletion),
             }
-            LeapSecondsResult::InsertionPoint { start, end } => Err(LeapSecondError::Ambiguous {
-                start: start.try_cast().unwrap().into_unit() + subseconds,
-                end: end.try_cast().unwrap().into_unit() + subseconds,
-            })?,
-            LeapSecondsResult::DeletionPoint => Err(LeapSecondError::Deletion),
-        }
+        };
+        Ok(Self::from_time_scale(utc))
     }
 }
 
 #[derive(Debug)]
-pub enum LeapSecondError<Representation, Period> {
+pub enum LeapSecondError {
     Ambiguous {
-        start: UtcTime<Representation, Period>,
-        end: UtcTime<Representation, Period>,
+        start: UtcTime<i64, Second>,
+        end: UtcTime<i64, Second>,
     },
     Deletion,
 }

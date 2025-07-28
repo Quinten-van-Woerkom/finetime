@@ -1,12 +1,10 @@
 //! Implementation of the Terrestrial Time (TT) time scale.
 
-use num::{NumCast, traits::NumOps};
-
 use crate::{
-    Date, LocalTime, Month, TaiTime, TimePoint, TryTimeScaleConversion, Unix, Utc,
+    Date, FromTimeScale, Gpst, LeapSecondError, LocalTime, Month, Tai, TaiTime, TimePoint,
+    TimeScale, TryFromTimeScale, Unix, Utc,
+    arithmetic::{FromUnit, Milli, Second, TimeRepresentation, Unit},
     duration::MilliSeconds,
-    time_scale::{Tai, TimeScale, TimeScaleConversion},
-    units::{IntoUnit, Milli, MulExact, Second, Unit},
 };
 
 /// A time point that is expressed in Terrestrial Time.
@@ -24,7 +22,7 @@ impl TimeScale for Tt {
     /// its epoch is precisely 1977-01-01T00:00:00 TAI.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         let date = Date::new(1977, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 0)
@@ -38,7 +36,7 @@ impl TimeScale for Tt {
     /// 1977-01-01T00:00:32.184: at this time, TT and TCG match exactly (by definition).
     fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         let date = Date::new(1977, Month::January, 1).unwrap();
         let epoch = date.to_local_days().into_unit() + MilliSeconds::new(32_184);
@@ -50,31 +48,24 @@ impl TimeScale for Tt {
     }
 }
 
-impl TimeScaleConversion<Tt, Tai> for () {}
-impl TimeScaleConversion<Tai, Tt> for () {}
-impl TimeScaleConversion<Tt, Utc> for () {}
-impl TimeScaleConversion<Utc, Tt> for () {}
+impl FromTimeScale<Tai> for Tt {}
+impl FromTimeScale<Utc> for Tt {}
+impl FromTimeScale<Gpst> for Tt {}
 
-impl<Representation, Period> TryTimeScaleConversion<Unix, Tt, Representation, Period> for ()
-where
-    (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
-    Period: Unit,
-    Representation: Copy + NumCast + NumOps + MulExact,
-{
-    type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
+impl TryFromTimeScale<Unix> for Tt {
+    type Error = LeapSecondError;
 
-    fn try_into_time_scale(
+    fn try_from_time_scale<Representation, Period>(
         from: TimePoint<Unix, Representation, Period>,
-    ) -> Result<TimePoint<Tt, Representation, Period>, Self::Error>
+    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
-        <Unix as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <Tt as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        Period: Unit
+            + FromUnit<<Unix as TimeScale>::NativePeriod, Representation>
+            + FromUnit<Self::NativePeriod, Representation>,
+        Representation: TimeRepresentation,
     {
-        let utc =
-            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_into_time_scale(
-                from,
-            )?;
-        Ok(<() as TimeScaleConversion<Utc, Tt>>::into_time_scale(utc))
+        let utc_time = Utc::try_from_time_scale(from)?;
+        Ok(utc_time.into_time_scale())
     }
 }
 

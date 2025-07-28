@@ -1,14 +1,12 @@
 //! Implementation of a time scale that represents that used by Unix time, i.e., the system clock.
 
-use num::NumCast;
-
 use crate::{
     LocalTime,
+    arithmetic::{Second, TimeRepresentation},
     calendar::{Date, Month},
     duration::Duration,
     time_point::TimePoint,
     time_scale::{TimeScale, local::LocalDays, tai::TaiTime},
-    units::Second,
 };
 
 /// `UnixTime` is a `TimePoint` that uses the `Unix` time scale.
@@ -50,7 +48,7 @@ impl TimeScale for Unix {
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         let date = Date::new(1970, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10)
@@ -64,7 +62,7 @@ impl TimeScale for Unix {
     /// as a zero value.
     fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         LocalDays::from_time_since_epoch(Duration::new(0))
             .into_unit()
@@ -78,7 +76,7 @@ impl TimeScale for Unix {
 }
 
 #[cfg(feature = "std")]
-impl From<std::time::SystemTime> for UnixTime<u128, crate::units::Nano> {
+impl From<std::time::SystemTime> for UnixTime<u128, crate::arithmetic::Nano> {
     fn from(value: std::time::SystemTime) -> Self {
         let nanoseconds_since_epoch = crate::NanoSeconds::new(
             value

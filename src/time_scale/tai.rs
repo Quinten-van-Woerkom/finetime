@@ -1,13 +1,13 @@
 //! Implementation of international atomic time (TAI).
 
-use num::{NumCast, Zero, traits::NumOps};
+use num::Zero;
 
 use crate::{
-    LocalTime, Seconds, TimeScaleConversion, TryTimeScaleConversion, Unix, Utc,
+    FromTimeScale, Gpst, LeapSecondError, LocalTime, Seconds, TryFromTimeScale, Tt, Unix, Utc,
+    arithmetic::{FromUnit, Second, TimeRepresentation, Unit},
     calendar::{Date, Month},
     time_point::TimePoint,
     time_scale::TimeScale,
-    units::{IntoUnit, MulExact, Second, Unit},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
@@ -25,14 +25,14 @@ impl TimeScale for Tai {
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
-        TimePoint::from_time_since_epoch(Seconds::<u8>::zero().try_cast().unwrap())
+        TimePoint::from_time_since_epoch(Seconds::<i64>::zero().try_cast().unwrap())
     }
 
     fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         Date::new(1958, Month::January, 1)
             .unwrap()
@@ -47,24 +47,24 @@ impl TimeScale for Tai {
     }
 }
 
-impl<Representation, Period> TryTimeScaleConversion<Unix, Tai, Representation, Period> for ()
-where
-    (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
-    Period: Unit,
-    Representation: Copy + NumCast + NumOps + MulExact,
-{
-    type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
+impl FromTimeScale<Tt> for Tai {}
+impl FromTimeScale<Gpst> for Tai {}
+impl FromTimeScale<Utc> for Tai {}
 
-    fn try_into_time_scale(
+impl TryFromTimeScale<Unix> for Tai {
+    type Error = LeapSecondError;
+
+    fn try_from_time_scale<Representation, Period>(
         from: TimePoint<Unix, Representation, Period>,
-    ) -> Result<TimePoint<Tai, Representation, Period>, Self::Error>
+    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
-        <Unix as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <Tai as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        Period: Unit
+            + FromUnit<<Unix as TimeScale>::NativePeriod, Representation>
+            + FromUnit<Self::NativePeriod, Representation>,
+        Representation: TimeRepresentation,
     {
-        let utc =
-            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_into_time_scale(from)?;
-        Ok(<() as TimeScaleConversion<Utc, Tai>>::into_time_scale(utc))
+        let utc_time = Utc::try_from_time_scale(from)?;
+        Ok(utc_time.into_time_scale())
     }
 }
 

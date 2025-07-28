@@ -2,25 +2,30 @@
 //! at 0h UT. Effectively, this makes it a constant offset from the Julian Day (JD); however, the
 //! MJD is useful because it is not fractional for time points at midnight.
 
-use core::ops::{Add, Mul, Sub};
-use std::ops::Div;
-
-use num::NumCast;
+use core::ops::{Add, Sub};
 
 use crate::{
     Duration, LocalTime,
+    arithmetic::{IntoUnit, SecondsPerDay, TimeRepresentation, Unit},
     duration::Days,
     time_scale::LocalDays,
-    units::{IntoUnit, Unit, SecondsPerDay},
 };
 
 /// The Modified Julian Day (MJD) representation of any given date.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ModifiedJulianDate<T, Period = SecondsPerDay> {
+pub struct ModifiedJulianDate<T, Period = SecondsPerDay>
+where
+    T: TimeRepresentation,
+    Period: Unit,
+{
     day: Duration<T, Period>,
 }
 
-impl<T, Period> ModifiedJulianDate<T, Period> {
+impl<T, Period> ModifiedJulianDate<T, Period>
+where
+    T: TimeRepresentation,
+    Period: Unit,
+{
     /// Constructs a new MJD directly from some duration since the MJD epoch, November 17 1858.
     pub const fn new(duration: Duration<T, Period>) -> Self {
         Self { day: duration }
@@ -39,12 +44,7 @@ impl<Representation, Period> From<LocalTime<Representation, Period>>
     for ModifiedJulianDate<Representation, Period>
 where
     Period: Unit,
-    Representation: Copy
-        + From<i64>
-        + Add<Representation, Output = Representation>
-        + Mul<Representation, Output = Representation>
-        + Div<Representation, Output = Representation>
-        + NumCast,
+    Representation: From<i64> + TimeRepresentation,
     SecondsPerDay: IntoUnit<Period, Representation>,
 {
     /// Transforming from `LocalDays` (since Unix epoch) to the equivalent `ModifiedJulianDate` is
@@ -60,12 +60,7 @@ impl<Representation, Period> From<ModifiedJulianDate<Representation, Period>>
     for LocalTime<Representation, Period>
 where
     Period: Unit,
-    Representation: Copy
-        + From<i64>
-        + Sub<Representation, Output = Representation>
-        + Mul<Representation, Output = Representation>
-        + Div<Representation, Output = Representation>
-        + NumCast,
+    Representation: From<i64> + TimeRepresentation,
     SecondsPerDay: IntoUnit<Period, Representation>,
 {
     /// Transforming to `LocalDays` (since Unix epoch) from the equivalent `ModifiedJulianDate` is
@@ -195,7 +190,7 @@ fn gregorian_dates_from_meeus() {
 
 impl<Representation, Period> Sub for ModifiedJulianDate<Representation, Period>
 where
-    Representation: Sub<Output = Representation>,
+    Representation: TimeRepresentation,
     Period: Unit,
 {
     type Output = Duration<Representation, Period>;
@@ -210,7 +205,7 @@ where
 impl<Representation, Period> Add<Duration<Representation, Period>>
     for ModifiedJulianDate<Representation, Period>
 where
-    Representation: Add<Output = Representation>,
+    Representation: TimeRepresentation,
     Period: Unit,
 {
     type Output = ModifiedJulianDate<Representation, Period>;

@@ -1,11 +1,8 @@
 //! Implementation of the Geocentric Coordinate Time (TCG) time scale.
 
-use num::{NumCast, traits::NumOps};
-
 use crate::{
-    Date, LocalTime, MilliSeconds, Month, TaiTime, TimePoint, TimeScale, TimeScaleConversion, Tt,
-    TtTime,
-    units::{Fraction, IntoUnit, Milli, MulExact, Second, Unit},
+    Date, IntoTimeScale, LocalTime, MilliSeconds, Month, TaiTime, TimePoint, TimeScale, Tt, TtTime,
+    arithmetic::{Fraction, IntoUnit, Milli, Second, TimeRepresentation, Unit},
 };
 
 /// `TcgTime` is a specialization of `TimePoint` that uses the Geocentric Coordinate Time (TCG)
@@ -24,7 +21,7 @@ impl TimeScale for Tcg {
     /// its epoch is precisely 1977-01-01T00:00:00 TAI.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         let date = Date::new(1977, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 0)
@@ -38,7 +35,7 @@ impl TimeScale for Tcg {
     /// 1977-01-01T00:00:32.184: at this time, TT and TCG match exactly (by definition).
     fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         let date = Date::new(1977, Month::January, 1).unwrap();
         let epoch = date.to_local_days().into_unit() + MilliSeconds::new(32_184);
@@ -50,15 +47,15 @@ impl TimeScale for Tcg {
     }
 }
 
-impl TimeScaleConversion<Tcg, Tt> for () {
+impl IntoTimeScale<Tt> for Tcg {
     fn into_time_scale<Representation, Period>(
         from: TimePoint<Tcg, Representation, Period>,
     ) -> TimePoint<Tt, Representation, Period>
     where
         Period: Unit,
-        Representation: Copy + NumCast + NumOps + MulExact,
-        <Tcg as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <Tt as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        Representation: TimeRepresentation,
+        <Tcg as TimeScale>::NativePeriod: IntoUnit<Period, Representation>,
+        <Tt as TimeScale>::NativePeriod: IntoUnit<Period, Representation>,
     {
         // We encode the conversion factor (= (1.0 - 6.969290134e-10)) as an exact fraction, such
         // that integer arithmetic can be done to exact precision, even when some rounding is
@@ -72,15 +69,15 @@ impl TimeScaleConversion<Tcg, Tt> for () {
     }
 }
 
-impl TimeScaleConversion<Tt, Tcg> for () {
+impl IntoTimeScale<Tcg> for Tt {
     fn into_time_scale<Representation, Period>(
         from: TimePoint<Tt, Representation, Period>,
     ) -> TimePoint<Tcg, Representation, Period>
     where
         Period: Unit,
-        Representation: Copy + NumCast + NumOps + MulExact,
-        <Tcg as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <Tt as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        Representation: TimeRepresentation,
+        <Tcg as TimeScale>::NativePeriod: IntoUnit<Period, Representation>,
+        <Tt as TimeScale>::NativePeriod: IntoUnit<Period, Representation>,
     {
         // We encode the conversion factor (= (1.0 - 6.969290134e-10)) as an exact fraction, such
         // that integer arithmetic can be done to exact precision, even when some rounding is
@@ -142,7 +139,7 @@ mod proof_harness {
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1: TcgTime<i128, crate::units::Nano> =
+        let time1: TcgTime<i128, crate::arithmetic::Nano> =
             TcgTime::from_datetime(date, hour, minute, second)
                 .unwrap()
                 .cast()
@@ -156,7 +153,7 @@ mod proof_harness {
 #[test]
 fn datetime_tt_tcg_conversion() {
     use crate::Month::*;
-    use crate::units::{Atto, Micro, Pico};
+    use crate::arithmetic::{Atto, Micro, Pico};
     use crate::{MicroSeconds, NanoSeconds, Seconds};
 
     // At the epoch 1977-01-01T00:00:32.184, both time stamps should be exactly equivalent. We

@@ -2,8 +2,7 @@
 //! types are little more than labels that are associated with a given ratio to SI seconds, as may
 //! be used to convert between arbitrary time periods.
 
-mod fraction;
-pub use fraction::*;
+use crate::arithmetic::Fraction;
 
 /// Trait used to describe a time unit. Such units are always defined as an exact ratio to SI
 /// seconds. Based on this ratio, conversions to other units are defined.

@@ -3,7 +3,7 @@
 
 use crate::{
     TimePoint,
-    units::{Second, SecondsPerDay},
+    arithmetic::{Second, SecondsPerDay},
 };
 
 /// The `Local` `TimeScale` is not actually a `TimeScale`. Instead, it is useful in scenarios where

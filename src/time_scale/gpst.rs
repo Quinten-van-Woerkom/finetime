@@ -1,16 +1,11 @@
 //! Implementation of the Global Positioning System (GPS) time scale, generally abbreviated as
 //! GPST.
 
-use num::{NumCast, traits::NumOps};
-
 use crate::{
-    LocalTime, TimePoint, TryTimeScaleConversion, Unix, Utc,
+    FromTimeScale, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
+    TryFromTimeScale, Tt, Unix, Utc,
+    arithmetic::{FromUnit, Second, TimeRepresentation, Unit},
     calendar::{Date, Month},
-    time_scale::{
-        TimeScale, TimeScaleConversion,
-        tai::{Tai, TaiTime},
-    },
-    units::{IntoUnit, MulExact, Second, Unit},
 };
 
 /// `GpsTime` is a time point that is expressed according to the GPS time scale.
@@ -27,7 +22,7 @@ impl TimeScale for Gpst {
 
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
-        T: NumCast,
+        T: TimeRepresentation,
     {
         TaiTime::from_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
             .unwrap()
@@ -38,7 +33,7 @@ impl TimeScale for Gpst {
 
     fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
-        T: num::NumCast,
+        T: TimeRepresentation,
     {
         Date::new(1980, Month::January, 6)
             .unwrap()
@@ -53,31 +48,24 @@ impl TimeScale for Gpst {
     }
 }
 
-impl TimeScaleConversion<Tai, Gpst> for () {}
-impl TimeScaleConversion<Gpst, Tai> for () {}
-impl TimeScaleConversion<Gpst, Utc> for () {}
-impl TimeScaleConversion<Utc, Gpst> for () {}
+impl FromTimeScale<Tai> for Gpst {}
+impl FromTimeScale<Utc> for Gpst {}
+impl FromTimeScale<Tt> for Gpst {}
 
-impl<Representation, Period> TryTimeScaleConversion<Unix, Gpst, Representation, Period> for ()
-where
-    (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
-    Period: Unit,
-    Representation: Copy + NumCast + NumOps + MulExact,
-{
-    type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
+impl TryFromTimeScale<Unix> for Gpst {
+    type Error = LeapSecondError;
 
-    fn try_into_time_scale(
+    fn try_from_time_scale<Representation, Period>(
         from: TimePoint<Unix, Representation, Period>,
-    ) -> Result<TimePoint<Gpst, Representation, Period>, Self::Error>
+    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
-        <Unix as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <Gpst as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        Period: Unit
+            + FromUnit<<Unix as TimeScale>::NativePeriod, Representation>
+            + FromUnit<Self::NativePeriod, Representation>,
+        Representation: TimeRepresentation,
     {
-        let utc =
-            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_into_time_scale(
-                from,
-            )?;
-        Ok(<() as TimeScaleConversion<Utc, Gpst>>::into_time_scale(utc))
+        let utc_time = Utc::try_from_time_scale(from)?;
+        Ok(utc_time.into_time_scale())
     }
 }
 

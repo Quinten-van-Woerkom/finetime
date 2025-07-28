@@ -9,4 +9,4 @@ mod time_point;
 pub use time_point::*;
 mod time_scale;
 pub use time_scale::*;
-pub mod units;
+pub mod arithmetic;

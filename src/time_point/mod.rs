@@ -3,25 +3,33 @@
 
 use core::{
     hash::Hash,
-    ops::{Add, AddAssign, Div, Mul, Sub},
+    ops::{Add, AddAssign, Sub},
 };
 
-use num::{Bounded, Integer, NumCast, One, Zero, traits::NumOps};
+use num::Integer;
 
 use crate::{
-    DateTimeError, FineDateTimeError, TimeScaleConversion,
+    DateTimeError, FineDateTimeError, IntoTimeScale, TryIntoTimeScale,
+    arithmetic::{
+        IntoUnit, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
+        TimeRepresentation, TryFromExact, TryIntoExact, Unit,
+    },
     duration::Duration,
     time_scale::{LocalDays, TimeScale},
-    units::{
-        IntoUnit, MulExact, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Unit,
-    },
 };
+
+#[cfg(feature = "std")]
+use crate::{TryFromTimeScale, Unix, UnixTime, arithmetic::FromUnit};
 
 /// A time point indicates an elapsed duration with respect to the epoch of some time scale. It may
 /// utilize arbitrary units and arbitrary precision, defined by the underlying `Representation` and
 /// `Period`.
 #[derive(Debug)]
-pub struct TimePoint<TimeScale, Representation, Period = Second> {
+pub struct TimePoint<TimeScale, Representation, Period = Second>
+where
+    Representation: TimeRepresentation,
+    Period: Unit,
+{
     duration: Duration<Representation, Period>,
     time_scale: core::marker::PhantomData<TimeScale>,
 }
@@ -35,19 +43,15 @@ impl<Scale> TimePoint<Scale, u128, Nano> {
     /// may happen in particular around leap seconds, where the conversion from Unix time to
     /// continuous time scales like TAI or UTC is impossible.
     #[cfg(feature = "std")]
-    pub fn now()
-    -> Result<Self, <() as crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>>::Error>
+    pub fn now() -> Result<Self, <Scale as TryFromTimeScale<Unix>>::Error>
     where
-        Scale: TimeScale,
-        <crate::Unix as TimeScale>::NativePeriod: IntoUnit<Nano, i64>,
-        <Scale as TimeScale>::NativePeriod: IntoUnit<Nano, i64>,
-        (): crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>,
+        Scale: TimeScale + TryFromTimeScale<Unix>,
+        Nano: FromUnit<<Unix as TimeScale>::NativePeriod, u128>
+            + FromUnit<<Scale as TimeScale>::NativePeriod, u128>,
     {
         let system_time = std::time::SystemTime::now();
-        let unix_time = crate::UnixTime::from(system_time);
-        <() as crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>>::try_into_time_scale(
-            unix_time,
-        )
+        let unix_time = UnixTime::from(system_time);
+        Scale::try_from_time_scale(unix_time)
     }
 }
 
@@ -65,7 +69,11 @@ fn get_current_time() {
     let _ = UtcTime::now();
 }
 
-impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
+impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
+where
+    Representation: TimeRepresentation,
+    Period: Unit,
+{
     /// Creates a `TimePoint` directly from the given elapsed time since some `TimeScale` epoch.
     pub const fn from_time_since_epoch(duration: Duration<Representation, Period>) -> Self {
         Self {
@@ -75,11 +83,11 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     }
 
     /// Returns the elapsed time since the `TimeScale` epoch.
-    pub const fn elapsed_time_since_epoch(&self) -> Duration<Representation, Period>
+    pub fn elapsed_time_since_epoch(&self) -> Duration<Representation, Period>
     where
-        Duration<Representation, Period>: Copy,
+        Duration<Representation, Period>: Clone,
     {
-        self.duration
+        self.duration.clone()
     }
 
     /// Creates a `TimePoint` from some datetime and time-of-day, plus some additional subseconds.
@@ -93,7 +101,6 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     where
         Scale: TimeScale,
         Period: Unit,
-        Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
         SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
         SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
         SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
@@ -106,7 +113,6 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     /// Converts towards a different time unit, rounding towards the nearest whole unit.
     pub fn round<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
-        Representation: NumCast + Integer + Copy + MulExact,
         Period: Unit,
         Target: Unit,
     {
@@ -120,7 +126,6 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     /// not entirely commensurate with the present unit.
     pub fn ceil<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
-        Representation: NumCast + Integer + Copy,
         Period: Unit,
         Target: Unit,
     {
@@ -134,7 +139,6 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     /// not entirely commensurate with the present unit.
     pub fn floor<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
-        Representation: NumCast + Integer + Copy,
         Period: Unit,
         Target: Unit,
     {
@@ -167,16 +171,17 @@ where
     }
 }
 
-impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Period> {
+impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Period>
+where
+    Representation: TimeRepresentation,
+    Period: Unit,
+{
     /// Converts a `TimePoint` towards a different time unit. May only be used if the time unit is
     /// smaller than the current one (e.g., seconds to milliseconds) or if the representation of
     /// this `TimePoint` is a float.
     pub fn into_unit<Target: Unit>(self) -> TimePoint<Scale, Representation, Target>
     where
         Period: IntoUnit<Target, Representation>,
-        Representation: Mul<Representation, Output = Representation>
-            + Div<Representation, Output = Representation>
-            + NumCast,
     {
         TimePoint {
             duration: self.duration.into_unit(),
@@ -189,7 +194,7 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
     /// is lossless.
     pub fn try_into_unit<Target: Unit>(self) -> Option<TimePoint<Scale, Representation, Target>>
     where
-        Representation: NumCast + Integer + Bounded + Copy,
+        Representation: Integer + TryFromExact<i128>,
     {
         Some(TimePoint {
             duration: self.duration.try_into_unit()?,
@@ -201,6 +206,8 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
     pub fn cast<Target>(self) -> TimePoint<Scale, Target, Period>
     where
         Representation: Into<Target>,
+        Target: TimeRepresentation,
+        Period: Unit,
     {
         TimePoint {
             duration: self.duration.cast(),
@@ -212,8 +219,9 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
     /// the result of this cast, returns `None`.
     pub fn try_cast<Target>(self) -> Option<TimePoint<Scale, Target, Period>>
     where
-        Representation: NumCast,
-        Target: NumCast,
+        Representation: TryIntoExact<Target>,
+        Target: TimeRepresentation,
+        Period: Unit,
     {
         Some(TimePoint {
             duration: self.duration.try_cast()?,
@@ -225,24 +233,39 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
     pub fn into_time_scale<Target>(self) -> TimePoint<Target, Representation, Period>
     where
         Target: TimeScale,
-        Scale: TimeScale,
-        Representation: Copy + NumCast + NumOps + MulExact,
-        <Scale as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <Target as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        (): TimeScaleConversion<Scale, Target>,
+        Scale: TimeScale + IntoTimeScale<Target>,
+        Period: FromUnit<Scale::NativePeriod, Representation>
+            + FromUnit<Target::NativePeriod, Representation>,
     {
-        <() as TimeScaleConversion<Scale, Target>>::into_time_scale(self)
+        <Scale as IntoTimeScale<Target>>::into_time_scale(self)
+    }
+
+    /// Tries to transform a time point into another time scale.
+    #[allow(clippy::type_complexity)]
+    pub fn try_into_time_scale<Target>(
+        self,
+    ) -> Result<TimePoint<Target, Representation, Period>, <Scale as TryIntoTimeScale<Target>>::Error>
+    where
+        Scale: TimeScale,
+        Target: TryFromTimeScale<Scale> + TimeScale,
+        Period: FromUnit<Scale::NativePeriod, Representation>
+            + FromUnit<Target::NativePeriod, Representation>,
+    {
+        Target::try_from_time_scale(self)
     }
 }
 
-impl<TimeScale, Representation, Period> Copy for TimePoint<TimeScale, Representation, Period> where
-    Representation: Copy
+impl<TimeScale, Representation, Period> Copy for TimePoint<TimeScale, Representation, Period>
+where
+    Representation: Copy + TimeRepresentation,
+    Period: Unit,
 {
 }
 
 impl<TimeScale, Representation, Period> Clone for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: Clone,
+    Representation: TimeRepresentation,
+    Period: Unit,
 {
     fn clone(&self) -> Self {
         Self {
@@ -254,21 +277,25 @@ where
 
 impl<TimeScale, Representation, Period> PartialEq for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: PartialEq,
+    Representation: TimeRepresentation + PartialEq,
+    Period: Unit,
 {
     fn eq(&self, other: &Self) -> bool {
         self.duration == other.duration
     }
 }
 
-impl<TimeScale, Representation, Period> Eq for TimePoint<TimeScale, Representation, Period> where
-    Representation: Eq
+impl<TimeScale, Representation, Period> Eq for TimePoint<TimeScale, Representation, Period>
+where
+    Representation: TimeRepresentation + Eq,
+    Period: Unit,
 {
 }
 
 impl<TimeScale, Representation, Period> PartialOrd for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: PartialOrd,
+    Representation: TimeRepresentation + PartialOrd,
+    Period: Unit,
 {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.duration.partial_cmp(&other.duration)
@@ -277,7 +304,8 @@ where
 
 impl<TimeScale, Representation, Period> Ord for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: Ord,
+    Representation: TimeRepresentation + Ord,
+    Period: Unit,
 {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.duration.cmp(&other.duration)
@@ -286,7 +314,8 @@ where
 
 impl<TimeScale, Representation, Period> Hash for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: Hash,
+    Representation: TimeRepresentation + Hash,
+    Period: Unit,
 {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.duration.hash(state);
@@ -295,7 +324,8 @@ where
 
 impl<TimeScale, Representation, Period: Unit> Sub for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: Sub<Representation, Output = Representation>,
+    Representation: TimeRepresentation,
+    Period: Unit,
 {
     type Output = Duration<Representation, Period>;
 
@@ -307,7 +337,8 @@ where
 impl<TimeScale, Representation, Period: Unit> Sub<Duration<Representation, Period>>
     for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: Sub<Representation, Output = Representation>,
+    Representation: TimeRepresentation,
+    Period: Unit,
 {
     type Output = TimePoint<TimeScale, Representation, Period>;
 
@@ -322,7 +353,8 @@ where
 impl<TimeScale, Representation, Period: Unit> Add<Duration<Representation, Period>>
     for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: Add<Representation, Output = Representation>,
+    Representation: TimeRepresentation,
+    Period: Unit,
 {
     type Output = TimePoint<TimeScale, Representation, Period>;
 
@@ -337,7 +369,8 @@ where
 impl<TimeScale, Representation, Period: Unit> AddAssign<Duration<Representation, Period>>
     for TimePoint<TimeScale, Representation, Period>
 where
-    Representation: AddAssign<Representation>,
+    Representation: TimeRepresentation + AddAssign<Representation>,
+    Period: Unit,
 {
     fn add_assign(&mut self, rhs: Duration<Representation, Period>) {
         self.duration += rhs;
@@ -347,6 +380,9 @@ where
 #[cfg(kani)]
 impl<TimeScale, Representation: kani::Arbitrary, Period> kani::Arbitrary
     for TimePoint<TimeScale, Representation, Period>
+where
+    Representation: TimeRepresentation,
+    Period: Unit,
 {
     fn any() -> Self {
         TimePoint {

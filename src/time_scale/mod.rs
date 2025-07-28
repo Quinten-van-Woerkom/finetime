@@ -2,13 +2,16 @@
 //! link instances in time to a number of elapsed seconds since some epoch. The manner in which
 //! this relation is established differs per time scale.
 
-use num::{NumCast, One, Zero, traits::NumOps};
+use num::Zero;
 
 use crate::{
     DateTimeError, FineDateTimeError,
+    arithmetic::{
+        FromUnit, IntoUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
+        TimeRepresentation, Unit,
+    },
     duration::{Duration, Hours, Minutes, Seconds},
     time_point::TimePoint,
-    units::{IntoUnit, MulExact, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Unit},
 };
 
 mod gpst;
@@ -41,7 +44,7 @@ pub trait TimeScale: Sized {
     /// conversions between different time scales.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
-        T: NumCast;
+        T: TimeRepresentation;
 
     /// Returns the epoch of a time scale, expressed as a `LocalTime` in its own time scale. The
     /// result may be expressed in any type `T`, as long as this type can be constructed from some
@@ -49,7 +52,7 @@ pub trait TimeScale: Sized {
     /// be represented by a value of type `T`.
     fn epoch_local<T>() -> LocalTime<T, Self::NativePeriod>
     where
-        T: NumCast;
+        T: TimeRepresentation;
 
     /// Returns whether this time scales incorporates leap seconds, i.e., whether the underlying
     /// "seconds since epoch" count also increases one second when a leap second is inserted.
@@ -104,7 +107,7 @@ pub trait TimeScale: Sized {
     ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
     where
         Period: Unit,
-        Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
+        Representation: TimeRepresentation,
         SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
         SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
         SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
@@ -123,45 +126,65 @@ pub trait TimeScale: Sized {
             .unwrap();
         Ok(seconds.into_unit() + subseconds)
     }
+}
 
-    /// Creates a time point in this time scale based on a time point in TAI. Note that some
-    /// rounding is permitted to occur here: not all time scales can be related exactly to TAI.
-    fn from_tai<Representation, Period>(
-        time_point: TimePoint<Tai, Representation, Period>,
+/// Used to indicate that it is possible to convert from one `TimeScale` to another.
+pub trait FromTimeScale<From: TimeScale>: TimeScale {
+    /// Converts from a `TimePoint` in the `Self` `TimeScale` to an equivalent `TimePoint` in the
+    /// `To` `TimeScale`. Note that the representations shall be the same between both
+    /// `TimeScales`. Due to some time scale conversions being inexact relations (e.g., TAI to
+    /// TDB), this may mean that some rounding is allowed to occur. Hence, it is advisable to
+    /// upcast the `from` time point towards a higher-accuracy representation before converting.
+    ///
+    /// This function is allowed to panic for scenarios where the underlying `Representation`
+    /// cannot represent the difference between two `TimePoint` reference epochs to a given
+    /// `Period` resolution. For all other choices of `Representation` and `Period`, this
+    /// conversion must be infallible.
+    ///
+    /// A default implementation of this function is provided that is valid for any two time scales
+    /// that have the same time tick rate but that differ in epoch. This means that this
+    /// implementation is valid, for example, for the TAI, UTC, Unix, and GPS clocks. It will not
+    /// be valid for dynamic clocks.
+    fn from_time_scale<Representation, Period>(
+        from: TimePoint<From, Representation, Period>,
     ) -> TimePoint<Self, Representation, Period>
     where
-        Self::NativePeriod: IntoUnit<Period, i64>,
-        <Tai as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        (): TimeScaleConversion<Tai, Self>,
         Period: Unit,
-        Representation: Copy + NumCast + NumOps + MulExact,
+        Representation: TimeRepresentation,
+        Period: FromUnit<From::NativePeriod, Representation>,
+        Period: FromUnit<Self::NativePeriod, Representation>,
     {
-        <() as TimeScaleConversion<Tai, Self>>::into_time_scale(time_point)
-    }
-
-    /// Creates a TAI time point based on a time point in this time scale. Rounding is permitted,
-    /// as not all time scales can be exactly related to TAI.
-    fn to_tai<Representation, Period>(
-        time_point: TimePoint<Self, Representation, Period>,
-    ) -> TimePoint<Tai, Representation, Period>
-    where
-        Self::NativePeriod: IntoUnit<Period, i64>,
-        <Tai as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        (): TimeScaleConversion<Self, Tai>,
-        Period: Unit,
-        Representation: Copy + NumCast + NumOps + MulExact,
-    {
-        <() as TimeScaleConversion<Self, Tai>>::into_time_scale(time_point)
+        let time_since_from_epoch = from.elapsed_time_since_epoch();
+        let from_epoch = From::epoch_tai::<Representation>().into_unit::<Period>();
+        let to_epoch = Self::epoch_tai::<Representation>().into_unit::<Period>();
+        // Note that this operation first rounds and then casts the epoch differences into the
+        // proper units and representation. The representation cast may fail, if the difference in
+        // epochs is not representable by the chosen representation (e.g., a `u8` cannot store the
+        // number of seconds between the `To` and `From` epoch). In such cases, this conversion will
+        // panic.
+        // We check which epoch is latest in time, and flip the signs based on that. This is needed
+        // so that we don't overflow (to below 0) when working with unsigned counts.
+        if to_epoch > from_epoch {
+            let epoch_difference: Duration<Representation, Period> = to_epoch - from_epoch;
+            TimePoint::<Self, Representation, Period>::from_time_since_epoch(
+                time_since_from_epoch - epoch_difference,
+            )
+        } else {
+            let epoch_difference: Duration<Representation, Period> = from_epoch - to_epoch;
+            TimePoint::<Self, Representation, Period>::from_time_since_epoch(
+                time_since_from_epoch + epoch_difference,
+            )
+        }
     }
 }
 
 /// Used to indicate that it is possible to convert from one `TimeScale` to another.
-pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
-    /// Converts from a `TimePoint` in the `From` `TimeScale` to an equivalent `TimePoint` in the
+pub trait IntoTimeScale<To: TimeScale>: TimeScale {
+    /// Converts from a `TimePoint` in the `Self` `TimeScale` to an equivalent `TimePoint` in the
     /// `To` `TimeScale`. Note that the representations shall be the same between both
     /// `TimeScales`. Due to some time scale conversions being inexact relations (e.g., TAI to
-    /// TDB), this may mean that some is allowed to occur. Hence, it is advisable to upcast the
-    /// `from` time point towards a higher-accuracy representation before converting.
+    /// TDB), this may mean that some rounding is allowed to occur. Hence, it is advisable to
+    /// upcast the `from` time point towards a higher-accuracy representation before converting.
     ///
     /// This function is allowed to panic for scenarios where the underlying `Representation`
     /// cannot represent the difference between two `TimePoint` reference epochs to a given
@@ -173,45 +196,41 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
     /// implementation is valid, for example, for the TAI, UTC, Unix, and GPS clocks. It will not
     /// be valid for dynamic clocks.
     fn into_time_scale<Representation, Period>(
-        from: TimePoint<From, Representation, Period>,
+        from: TimePoint<Self, Representation, Period>,
     ) -> TimePoint<To, Representation, Period>
     where
-        Period: Unit,
-        Representation: Copy + NumCast + NumOps + MulExact,
-        <From as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <To as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        Period: Unit
+            + FromUnit<To::NativePeriod, Representation>
+            + FromUnit<Self::NativePeriod, Representation>,
+        Representation: TimeRepresentation;
+}
+
+impl<From: TimeScale, To: TimeScale> IntoTimeScale<To> for From
+where
+    To: FromTimeScale<From>,
+{
+    fn into_time_scale<Representation, Period>(
+        from: TimePoint<Self, Representation, Period>,
+    ) -> TimePoint<To, Representation, Period>
+    where
+        Period: Unit
+            + FromUnit<To::NativePeriod, Representation>
+            + FromUnit<Self::NativePeriod, Representation>,
+        Representation: TimeRepresentation,
     {
-        let time_since_from_epoch = from.elapsed_time_since_epoch();
-        let from_epoch = From::epoch_tai().into_unit();
-        let to_epoch = To::epoch_tai().into_unit();
-        // Note that this operation first rounds and then casts the epoch differences into the
-        // proper units and representation. The representation cast may fail, if the difference in
-        // epochs is not representable by the chosen representation (e.g., a `u8` cannot store the
-        // number of seconds between the `To` and `From` epoch). In such cases, this conversion will
-        // panic.
-        // We check which epoch is latest in time, and flip the signs based on that. This is needed
-        // so that we don't overflow (to below 0) when working with unsigned counts.
-        if to_epoch > from_epoch {
-            let epoch_difference: Duration<Representation, Period> =
-                (to_epoch - from_epoch).round().try_cast().unwrap();
-            TimePoint::<To, Representation, Period>::from_time_since_epoch(
-                time_since_from_epoch - epoch_difference,
-            )
-        } else {
-            let epoch_difference: Duration<Representation, Period> =
-                (from_epoch - to_epoch).round().try_cast().unwrap();
-            TimePoint::<To, Representation, Period>::from_time_since_epoch(
-                time_since_from_epoch + epoch_difference,
-            )
-        }
+        To::from_time_scale(from)
     }
 }
 
-impl<T: TimeScale> TimeScaleConversion<T, T> for () {
+impl<T: TimeScale> FromTimeScale<T> for T {
     /// Conversion from a clock to itself is always possible and a no-op.
-    fn into_time_scale<Representation, Period>(
+    fn from_time_scale<Representation, Period>(
         from: TimePoint<T, Representation, Period>,
-    ) -> TimePoint<T, Representation, Period> {
+    ) -> TimePoint<T, Representation, Period>
+    where
+        Representation: TimeRepresentation,
+        Period: Unit,
+    {
         from
     }
 }
@@ -219,37 +238,78 @@ impl<T: TimeScale> TimeScaleConversion<T, T> for () {
 /// Used to indicate that it is possible to convert from one `TimeScale` to another, though it is
 /// allowed for this operation to fail. This is the case when applying leap seconds, for example:
 /// the result may then be ambiguous or undefined, based on folds and gaps in time.
-pub trait TryTimeScaleConversion<From: TimeScale, To: TimeScale, Representation, Period: Unit> {
+///
+/// Similar to `TryFrom` and `TryInto`, it is advised to implement only `TryFromTimeScale`. The
+/// equivalent `TryIntoTimeScale` trait implementation may then be derived.
+pub trait TryFromTimeScale<From: TimeScale>: TimeScale {
     type Error: core::fmt::Debug;
 
     /// Tries to convert from one time scale to another. If this is not unambiguously possible,
     /// returns an error indicating why it is not.
-    fn try_into_time_scale(
+    fn try_from_time_scale<Representation, Period>(
         from: TimePoint<From, Representation, Period>,
-    ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
+    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
-        <From as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <To as TimeScale>::NativePeriod: IntoUnit<Period, i64>;
+        Period: Unit
+            + FromUnit<From::NativePeriod, Representation>
+            + FromUnit<Self::NativePeriod, Representation>,
+        Representation: TimeRepresentation;
 }
 
-impl<From: TimeScale, To: TimeScale, Representation, Period>
-    TryTimeScaleConversion<From, To, Representation, Period> for ()
+/// Used to indicate that it is possible to convert from one `TimeScale` to another, though it is
+/// allowed for this operation to fail. This is the case when applying leap seconds, for example:
+/// the result may then be ambiguous or undefined, based on folds and gaps in time.
+pub trait TryIntoTimeScale<To: TimeScale>: TimeScale {
+    type Error: core::fmt::Debug;
+
+    /// Tries to convert from one time scale to another. If this is not unambiguously possible,
+    /// returns an error indicating why it is not.
+    fn try_into_time_scale<Representation, Period>(
+        from: TimePoint<Self, Representation, Period>,
+    ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
+    where
+        Period: Unit
+            + FromUnit<To::NativePeriod, Representation>
+            + FromUnit<Self::NativePeriod, Representation>,
+        Representation: TimeRepresentation;
+}
+
+impl<From: TimeScale, To: TimeScale> TryFromTimeScale<From> for To
 where
-    (): TimeScaleConversion<From, To>,
-    Period: Unit,
-    Representation: Copy + NumCast + NumOps + MulExact,
+    To: FromTimeScale<From>,
 {
     type Error = core::convert::Infallible;
 
     /// Default implementation of a "try" conversion whenever two time scales can already be
     /// converted infallibly.
-    fn try_into_time_scale(
+    fn try_from_time_scale<Representation, Period>(
+        from: TimePoint<From, Representation, Period>,
+    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
+    where
+        Period: Unit
+            + FromUnit<From::NativePeriod, Representation>
+            + FromUnit<To::NativePeriod, Representation>,
+        Representation: TimeRepresentation,
+    {
+        Ok(Self::from_time_scale(from))
+    }
+}
+
+impl<From: TimeScale, To: TimeScale> TryIntoTimeScale<To> for From
+where
+    To: TryFromTimeScale<From>,
+{
+    type Error = <To as TryFromTimeScale<From>>::Error;
+
+    fn try_into_time_scale<Representation, Period>(
         from: TimePoint<From, Representation, Period>,
     ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
     where
-        <From as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
-        <To as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        Period: Unit
+            + FromUnit<From::NativePeriod, Representation>
+            + FromUnit<To::NativePeriod, Representation>,
+        Representation: TimeRepresentation,
     {
-        Ok(<() as TimeScaleConversion<From, To>>::into_time_scale(from))
+        To::try_from_time_scale(from)
     }
 }
