@@ -41,7 +41,7 @@ impl JulianDate<i64, SecondsPerHour> {
     /// Constructs a Julian date from some given calendar date.
     pub fn from_date(date: impl Into<LocalDays<i64>>) -> Self {
         let local_days: LocalTime<i64, SecondsPerDay> = date.into();
-        let local_hours: LocalTime<i64, SecondsPerHour> = local_days.convert();
+        let local_hours: LocalTime<i64, SecondsPerHour> = local_days.into_unit();
         Self::from(local_hours)
     }
 }
@@ -64,8 +64,8 @@ where
     fn from(value: LocalTime<Representation, Period>) -> Self {
         Self {
             day: value.elapsed_time_since_epoch()
-                + Days::new(2440587).cast().convert()
-                + Hours::new(12).cast().convert(),
+                + Days::new(2440587).cast().into_unit()
+                + Hours::new(12).cast().into_unit(),
         }
     }
 }
@@ -87,7 +87,7 @@ where
     /// nothing more than a constant offset of the number of days between the two epochs.
     fn from(value: JulianDate<Representation, Period>) -> Self {
         Self::from_time_since_epoch(
-            value.day - Days::new(2440587).cast().convert() - Hours::new(12).cast().convert(),
+            value.day - Days::new(2440587).cast().into_unit() - Hours::new(12).cast().into_unit(),
         )
     }
 }
@@ -101,63 +101,63 @@ fn historic_dates_from_meeus() {
     use crate::calendar::Month::*;
     assert_eq!(
         JulianDate::from_date(Date::new(2000, January, 1).unwrap()),
-        JulianDate::new(Days::new(2451544).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2451544).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(1999, January, 1).unwrap()),
-        JulianDate::new(Days::new(2451179).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2451179).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(1987, January, 27).unwrap()),
-        JulianDate::new(Days::new(2446822).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2446822).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(1987, June, 19).unwrap()),
-        JulianDate::new(Days::new(2446965).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2446965).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(1988, January, 27).unwrap()),
-        JulianDate::new(Days::new(2447187).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2447187).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(1988, June, 19).unwrap()),
-        JulianDate::new(Days::new(2447331).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2447331).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(1900, January, 1).unwrap()),
-        JulianDate::new(Days::new(2415020).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2415020).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(1600, January, 1).unwrap()),
-        JulianDate::new(Days::new(2305447).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2305447).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(1600, December, 31).unwrap()),
-        JulianDate::new(Days::new(2305812).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2305812).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(837, April, 10).unwrap()),
-        JulianDate::new(Days::new(2026871).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(2026871).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(-123, December, 31).unwrap()),
-        JulianDate::new(Days::new(1676496).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(1676496).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(-122, January, 1).unwrap()),
-        JulianDate::new(Days::new(1676497).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(1676497).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(-1000, July, 12).unwrap()),
-        JulianDate::new(Days::new(1356000).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(1356000).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(-1000, February, 29).unwrap()),
-        JulianDate::new(Days::new(1355866).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(1355866).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(-1001, August, 17).unwrap()),
-        JulianDate::new(Days::new(1355670).convert() + Hours::new(12i64))
+        JulianDate::new(Days::new(1355670).into_unit() + Hours::new(12i64))
     );
     assert_eq!(
         JulianDate::from_date(Date::new(-4712, January, 1).unwrap()),

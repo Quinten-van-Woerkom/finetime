@@ -29,7 +29,7 @@ impl TimeScale for Tt {
         let date = Date::new(1977, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 0)
             .unwrap()
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }
@@ -41,7 +41,7 @@ impl TimeScale for Tt {
         T: NumCast,
     {
         let date = Date::new(1977, Month::January, 1).unwrap();
-        let epoch = date.to_local_days().convert() + MilliSeconds::new(32_184);
+        let epoch = date.to_local_days().into_unit() + MilliSeconds::new(32_184);
         epoch.try_cast().unwrap()
     }
 
@@ -63,7 +63,7 @@ where
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
 
-    fn try_convert(
+    fn try_into_time_scale(
         from: TimePoint<Unix, Representation, Period>,
     ) -> Result<TimePoint<Tt, Representation, Period>, Self::Error>
     where
@@ -71,8 +71,10 @@ where
         <Tt as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         let utc =
-            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
-        Ok(<() as TimeScaleConversion<Utc, Tt>>::transform(utc))
+            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_into_time_scale(
+                from,
+            )?;
+        Ok(<() as TimeScaleConversion<Utc, Tt>>::into_time_scale(utc))
     }
 }
 
@@ -83,7 +85,7 @@ fn known_timestamps() {
     use crate::{Date, Month, TaiTime};
     let tai = TaiTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
         .unwrap()
-        .convert();
+        .into_unit();
     let tt = TtTime::from_subsecond_datetime(
         Date::new(2004, Month::May, 14).unwrap(),
         16,
@@ -92,7 +94,7 @@ fn known_timestamps() {
         MilliSeconds::new(184),
     )
     .unwrap();
-    assert_eq!(tai, tt.transform());
+    assert_eq!(tai, tt.into_time_scale());
 }
 
 #[cfg(kani)]
@@ -144,8 +146,8 @@ mod proof_harness {
         kani::assume(minute < 60);
         kani::assume(second < 60);
         let time1 = TtTime::from_datetime(date, hour, minute, second).unwrap();
-        let tai: TaiTime<_, _> = time1.transform();
-        let time2: TtTime<_, _> = tai.transform();
+        let tai: TaiTime<_, _> = time1.into_time_scale();
+        let time2: TtTime<_, _> = tai.into_time_scale();
         assert_eq!(time1, time2);
     }
 }

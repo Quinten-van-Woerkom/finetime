@@ -10,7 +10,7 @@ use crate::{
         TimeScale, TimeScaleConversion,
         tai::{Tai, TaiTime},
     },
-    units::{IntoUnit, MulExact, Unit, Second},
+    units::{IntoUnit, MulExact, Second, Unit},
 };
 
 /// `GpsTime` is a time point that is expressed according to the GPS time scale.
@@ -31,7 +31,7 @@ impl TimeScale for Gpst {
     {
         TaiTime::from_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
             .unwrap()
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }
@@ -43,7 +43,7 @@ impl TimeScale for Gpst {
         Date::new(1980, Month::January, 6)
             .unwrap()
             .to_local_days()
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }
@@ -66,7 +66,7 @@ where
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
 
-    fn try_convert(
+    fn try_into_time_scale(
         from: TimePoint<Unix, Representation, Period>,
     ) -> Result<TimePoint<Gpst, Representation, Period>, Self::Error>
     where
@@ -74,8 +74,10 @@ where
         <Gpst as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         let utc =
-            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
-        Ok(<() as TimeScaleConversion<Utc, Gpst>>::transform(utc))
+            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_into_time_scale(
+                from,
+            )?;
+        Ok(<() as TimeScaleConversion<Utc, Gpst>>::into_time_scale(utc))
     }
 }
 
@@ -86,7 +88,7 @@ fn known_timestamps() {
     let tai = TaiTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32).unwrap();
     let gpst =
         GpsTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 13).unwrap();
-    assert_eq!(tai, gpst.transform());
+    assert_eq!(tai, gpst.into_time_scale());
 }
 
 #[cfg(kani)]
@@ -127,8 +129,8 @@ mod proof_harness {
         kani::assume(minute < 60);
         kani::assume(second < 60);
         let time1 = GpsTime::from_datetime(date, hour, minute, second).unwrap();
-        let tai: TaiTime<_> = time1.transform();
-        let time2: GpsTime<_> = tai.transform();
+        let tai: TaiTime<_> = time1.into_time_scale();
+        let time2: GpsTime<_> = tai.into_time_scale();
         assert_eq!(time1, time2);
     }
 }

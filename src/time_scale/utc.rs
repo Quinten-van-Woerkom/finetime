@@ -142,7 +142,7 @@ impl TimeScale for Utc {
         let date = Date::new(1970, January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10)
             .unwrap()
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }
@@ -154,7 +154,7 @@ impl TimeScale for Utc {
         T: NumCast,
     {
         LocalDays::from_time_since_epoch(Duration::new(0u8))
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }
@@ -276,7 +276,7 @@ impl TimeScale for Utc {
         SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
         Second: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
     {
-        let one = Seconds::new(Representation::one()).convert();
+        let one = Seconds::new(Representation::one()).into_unit();
         let zero = Duration::zero();
         if subseconds < zero || subseconds >= one {
             return Err(FineDateTimeError::InvalidSubseconds { subseconds });
@@ -285,7 +285,7 @@ impl TimeScale for Utc {
         let seconds = Self::from_local_datetime(date, hour, minute, second)?
             .try_cast()
             .unwrap();
-        Ok(seconds.convert() + subseconds)
+        Ok(seconds.into_unit() + subseconds)
     }
 }
 
@@ -300,19 +300,19 @@ where
 {
     type Error = LeapSecondError<Representation, Period>;
 
-    fn try_convert(
+    fn try_into_time_scale(
         from: TimePoint<Unix, Representation, Period>,
     ) -> Result<TimePoint<Utc, Representation, Period>, Self::Error> {
         let unix_time_seconds: crate::UnixTime<_> = from.floor();
-        let subseconds = from - unix_time_seconds.convert();
+        let subseconds = from - unix_time_seconds.into_unit();
         let unix_time_seconds = from.floor().try_cast().unwrap();
         match LEAP_SECONDS.to_utc(unix_time_seconds) {
             LeapSecondsResult::Unambiguous(utc_time) => {
-                Ok(utc_time.try_cast().unwrap().convert() + subseconds)
+                Ok(utc_time.try_cast().unwrap().into_unit() + subseconds)
             }
             LeapSecondsResult::InsertionPoint { start, end } => Err(LeapSecondError::Ambiguous {
-                start: start.try_cast().unwrap().convert() + subseconds,
-                end: end.try_cast().unwrap().convert() + subseconds,
+                start: start.try_cast().unwrap().into_unit() + subseconds,
+                end: end.try_cast().unwrap().into_unit() + subseconds,
             })?,
             LeapSecondsResult::DeletionPoint => Err(LeapSecondError::Deletion),
         }
@@ -633,6 +633,6 @@ fn known_timestamps() {
     let utc = UtcTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 0).unwrap();
     let tai = TaiTime::from_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
         .unwrap()
-        .transform();
+        .into_time_scale();
     assert_eq!(utc, tai);
 }

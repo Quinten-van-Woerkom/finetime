@@ -5,7 +5,7 @@ use num::{NumCast, traits::NumOps};
 use crate::{
     Date, LocalTime, MilliSeconds, Month, TaiTime, TimePoint, TimeScale, TimeScaleConversion, Tt,
     TtTime,
-    units::{Fraction, IntoUnit, Milli, MulExact, Unit, Second},
+    units::{Fraction, IntoUnit, Milli, MulExact, Second, Unit},
 };
 
 /// `TcgTime` is a specialization of `TimePoint` that uses the Geocentric Coordinate Time (TCG)
@@ -29,7 +29,7 @@ impl TimeScale for Tcg {
         let date = Date::new(1977, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 0)
             .unwrap()
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }
@@ -41,7 +41,7 @@ impl TimeScale for Tcg {
         T: NumCast,
     {
         let date = Date::new(1977, Month::January, 1).unwrap();
-        let epoch = date.to_local_days().convert() + MilliSeconds::new(32_184);
+        let epoch = date.to_local_days().into_unit() + MilliSeconds::new(32_184);
         epoch.try_cast().unwrap()
     }
 
@@ -51,7 +51,7 @@ impl TimeScale for Tcg {
 }
 
 impl TimeScaleConversion<Tcg, Tt> for () {
-    fn transform<Representation, Period>(
+    fn into_time_scale<Representation, Period>(
         from: TimePoint<Tcg, Representation, Period>,
     ) -> TimePoint<Tt, Representation, Period>
     where
@@ -73,7 +73,7 @@ impl TimeScaleConversion<Tcg, Tt> for () {
 }
 
 impl TimeScaleConversion<Tt, Tcg> for () {
-    fn transform<Representation, Period>(
+    fn into_time_scale<Representation, Period>(
         from: TimePoint<Tt, Representation, Period>,
     ) -> TimePoint<Tcg, Representation, Period>
     where
@@ -146,9 +146,9 @@ mod proof_harness {
             TcgTime::from_datetime(date, hour, minute, second)
                 .unwrap()
                 .cast()
-                .convert();
-        let tt: TtTime<_, _> = time1.transform();
-        let _: TcgTime<_, _> = tt.transform();
+                .into_unit();
+        let tt: TtTime<_, _> = time1.into_time_scale();
+        let _: TcgTime<_, _> = tt.into_time_scale();
     }
 }
 
@@ -169,7 +169,7 @@ fn datetime_tt_tcg_conversion() {
         MilliSeconds::new(184i64),
     )
     .unwrap()
-    .convert::<Atto>();
+    .into_unit::<Atto>();
     let time2 = TtTime::from_subsecond_datetime(
         Date::new(1977, January, 1).unwrap(),
         0,
@@ -178,23 +178,23 @@ fn datetime_tt_tcg_conversion() {
         MilliSeconds::new(184i64),
     )
     .unwrap()
-    .convert::<Atto>();
-    assert_eq!(time1, time2.transform());
+    .into_unit::<Atto>();
+    assert_eq!(time1, time2.into_time_scale());
 
     // 10_000_000_000 seconds after that epoch, there should be a difference of 6.969290134 seconds
     // based on the known rate difference of L_G = 6.969290134e-10. We check this to picosecond
     // precision: the offset shall be exactly 6.969290134000 seconds (to picosecond accuracy),
     // since this rate difference is a defining constant (not just an approximation).
-    let time1 = time1.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).convert();
-    let time2 = time2.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).convert()
-        - NanoSeconds::new(6_969_290_134i128).convert();
-    assert_eq!(time1.transform(), time2);
+    let time1 = time1.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).into_unit();
+    let time2 = time2.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).into_unit()
+        - NanoSeconds::new(6_969_290_134i128).into_unit();
+    assert_eq!(time1.into_time_scale(), time2);
 
     // At J2000, the difference should be about 505.833 ms (see "Report of the IAU WGAS Sub-group
     // on Issues on Time", P.K. Seidelmann).
     let time1 = TtTime::from_datetime(Date::new(2000, January, 1).unwrap(), 12, 0, 0)
         .unwrap()
-        .convert::<Micro>();
+        .into_unit::<Micro>();
     let time2 = TcgTime::from_subsecond_datetime(
         Date::new(2000, January, 1).unwrap(),
         12,
@@ -203,8 +203,8 @@ fn datetime_tt_tcg_conversion() {
         MicroSeconds::new(505_833),
     )
     .unwrap()
-    .convert();
-    assert_eq!(time1.transform(), time2);
+    .into_unit();
+    assert_eq!(time1.into_time_scale(), time2);
 
     // At J2100 (2100-01-01T12:00:00 TT), the difference should be 2.70517411 seconds (see "Report
     // of the IAU WGAS Sub-group on Issues on Time", P.K. Seidelmann). Redoing the math using
@@ -212,7 +212,7 @@ fn datetime_tt_tcg_conversion() {
     // result), so we only check this to microsecond precision.
     let time1 = TtTime::from_datetime(Date::new(2100, January, 1).unwrap(), 12, 0, 0)
         .unwrap()
-        .convert::<Micro>();
+        .into_unit::<Micro>();
     let time2 = TcgTime::from_subsecond_datetime(
         Date::new(2100, January, 1).unwrap(),
         12,
@@ -222,5 +222,5 @@ fn datetime_tt_tcg_conversion() {
     )
     .unwrap()
     .round::<Micro>();
-    assert_eq!(time1.transform(), time2);
+    assert_eq!(time1.into_time_scale(), time2);
 }

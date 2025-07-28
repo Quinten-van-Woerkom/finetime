@@ -7,7 +7,7 @@ use crate::{
     calendar::{Date, Month},
     time_point::TimePoint,
     time_scale::TimeScale,
-    units::{IntoUnit, MulExact, Unit, Second},
+    units::{IntoUnit, MulExact, Second, Unit},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
@@ -37,7 +37,7 @@ impl TimeScale for Tai {
         Date::new(1958, Month::January, 1)
             .unwrap()
             .to_local_days()
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }
@@ -55,7 +55,7 @@ where
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
 
-    fn try_convert(
+    fn try_into_time_scale(
         from: TimePoint<Unix, Representation, Period>,
     ) -> Result<TimePoint<Tai, Representation, Period>, Self::Error>
     where
@@ -63,8 +63,8 @@ where
         <Tai as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         let utc =
-            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
-        Ok(<() as TimeScaleConversion<Utc, Tai>>::transform(utc))
+            <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_into_time_scale(from)?;
+        Ok(<() as TimeScaleConversion<Utc, Tai>>::into_time_scale(utc))
     }
 }
 

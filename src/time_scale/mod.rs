@@ -8,7 +8,7 @@ use crate::{
     DateTimeError, FineDateTimeError,
     duration::{Duration, Hours, Minutes, Seconds},
     time_point::TimePoint,
-    units::{IntoUnit, MulExact, Unit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
+    units::{IntoUnit, MulExact, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Unit},
 };
 
 mod gpst;
@@ -88,8 +88,8 @@ pub trait TimeScale: Sized {
         let seconds = Seconds::new(second).cast();
         let epoch = Self::epoch_local();
         let local_time: LocalTime<i64> =
-            date.convert() + hours.convert() + minutes.convert() + seconds;
-        let time_since_epoch = local_time.convert() - epoch;
+            date.into_unit() + hours.into_unit() + minutes.into_unit() + seconds;
+        let time_since_epoch = local_time.into_unit() - epoch;
         Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
 
@@ -112,7 +112,7 @@ pub trait TimeScale: Sized {
         Self::NativePeriod: IntoUnit<Period, Representation>,
     {
         // We check that the number of subseconds does not exceed one second.
-        let one = Seconds::new(Representation::one()).convert();
+        let one = Seconds::new(Representation::one()).into_unit();
         let zero = Duration::zero();
         if subseconds < zero || subseconds >= one {
             return Err(FineDateTimeError::InvalidSubseconds { subseconds });
@@ -121,7 +121,7 @@ pub trait TimeScale: Sized {
         let seconds = Self::from_local_datetime(date, hour, minute, second)?
             .try_cast()
             .unwrap();
-        Ok(seconds.convert() + subseconds)
+        Ok(seconds.into_unit() + subseconds)
     }
 
     /// Creates a time point in this time scale based on a time point in TAI. Note that some
@@ -136,7 +136,7 @@ pub trait TimeScale: Sized {
         Period: Unit,
         Representation: Copy + NumCast + NumOps + MulExact,
     {
-        <() as TimeScaleConversion<Tai, Self>>::transform(time_point)
+        <() as TimeScaleConversion<Tai, Self>>::into_time_scale(time_point)
     }
 
     /// Creates a TAI time point based on a time point in this time scale. Rounding is permitted,
@@ -151,7 +151,7 @@ pub trait TimeScale: Sized {
         Period: Unit,
         Representation: Copy + NumCast + NumOps + MulExact,
     {
-        <() as TimeScaleConversion<Self, Tai>>::transform(time_point)
+        <() as TimeScaleConversion<Self, Tai>>::into_time_scale(time_point)
     }
 }
 
@@ -172,7 +172,7 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
     /// that have the same time tick rate but that differ in epoch. This means that this
     /// implementation is valid, for example, for the TAI, UTC, Unix, and GPS clocks. It will not
     /// be valid for dynamic clocks.
-    fn transform<Representation, Period>(
+    fn into_time_scale<Representation, Period>(
         from: TimePoint<From, Representation, Period>,
     ) -> TimePoint<To, Representation, Period>
     where
@@ -182,8 +182,8 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
         <To as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         let time_since_from_epoch = from.elapsed_time_since_epoch();
-        let from_epoch = From::epoch_tai().convert();
-        let to_epoch = To::epoch_tai().convert();
+        let from_epoch = From::epoch_tai().into_unit();
+        let to_epoch = To::epoch_tai().into_unit();
         // Note that this operation first rounds and then casts the epoch differences into the
         // proper units and representation. The representation cast may fail, if the difference in
         // epochs is not representable by the chosen representation (e.g., a `u8` cannot store the
@@ -209,7 +209,7 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
 
 impl<T: TimeScale> TimeScaleConversion<T, T> for () {
     /// Conversion from a clock to itself is always possible and a no-op.
-    fn transform<Representation, Period>(
+    fn into_time_scale<Representation, Period>(
         from: TimePoint<T, Representation, Period>,
     ) -> TimePoint<T, Representation, Period> {
         from
@@ -224,7 +224,7 @@ pub trait TryTimeScaleConversion<From: TimeScale, To: TimeScale, Representation,
 
     /// Tries to convert from one time scale to another. If this is not unambiguously possible,
     /// returns an error indicating why it is not.
-    fn try_convert(
+    fn try_into_time_scale(
         from: TimePoint<From, Representation, Period>,
     ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
     where
@@ -243,13 +243,13 @@ where
 
     /// Default implementation of a "try" conversion whenever two time scales can already be
     /// converted infallibly.
-    fn try_convert(
+    fn try_into_time_scale(
         from: TimePoint<From, Representation, Period>,
     ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
     where
         <From as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
         <To as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
-        Ok(<() as TimeScaleConversion<From, To>>::transform(from))
+        Ok(<() as TimeScaleConversion<From, To>>::into_time_scale(from))
     }
 }

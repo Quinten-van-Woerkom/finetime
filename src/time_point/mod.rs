@@ -13,7 +13,7 @@ use crate::{
     duration::Duration,
     time_scale::{LocalDays, TimeScale},
     units::{
-        IntoUnit, MulExact, Nano, Unit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
+        IntoUnit, MulExact, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Unit,
     },
 };
 
@@ -45,7 +45,7 @@ impl<Scale> TimePoint<Scale, u128, Nano> {
     {
         let system_time = std::time::SystemTime::now();
         let unix_time = crate::UnixTime::from(system_time);
-        <() as crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>>::try_convert(
+        <() as crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>>::try_into_time_scale(
             unix_time,
         )
     }
@@ -171,7 +171,7 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
     /// Converts a `TimePoint` towards a different time unit. May only be used if the time unit is
     /// smaller than the current one (e.g., seconds to milliseconds) or if the representation of
     /// this `TimePoint` is a float.
-    pub fn convert<Target: Unit>(self) -> TimePoint<Scale, Representation, Target>
+    pub fn into_unit<Target: Unit>(self) -> TimePoint<Scale, Representation, Target>
     where
         Period: IntoUnit<Target, Representation>,
         Representation: Mul<Representation, Output = Representation>
@@ -179,7 +179,7 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
             + NumCast,
     {
         TimePoint {
-            duration: self.duration.convert(),
+            duration: self.duration.into_unit(),
             time_scale: core::marker::PhantomData,
         }
     }
@@ -187,12 +187,12 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
     /// Tries to convert a `TimePoint` towards a different time unit. Only applies to integers (as
     /// all floats may be converted infallibly anyway). Will only return a result if the conversion
     /// is lossless.
-    pub fn try_convert<Target: Unit>(self) -> Option<TimePoint<Scale, Representation, Target>>
+    pub fn try_into_unit<Target: Unit>(self) -> Option<TimePoint<Scale, Representation, Target>>
     where
         Representation: NumCast + Integer + Bounded + Copy,
     {
         Some(TimePoint {
-            duration: self.duration.try_convert()?,
+            duration: self.duration.try_into_unit()?,
             time_scale: core::marker::PhantomData,
         })
     }
@@ -222,7 +222,7 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
     }
 
     /// Transforms a time point towards another time scale.
-    pub fn transform<Target>(self) -> TimePoint<Target, Representation, Period>
+    pub fn into_time_scale<Target>(self) -> TimePoint<Target, Representation, Period>
     where
         Target: TimeScale,
         Scale: TimeScale,
@@ -231,7 +231,7 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
         <Target as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
         (): TimeScaleConversion<Scale, Target>,
     {
-        <() as TimeScaleConversion<Scale, Target>>::transform(self)
+        <() as TimeScaleConversion<Scale, Target>>::into_time_scale(self)
     }
 }
 

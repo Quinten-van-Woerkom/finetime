@@ -55,7 +55,7 @@ impl TimeScale for Unix {
         let date = Date::new(1970, Month::January, 1).unwrap();
         TaiTime::from_datetime(date, 0, 0, 10)
             .unwrap()
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }
@@ -67,7 +67,7 @@ impl TimeScale for Unix {
         T: NumCast,
     {
         LocalDays::from_time_since_epoch(Duration::new(0))
-            .convert()
+            .into_unit()
             .try_cast()
             .unwrap()
     }

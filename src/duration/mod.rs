@@ -10,9 +10,9 @@ use core::{
 use num::{Bounded, Integer, NumCast, Signed, Zero, traits::ConstZero};
 
 use crate::units::{
-    Atto, ConversionRatio, Femto, Fraction, IntoUnit, Micro, Milli, MulExact, Nano, Pico, Unit,
-    Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
-    SecondsPerYear,
+    Atto, ConversionRatio, Femto, Fraction, IntoUnit, Micro, Milli, MulExact, Nano, Pico, Second,
+    SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
+    SecondsPerYear, Unit,
 };
 
 /// A `Duration` represents the difference between two time points. It has an associated
@@ -47,7 +47,7 @@ impl<Representation, Period: Unit> Duration<Representation, Period> {
     /// Converts a `Duration` towards a different time unit. May only be used if the time unit is
     /// smaller than the current one (e.g., seconds to milliseconds) or if the representation of
     /// this `Duration` is a float.
-    pub fn convert<Target: Unit>(self) -> Duration<Representation, Target>
+    pub fn into_unit<Target: Unit>(self) -> Duration<Representation, Target>
     where
         Period: IntoUnit<Target, Representation>,
         Representation: Mul<Representation, Output = Representation>
@@ -64,7 +64,7 @@ impl<Representation, Period: Unit> Duration<Representation, Period> {
     /// Tries to convert a `Duration` towards a different time unit. Only applies to integers (as
     /// all floats may be converted infallibly anyway). Will only return a result if the conversion
     /// is lossless.
-    pub fn try_convert<Target: Unit>(self) -> Option<Duration<Representation, Target>>
+    pub fn try_into_unit<Target: Unit>(self) -> Option<Duration<Representation, Target>>
     where
         Representation: NumCast + Integer + Bounded + Copy,
     {
@@ -415,16 +415,16 @@ where
 #[test]
 fn convert_si_unit_seconds() {
     let seconds = Seconds::new(1.);
-    let milliseconds: MilliSeconds<_> = seconds.convert();
+    let milliseconds: MilliSeconds<_> = seconds.into_unit();
     assert_eq!(milliseconds.count(), 1_000.);
 
     let seconds = Seconds::new(1u64);
-    let milliseconds: MilliSeconds<_> = seconds.convert();
-    let microseconds: MicroSeconds<_> = seconds.convert();
-    let nanoseconds: NanoSeconds<_> = seconds.convert();
-    let picoseconds: PicoSeconds<_> = seconds.convert();
-    let femtoseconds: FemtoSeconds<_> = seconds.convert();
-    let attoseconds: AttoSeconds<_> = seconds.convert();
+    let milliseconds: MilliSeconds<_> = seconds.into_unit();
+    let microseconds: MicroSeconds<_> = seconds.into_unit();
+    let nanoseconds: NanoSeconds<_> = seconds.into_unit();
+    let picoseconds: PicoSeconds<_> = seconds.into_unit();
+    let femtoseconds: FemtoSeconds<_> = seconds.into_unit();
+    let attoseconds: AttoSeconds<_> = seconds.into_unit();
 
     assert_eq!(milliseconds.count(), 1_000);
     assert_eq!(microseconds.count(), 1_000_000);
@@ -439,12 +439,12 @@ fn convert_si_unit_seconds() {
 fn convert_binary_fraction_seconds() {
     use crate::units::*;
     let seconds = Seconds::new(1u64);
-    let fraction1: Duration<_, BinaryFraction1> = seconds.convert();
-    let fraction2: Duration<_, BinaryFraction2> = seconds.convert();
-    let fraction3: Duration<_, BinaryFraction3> = seconds.convert();
-    let fraction4: Duration<_, BinaryFraction4> = seconds.convert();
-    let fraction5: Duration<_, BinaryFraction5> = seconds.convert();
-    let fraction6: Duration<_, BinaryFraction6> = seconds.convert();
+    let fraction1: Duration<_, BinaryFraction1> = seconds.into_unit();
+    let fraction2: Duration<_, BinaryFraction2> = seconds.into_unit();
+    let fraction3: Duration<_, BinaryFraction3> = seconds.into_unit();
+    let fraction4: Duration<_, BinaryFraction4> = seconds.into_unit();
+    let fraction5: Duration<_, BinaryFraction5> = seconds.into_unit();
+    let fraction6: Duration<_, BinaryFraction6> = seconds.into_unit();
 
     assert_eq!(fraction1.count(), 0x100);
     assert_eq!(fraction2.count(), 0x10000);
@@ -481,9 +481,9 @@ mod proof_harness {
                     if let (Some(_), Some(denominator)) = (numerator, denominator) {
                         kani::assume(a <= Seconds::new(<$repr>::max_value() / denominator));
                         kani::assume(a >= Seconds::new(<$repr>::min_value() / denominator));
-                        let b: Duration<_, $to> = a.convert();
+                        let b: Duration<_, $to> = a.into_unit();
                         assert_eq!(b.count(), <$to>::RATIO.recip() * a.count());
-                        let c: Seconds<_> = b.try_convert().unwrap();
+                        let c: Seconds<_> = b.try_into_unit().unwrap();
                         assert_eq!(a, c);
                     }
                 }
