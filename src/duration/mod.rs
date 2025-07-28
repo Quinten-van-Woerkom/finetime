@@ -117,9 +117,9 @@ impl<Representation, Period: Unit> Duration<Representation, Period> {
     /// Infallibly converts towards a different representation.
     pub fn cast<Target>(self) -> Duration<Target, Period>
     where
-        Target: From<Representation>,
+        Representation: Into<Target>,
     {
-        Duration::new(Target::from(self.count))
+        Duration::new(self.count.into())
     }
 
     /// Converts towards a different representation. If the underlying representation cannot store

@@ -200,7 +200,7 @@ impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Perio
     /// Infallibly converts towards a different representation.
     pub fn cast<Target>(self) -> TimePoint<Scale, Target, Period>
     where
-        Target: From<Representation>,
+        Representation: Into<Target>,
     {
         TimePoint {
             duration: self.duration.cast(),
