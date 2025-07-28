@@ -11,7 +11,7 @@ use crate::{
     Duration, LocalTime,
     duration::Days,
     time_scale::LocalDays,
-    units::{IsValidConversion, Ratio, SecondsPerDay},
+    units::{IntoUnit, Unit, SecondsPerDay},
 };
 
 /// The Modified Julian Day (MJD) representation of any given date.
@@ -38,14 +38,14 @@ impl ModifiedJulianDate<i64> {
 impl<Representation, Period> From<LocalTime<Representation, Period>>
     for ModifiedJulianDate<Representation, Period>
 where
-    Period: Ratio,
+    Period: Unit,
     Representation: Copy
         + From<i64>
         + Add<Representation, Output = Representation>
         + Mul<Representation, Output = Representation>
         + Div<Representation, Output = Representation>
         + NumCast,
-    (): IsValidConversion<Representation, SecondsPerDay, Period>,
+    SecondsPerDay: IntoUnit<Period, Representation>,
 {
     /// Transforming from `LocalDays` (since Unix epoch) to the equivalent `ModifiedJulianDate` is
     /// nothing more than a constant offset of the number of days between the two epochs.
@@ -59,14 +59,14 @@ where
 impl<Representation, Period> From<ModifiedJulianDate<Representation, Period>>
     for LocalTime<Representation, Period>
 where
-    Period: Ratio,
+    Period: Unit,
     Representation: Copy
         + From<i64>
         + Sub<Representation, Output = Representation>
         + Mul<Representation, Output = Representation>
         + Div<Representation, Output = Representation>
         + NumCast,
-    (): IsValidConversion<Representation, SecondsPerDay, Period>,
+    SecondsPerDay: IntoUnit<Period, Representation>,
 {
     /// Transforming to `LocalDays` (since Unix epoch) from the equivalent `ModifiedJulianDate` is
     /// nothing more than a constant offset of the number of days between the two epochs.
@@ -196,7 +196,7 @@ fn gregorian_dates_from_meeus() {
 impl<Representation, Period> Sub for ModifiedJulianDate<Representation, Period>
 where
     Representation: Sub<Output = Representation>,
-    Period: Ratio,
+    Period: Unit,
 {
     type Output = Duration<Representation, Period>;
 
@@ -211,7 +211,7 @@ impl<Representation, Period> Add<Duration<Representation, Period>>
     for ModifiedJulianDate<Representation, Period>
 where
     Representation: Add<Output = Representation>,
-    Period: Ratio,
+    Period: Unit,
 {
     type Output = ModifiedJulianDate<Representation, Period>;
 

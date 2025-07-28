@@ -10,9 +10,9 @@ use core::{
 use num::{Bounded, Integer, NumCast, Signed, Zero, traits::ConstZero};
 
 use crate::units::{
-    Atto, ConversionRatio, Femto, Fraction, IsValidConversion, LiteralRatio, Micro, Milli,
-    MulExact, Nano, Pico, Ratio, SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth,
-    SecondsPerWeek, SecondsPerYear,
+    Atto, ConversionRatio, Femto, Fraction, IntoUnit, Micro, Milli, MulExact, Nano, Pico, Unit,
+    Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
+    SecondsPerYear,
 };
 
 /// A `Duration` represents the difference between two time points. It has an associated
@@ -20,12 +20,12 @@ use crate::units::{
 /// determines the integer (!) ratio of each tick to seconds. This may be used to convert between
 /// `Duration`s of differing time units.
 #[derive(Debug)]
-pub struct Duration<Representation, Period = LiteralRatio<1>> {
+pub struct Duration<Representation, Period = Second> {
     count: Representation,
     period: core::marker::PhantomData<Period>,
 }
 
-impl<Representation, Period: Ratio> Duration<Representation, Period> {
+impl<Representation, Period: Unit> Duration<Representation, Period> {
     /// Constructs a new `Duration` from a given number of time units.
     pub const fn new(count: Representation) -> Self {
         Self {
@@ -47,14 +47,14 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
     /// Converts a `Duration` towards a different time unit. May only be used if the time unit is
     /// smaller than the current one (e.g., seconds to milliseconds) or if the representation of
     /// this `Duration` is a float.
-    pub fn convert<Target: Ratio>(self) -> Duration<Representation, Target>
+    pub fn convert<Target: Unit>(self) -> Duration<Representation, Target>
     where
-        (): IsValidConversion<Representation, Period, Target>,
+        Period: IntoUnit<Target, Representation>,
         Representation: Mul<Representation, Output = Representation>
             + Div<Representation, Output = Representation>
             + NumCast,
     {
-        let conversion_ratio = <() as ConversionRatio<Period, Target>>::CONVERSION_RATIO;
+        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
         Duration {
             count: conversion_ratio.mul(self.count),
             period: core::marker::PhantomData,
@@ -64,11 +64,11 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
     /// Tries to convert a `Duration` towards a different time unit. Only applies to integers (as
     /// all floats may be converted infallibly anyway). Will only return a result if the conversion
     /// is lossless.
-    pub fn try_convert<Target: Ratio>(self) -> Option<Duration<Representation, Target>>
+    pub fn try_convert<Target: Unit>(self) -> Option<Duration<Representation, Target>>
     where
         Representation: NumCast + Integer + Bounded + Copy,
     {
-        let conversion_ratio = <() as ConversionRatio<Period, Target>>::CONVERSION_RATIO;
+        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
         let count = conversion_ratio.try_mul(self.count)?;
         Some(Duration {
             count,
@@ -77,11 +77,11 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
     }
 
     /// Converts towards a different time unit, rounding towards the nearest whole unit.
-    pub fn round<Target: Ratio>(self) -> Duration<Representation, Target>
+    pub fn round<Target: Unit>(self) -> Duration<Representation, Target>
     where
         Representation: NumCast + Integer + Copy + MulExact,
     {
-        let conversion_ratio = <() as ConversionRatio<Period, Target>>::CONVERSION_RATIO;
+        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
         Duration {
             count: conversion_ratio.mul_round(self.count),
             period: core::marker::PhantomData,
@@ -90,11 +90,11 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
 
     /// Converts towards a different time unit, rounding towards positive infinity if the unit is
     /// not entirely commensurate with the present unit.
-    pub fn ceil<Target: Ratio>(self) -> Duration<Representation, Target>
+    pub fn ceil<Target: Unit>(self) -> Duration<Representation, Target>
     where
         Representation: NumCast + Integer + Copy,
     {
-        let conversion_ratio = <() as ConversionRatio<Period, Target>>::CONVERSION_RATIO;
+        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
         Duration {
             count: conversion_ratio.mul_ceil(self.count),
             period: core::marker::PhantomData,
@@ -103,11 +103,11 @@ impl<Representation, Period: Ratio> Duration<Representation, Period> {
 
     /// Converts towards a different time unit, rounding towards negative infinity if the unit is
     /// not entirely commensurate with the present unit.
-    pub fn floor<Target: Ratio>(self) -> Duration<Representation, Target>
+    pub fn floor<Target: Unit>(self) -> Duration<Representation, Target>
     where
         Representation: NumCast + Integer + Copy,
     {
-        let conversion_ratio = <() as ConversionRatio<Period, Target>>::CONVERSION_RATIO;
+        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
         Duration {
             count: conversion_ratio.mul_floor(self.count),
             period: core::marker::PhantomData,
@@ -219,7 +219,7 @@ pub type MicroSeconds<T> = Duration<T, Micro>;
 /// A duration that is expressed in units of milliseconds.
 pub type MilliSeconds<T> = Duration<T, Milli>;
 /// A duration that is expressed in units of seconds.
-pub type Seconds<T> = Duration<T, LiteralRatio<1>>;
+pub type Seconds<T> = Duration<T, Second>;
 /// A duration that is expressed in units of minutes.
 pub type Minutes<T> = Duration<T, SecondsPerMinute>;
 /// A duration that is expressed in units of hours.
@@ -234,7 +234,7 @@ pub type Months<T> = Duration<T, SecondsPerMonth>;
 pub type Years<T> = Duration<T, SecondsPerYear>;
 
 /// Two `Duration`s may only be added if they are of the same `Period`.
-impl<R1, R2, Period: Ratio> Add<Duration<R2, Period>> for Duration<R1, Period>
+impl<R1, R2, Period: Unit> Add<Duration<R2, Period>> for Duration<R1, Period>
 where
     R1: Add<R2>,
 {
@@ -248,7 +248,7 @@ where
     }
 }
 
-impl<R1, R2, Period: Ratio> AddAssign<Duration<R2, Period>> for Duration<R1, Period>
+impl<R1, R2, Period: Unit> AddAssign<Duration<R2, Period>> for Duration<R1, Period>
 where
     R1: AddAssign<R2>,
 {
@@ -261,7 +261,7 @@ where
 impl<R1, R2, Period> Sub<Duration<R2, Period>> for Duration<R1, Period>
 where
     R1: Sub<R2>,
-    Period: Ratio,
+    Period: Unit,
 {
     type Output = Duration<<R1 as Sub<R2>>::Output, Period>;
 
@@ -278,7 +278,7 @@ where
 impl<Representation, Period> Neg for Duration<Representation, Period>
 where
     Representation: Neg<Output = Representation>,
-    Period: Ratio,
+    Period: Unit,
 {
     type Output = Self;
 
@@ -293,7 +293,7 @@ where
 impl<R1, R2, Period> Mul<R2> for Duration<R1, Period>
 where
     R1: Mul<R2>,
-    Period: Ratio,
+    Period: Unit,
 {
     type Output = Duration<<R1 as Mul<R2>>::Output, Period>;
 
@@ -310,7 +310,7 @@ where
 impl<R1, R2, Period> Div<R2> for Duration<R1, Period>
 where
     R1: Div<R2>,
-    Period: Ratio,
+    Period: Unit,
 {
     type Output = Duration<<R1 as Div<R2>>::Output, Period>;
 
@@ -327,7 +327,7 @@ where
 impl<Representation, Period> Bounded for Duration<Representation, Period>
 where
     Representation: Bounded,
-    Period: Ratio,
+    Period: Unit,
 {
     /// Returns the `Duration` value that is nearest to negative infinity.
     fn min_value() -> Self {
@@ -349,7 +349,7 @@ where
 impl<Representation, Period> Zero for Duration<Representation, Period>
 where
     Representation: Zero,
-    Period: Ratio,
+    Period: Unit,
 {
     /// Returns a `Duration` value that represents no time passed.
     fn zero() -> Self {
@@ -368,7 +368,7 @@ where
 impl<Representation, Period> ConstZero for Duration<Representation, Period>
 where
     Representation: ConstZero,
-    Period: Ratio,
+    Period: Unit,
 {
     const ZERO: Self = Self {
         count: Representation::ZERO,
@@ -379,7 +379,7 @@ where
 impl<Representation, Period> Duration<Representation, Period>
 where
     Representation: Signed,
-    Period: Ratio,
+    Period: Unit,
 {
     pub fn abs(&self) -> Self {
         Self {

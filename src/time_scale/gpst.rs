@@ -10,12 +10,11 @@ use crate::{
         TimeScale, TimeScaleConversion,
         tai::{Tai, TaiTime},
     },
-    units::{IsValidConversion, LiteralRatio, MulExact, Ratio},
+    units::{IntoUnit, MulExact, Unit, Second},
 };
 
 /// `GpsTime` is a time point that is expressed according to the GPS time scale.
-pub type GpsTime<Representation, Period = LiteralRatio<1>> =
-    TimePoint<Gpst, Representation, Period>;
+pub type GpsTime<Representation, Period = Second> = TimePoint<Gpst, Representation, Period>;
 
 /// The Global Positioning System (GPS) time scale is broadcast by GPS satellites. It is based on
 /// internal atomic clocks that are synchronized with TAI. The signal is defined to be a constant
@@ -24,7 +23,7 @@ pub type GpsTime<Representation, Period = LiteralRatio<1>> =
 pub struct Gpst;
 
 impl TimeScale for Gpst {
-    type NativePeriod = LiteralRatio<1>;
+    type NativePeriod = Second;
 
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
@@ -62,7 +61,7 @@ impl TimeScaleConversion<Utc, Gpst> for () {}
 impl<Representation, Period> TryTimeScaleConversion<Unix, Gpst, Representation, Period> for ()
 where
     (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
-    Period: Ratio,
+    Period: Unit,
     Representation: Copy + NumCast + NumOps + MulExact,
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
@@ -71,8 +70,8 @@ where
         from: TimePoint<Unix, Representation, Period>,
     ) -> Result<TimePoint<Gpst, Representation, Period>, Self::Error>
     where
-        (): IsValidConversion<i64, <Unix as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <Gpst as TimeScale>::NativePeriod, Period>,
+        <Unix as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <Gpst as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         let utc =
             <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;

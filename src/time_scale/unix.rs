@@ -8,12 +8,11 @@ use crate::{
     duration::Duration,
     time_point::TimePoint,
     time_scale::{TimeScale, local::LocalDays, tai::TaiTime},
-    units::LiteralRatio,
+    units::Second,
 };
 
 /// `UnixTime` is a `TimePoint` that uses the `Unix` time scale.
-pub type UnixTime<Representation, Period = LiteralRatio<1>> =
-    TimePoint<Unix, Representation, Period>;
+pub type UnixTime<Representation, Period = Second> = TimePoint<Unix, Representation, Period>;
 
 /// The Unix time scale is the scale used throughout most operating systems nowadays. It is also
 /// the default used in `libc`, for example. It counts seconds since the Unix epoch (1970-01-01 UTC),
@@ -46,7 +45,7 @@ impl Unix {
 }
 
 impl TimeScale for Unix {
-    type NativePeriod = LiteralRatio<1>;
+    type NativePeriod = Second;
 
     /// The Unix reference epoch is 1 January 1970 midnight UTC.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>

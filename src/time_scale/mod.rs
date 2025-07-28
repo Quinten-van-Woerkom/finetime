@@ -8,10 +8,7 @@ use crate::{
     DateTimeError, FineDateTimeError,
     duration::{Duration, Hours, Minutes, Seconds},
     time_point::TimePoint,
-    units::{
-        IsValidConversion, LiteralRatio, MulExact, Ratio, SecondsPerDay, SecondsPerHour,
-        SecondsPerMinute,
-    },
+    units::{IntoUnit, MulExact, Unit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
 
 mod gpst;
@@ -38,7 +35,7 @@ pub trait TimeScale: Sized {
     /// The native `Period` in which a time scale's time points are expressed. This is the minimum
     /// unit needed to represent both its TAI and local time epochs. For most time scales, this is
     /// simply a day.
-    type NativePeriod: Ratio;
+    type NativePeriod: Unit;
 
     /// Returns the epoch of this time scale but expressed in TAI. This is useful for performing
     /// conversions between different time scales.
@@ -69,13 +66,13 @@ pub trait TimeScale: Sized {
         second: u8,
     ) -> Result<TimePoint<Self, i64, Self::NativePeriod>, DateTimeError>
     where
-        (): IsValidConversion<i64, SecondsPerDay, Self::NativePeriod>
-            + IsValidConversion<i64, SecondsPerHour, Self::NativePeriod>
-            + IsValidConversion<i64, SecondsPerMinute, Self::NativePeriod>
-            + IsValidConversion<i64, LiteralRatio<1>, Self::NativePeriod>
-            + IsValidConversion<i64, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<i64, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<i64, SecondsPerMinute, LiteralRatio<1>>,
+        SecondsPerDay: IntoUnit<Self::NativePeriod, i64>,
+        SecondsPerHour: IntoUnit<Self::NativePeriod, i64>,
+        SecondsPerMinute: IntoUnit<Self::NativePeriod, i64>,
+        Second: IntoUnit<Self::NativePeriod, i64>,
+        SecondsPerDay: IntoUnit<Second, i64>,
+        SecondsPerHour: IntoUnit<Second, i64>,
+        SecondsPerMinute: IntoUnit<Second, i64>,
     {
         // First, we verify that the timestamp is valid.
         if hour >= 24 || minute >= 60 || second >= 60 {
@@ -106,17 +103,13 @@ pub trait TimeScale: Sized {
         subseconds: Duration<Representation, Period>,
     ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
     where
-        Period: Ratio,
+        Period: Unit,
         Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
-        (): IsValidConversion<Representation, SecondsPerDay, Period>
-            + IsValidConversion<Representation, SecondsPerHour, Period>
-            + IsValidConversion<Representation, SecondsPerMinute, Period>
-            + IsValidConversion<Representation, LiteralRatio<1>, Period>
-            + IsValidConversion<i64, SecondsPerDay, Self::NativePeriod>
-            + IsValidConversion<i64, SecondsPerHour, Self::NativePeriod>
-            + IsValidConversion<i64, SecondsPerMinute, Self::NativePeriod>
-            + IsValidConversion<i64, LiteralRatio<1>, Self::NativePeriod>
-            + IsValidConversion<Representation, Self::NativePeriod, Period>,
+        SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
+        SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
+        SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
+        Second: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
+        Self::NativePeriod: IntoUnit<Period, Representation>,
     {
         // We check that the number of subseconds does not exceed one second.
         let one = Seconds::new(Representation::one()).convert();
@@ -137,10 +130,10 @@ pub trait TimeScale: Sized {
         time_point: TimePoint<Tai, Representation, Period>,
     ) -> TimePoint<Self, Representation, Period>
     where
-        (): TimeScaleConversion<Tai, Self>
-            + IsValidConversion<i64, Self::NativePeriod, Period>
-            + IsValidConversion<i64, <Tai as TimeScale>::NativePeriod, Period>,
-        Period: Ratio,
+        Self::NativePeriod: IntoUnit<Period, i64>,
+        <Tai as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        (): TimeScaleConversion<Tai, Self>,
+        Period: Unit,
         Representation: Copy + NumCast + NumOps + MulExact,
     {
         <() as TimeScaleConversion<Tai, Self>>::transform(time_point)
@@ -152,10 +145,10 @@ pub trait TimeScale: Sized {
         time_point: TimePoint<Self, Representation, Period>,
     ) -> TimePoint<Tai, Representation, Period>
     where
-        (): TimeScaleConversion<Self, Tai>
-            + IsValidConversion<i64, Self::NativePeriod, Period>
-            + IsValidConversion<i64, <Tai as TimeScale>::NativePeriod, Period>,
-        Period: Ratio,
+        Self::NativePeriod: IntoUnit<Period, i64>,
+        <Tai as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        (): TimeScaleConversion<Self, Tai>,
+        Period: Unit,
         Representation: Copy + NumCast + NumOps + MulExact,
     {
         <() as TimeScaleConversion<Self, Tai>>::transform(time_point)
@@ -183,10 +176,10 @@ pub trait TimeScaleConversion<From: TimeScale, To: TimeScale> {
         from: TimePoint<From, Representation, Period>,
     ) -> TimePoint<To, Representation, Period>
     where
-        Period: Ratio,
+        Period: Unit,
         Representation: Copy + NumCast + NumOps + MulExact,
-        (): IsValidConversion<i64, <From as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <To as TimeScale>::NativePeriod, Period>,
+        <From as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <To as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         let time_since_from_epoch = from.elapsed_time_since_epoch();
         let from_epoch = From::epoch_tai().convert();
@@ -226,7 +219,7 @@ impl<T: TimeScale> TimeScaleConversion<T, T> for () {
 /// Used to indicate that it is possible to convert from one `TimeScale` to another, though it is
 /// allowed for this operation to fail. This is the case when applying leap seconds, for example:
 /// the result may then be ambiguous or undefined, based on folds and gaps in time.
-pub trait TryTimeScaleConversion<From: TimeScale, To: TimeScale, Representation, Period: Ratio> {
+pub trait TryTimeScaleConversion<From: TimeScale, To: TimeScale, Representation, Period: Unit> {
     type Error: core::fmt::Debug;
 
     /// Tries to convert from one time scale to another. If this is not unambiguously possible,
@@ -235,15 +228,15 @@ pub trait TryTimeScaleConversion<From: TimeScale, To: TimeScale, Representation,
         from: TimePoint<From, Representation, Period>,
     ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
     where
-        (): IsValidConversion<i64, <From as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <To as TimeScale>::NativePeriod, Period>;
+        <From as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <To as TimeScale>::NativePeriod: IntoUnit<Period, i64>;
 }
 
 impl<From: TimeScale, To: TimeScale, Representation, Period>
     TryTimeScaleConversion<From, To, Representation, Period> for ()
 where
     (): TimeScaleConversion<From, To>,
-    Period: Ratio,
+    Period: Unit,
     Representation: Copy + NumCast + NumOps + MulExact,
 {
     type Error = core::convert::Infallible;
@@ -254,8 +247,8 @@ where
         from: TimePoint<From, Representation, Period>,
     ) -> Result<TimePoint<To, Representation, Period>, Self::Error>
     where
-        (): IsValidConversion<i64, <From as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <To as TimeScale>::NativePeriod, Period>,
+        <From as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <To as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         Ok(<() as TimeScaleConversion<From, To>>::transform(from))
     }

@@ -3,7 +3,7 @@
 
 use crate::{
     TimePoint,
-    units::{LiteralRatio, SecondsPerDay},
+    units::{Second, SecondsPerDay},
 };
 
 /// The `Local` `TimeScale` is not actually a `TimeScale`. Instead, it is useful in scenarios where
@@ -22,8 +22,7 @@ pub struct Local;
 /// Hence, it may not be compared with time points from other scales, as there is no way to link
 /// them in time. It is best seen as an intermediate type that may be linked to some kind of time
 /// scale identification to instantiate a "full" time point.
-pub type LocalTime<Representation, Period = LiteralRatio<1>> =
-    TimePoint<Local, Representation, Period>;
+pub type LocalTime<Representation, Period = Second> = TimePoint<Local, Representation, Period>;
 
 /// Typedef for a specialization of `LocalTime` to a unit of days. Useful as intermediate type for
 /// normalization of other calendrical types.

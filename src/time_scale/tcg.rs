@@ -5,12 +5,12 @@ use num::{NumCast, traits::NumOps};
 use crate::{
     Date, LocalTime, MilliSeconds, Month, TaiTime, TimePoint, TimeScale, TimeScaleConversion, Tt,
     TtTime,
-    units::{Fraction, IsValidConversion, LiteralRatio, Milli, MulExact, Ratio},
+    units::{Fraction, IntoUnit, Milli, MulExact, Unit, Second},
 };
 
 /// `TcgTime` is a specialization of `TimePoint` that uses the Geocentric Coordinate Time (TCG)
 /// time scale.
-pub type TcgTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tcg, Representation, Period>;
+pub type TcgTime<Representation, Period = Second> = TimePoint<Tcg, Representation, Period>;
 
 /// The Geocentric Coordinate Time (TCG) is the time of a hypothetical clock that is placed at the
 /// center of the non-rotating geocentric reference frame.
@@ -55,10 +55,10 @@ impl TimeScaleConversion<Tcg, Tt> for () {
         from: TimePoint<Tcg, Representation, Period>,
     ) -> TimePoint<Tt, Representation, Period>
     where
-        Period: Ratio,
+        Period: Unit,
         Representation: Copy + NumCast + NumOps + MulExact,
-        (): IsValidConversion<i64, <Tcg as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <Tt as TimeScale>::NativePeriod, Period>,
+        <Tcg as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <Tt as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         // We encode the conversion factor (= (1.0 - 6.969290134e-10)) as an exact fraction, such
         // that integer arithmetic can be done to exact precision, even when some rounding is
@@ -77,10 +77,10 @@ impl TimeScaleConversion<Tt, Tcg> for () {
         from: TimePoint<Tt, Representation, Period>,
     ) -> TimePoint<Tcg, Representation, Period>
     where
-        Period: Ratio,
+        Period: Unit,
         Representation: Copy + NumCast + NumOps + MulExact,
-        (): IsValidConversion<i64, <Tt as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <Tcg as TimeScale>::NativePeriod, Period>,
+        <Tcg as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <Tt as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         // We encode the conversion factor (= (1.0 - 6.969290134e-10)) as an exact fraction, such
         // that integer arithmetic can be done to exact precision, even when some rounding is

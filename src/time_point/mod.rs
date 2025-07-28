@@ -13,8 +13,7 @@ use crate::{
     duration::Duration,
     time_scale::{LocalDays, TimeScale},
     units::{
-        IsValidConversion, LiteralRatio, MulExact, Nano, Ratio, SecondsPerDay, SecondsPerHour,
-        SecondsPerMinute,
+        IntoUnit, MulExact, Nano, Unit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
     },
 };
 
@@ -22,7 +21,7 @@ use crate::{
 /// utilize arbitrary units and arbitrary precision, defined by the underlying `Representation` and
 /// `Period`.
 #[derive(Debug)]
-pub struct TimePoint<TimeScale, Representation, Period = LiteralRatio<1>> {
+pub struct TimePoint<TimeScale, Representation, Period = Second> {
     duration: Duration<Representation, Period>,
     time_scale: core::marker::PhantomData<TimeScale>,
 }
@@ -40,9 +39,9 @@ impl<Scale> TimePoint<Scale, u128, Nano> {
     -> Result<Self, <() as crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>>::Error>
     where
         Scale: TimeScale,
-        (): crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>
-            + IsValidConversion<i64, <crate::Unix as TimeScale>::NativePeriod, Nano>
-            + IsValidConversion<i64, <Scale as TimeScale>::NativePeriod, Nano>,
+        <crate::Unix as TimeScale>::NativePeriod: IntoUnit<Nano, i64>,
+        <Scale as TimeScale>::NativePeriod: IntoUnit<Nano, i64>,
+        (): crate::TryTimeScaleConversion<crate::Unix, Scale, u128, Nano>,
     {
         let system_time = std::time::SystemTime::now();
         let unix_time = crate::UnixTime::from(system_time);
@@ -93,17 +92,13 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     ) -> Result<Self, FineDateTimeError<Representation, Period>>
     where
         Scale: TimeScale,
-        Period: Ratio,
+        Period: Unit,
         Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
-        (): IsValidConversion<Representation, SecondsPerDay, Period>
-            + IsValidConversion<Representation, SecondsPerHour, Period>
-            + IsValidConversion<Representation, SecondsPerMinute, Period>
-            + IsValidConversion<Representation, LiteralRatio<1>, Period>
-            + IsValidConversion<i64, SecondsPerDay, Scale::NativePeriod>
-            + IsValidConversion<i64, SecondsPerHour, Scale::NativePeriod>
-            + IsValidConversion<i64, SecondsPerMinute, Scale::NativePeriod>
-            + IsValidConversion<i64, LiteralRatio<1>, Scale::NativePeriod>
-            + IsValidConversion<Representation, Scale::NativePeriod, Period>,
+        SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
+        SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
+        SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
+        Second: IntoUnit<Period, Representation> + IntoUnit<Scale::NativePeriod, i64>,
+        Scale::NativePeriod: IntoUnit<Period, Representation>,
     {
         Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subseconds)
     }
@@ -112,8 +107,8 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     pub fn round<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
         Representation: NumCast + Integer + Copy + MulExact,
-        Period: Ratio,
-        Target: Ratio,
+        Period: Unit,
+        Target: Unit,
     {
         TimePoint {
             duration: self.duration.round(),
@@ -126,8 +121,8 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     pub fn ceil<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
         Representation: NumCast + Integer + Copy,
-        Period: Ratio,
-        Target: Ratio,
+        Period: Unit,
+        Target: Unit,
     {
         TimePoint {
             duration: self.duration.ceil(),
@@ -140,8 +135,8 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     pub fn floor<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
         Representation: NumCast + Integer + Copy,
-        Period: Ratio,
-        Target: Ratio,
+        Period: Unit,
+        Target: Unit,
     {
         TimePoint {
             duration: self.duration.floor(),
@@ -163,25 +158,22 @@ where
     ) -> Result<Self, DateTimeError>
     where
         Scale: TimeScale,
-        (): IsValidConversion<i64, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<i64, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<i64, SecondsPerMinute, LiteralRatio<1>>
-            + IsValidConversion<i64, SecondsPerDay, Scale::NativePeriod>
-            + IsValidConversion<i64, SecondsPerHour, Scale::NativePeriod>
-            + IsValidConversion<i64, SecondsPerMinute, Scale::NativePeriod>
-            + IsValidConversion<i64, LiteralRatio<1>, Scale::NativePeriod>,
+        SecondsPerDay: IntoUnit<Second, i64> + IntoUnit<Scale::NativePeriod, i64>,
+        SecondsPerHour: IntoUnit<Second, i64> + IntoUnit<Scale::NativePeriod, i64>,
+        SecondsPerMinute: IntoUnit<Second, i64> + IntoUnit<Scale::NativePeriod, i64>,
+        Second: IntoUnit<Scale::NativePeriod, i64>,
     {
         Scale::from_local_datetime(date.into(), hour, minute, second)
     }
 }
 
-impl<Scale, Representation, Period: Ratio> TimePoint<Scale, Representation, Period> {
+impl<Scale, Representation, Period: Unit> TimePoint<Scale, Representation, Period> {
     /// Converts a `TimePoint` towards a different time unit. May only be used if the time unit is
     /// smaller than the current one (e.g., seconds to milliseconds) or if the representation of
     /// this `TimePoint` is a float.
-    pub fn convert<Target: Ratio>(self) -> TimePoint<Scale, Representation, Target>
+    pub fn convert<Target: Unit>(self) -> TimePoint<Scale, Representation, Target>
     where
-        (): IsValidConversion<Representation, Period, Target>,
+        Period: IntoUnit<Target, Representation>,
         Representation: Mul<Representation, Output = Representation>
             + Div<Representation, Output = Representation>
             + NumCast,
@@ -195,7 +187,7 @@ impl<Scale, Representation, Period: Ratio> TimePoint<Scale, Representation, Peri
     /// Tries to convert a `TimePoint` towards a different time unit. Only applies to integers (as
     /// all floats may be converted infallibly anyway). Will only return a result if the conversion
     /// is lossless.
-    pub fn try_convert<Target: Ratio>(self) -> Option<TimePoint<Scale, Representation, Target>>
+    pub fn try_convert<Target: Unit>(self) -> Option<TimePoint<Scale, Representation, Target>>
     where
         Representation: NumCast + Integer + Bounded + Copy,
     {
@@ -235,9 +227,9 @@ impl<Scale, Representation, Period: Ratio> TimePoint<Scale, Representation, Peri
         Target: TimeScale,
         Scale: TimeScale,
         Representation: Copy + NumCast + NumOps + MulExact,
-        (): TimeScaleConversion<Scale, Target>
-            + IsValidConversion<i64, <Scale as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <Target as TimeScale>::NativePeriod, Period>,
+        <Scale as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <Target as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        (): TimeScaleConversion<Scale, Target>,
     {
         <() as TimeScaleConversion<Scale, Target>>::transform(self)
     }
@@ -301,7 +293,7 @@ where
     }
 }
 
-impl<TimeScale, Representation, Period: Ratio> Sub for TimePoint<TimeScale, Representation, Period>
+impl<TimeScale, Representation, Period: Unit> Sub for TimePoint<TimeScale, Representation, Period>
 where
     Representation: Sub<Representation, Output = Representation>,
 {
@@ -312,7 +304,7 @@ where
     }
 }
 
-impl<TimeScale, Representation, Period: Ratio> Sub<Duration<Representation, Period>>
+impl<TimeScale, Representation, Period: Unit> Sub<Duration<Representation, Period>>
     for TimePoint<TimeScale, Representation, Period>
 where
     Representation: Sub<Representation, Output = Representation>,
@@ -327,7 +319,7 @@ where
     }
 }
 
-impl<TimeScale, Representation, Period: Ratio> Add<Duration<Representation, Period>>
+impl<TimeScale, Representation, Period: Unit> Add<Duration<Representation, Period>>
     for TimePoint<TimeScale, Representation, Period>
 where
     Representation: Add<Representation, Output = Representation>,
@@ -342,7 +334,7 @@ where
     }
 }
 
-impl<TimeScale, Representation, Period: Ratio> AddAssign<Duration<Representation, Period>>
+impl<TimeScale, Representation, Period: Unit> AddAssign<Duration<Representation, Period>>
     for TimePoint<TimeScale, Representation, Period>
 where
     Representation: AddAssign<Representation>,

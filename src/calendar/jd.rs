@@ -7,7 +7,7 @@ use num::NumCast;
 
 use crate::{
     Days, Duration, Hours, LocalDays, LocalTime,
-    units::{IsValidConversion, Ratio, SecondsPerDay, SecondsPerHour},
+    units::{IntoUnit, Unit, SecondsPerDay, SecondsPerHour},
 };
 
 /// Representation of calendrical dates in terms of Julian Days (JD). A Julian date is the number
@@ -49,15 +49,15 @@ impl JulianDate<i64, SecondsPerHour> {
 impl<Representation, Period> From<LocalTime<Representation, Period>>
     for JulianDate<Representation, Period>
 where
-    Period: Ratio,
+    Period: Unit,
     Representation: Copy
         + From<i64>
         + Add<Representation, Output = Representation>
         + Mul<Representation, Output = Representation>
         + Div<Representation, Output = Representation>
         + NumCast,
-    (): IsValidConversion<Representation, SecondsPerDay, Period>,
-    (): IsValidConversion<Representation, SecondsPerHour, Period>,
+    SecondsPerDay: IntoUnit<Period, Representation>,
+    SecondsPerHour: IntoUnit<Period, Representation>,
 {
     /// Transforming from `LocalDays` (since Unix epoch) to the equivalent `JulianDate` is
     /// nothing more than a constant offset of the number of days between the two epochs.
@@ -73,15 +73,15 @@ where
 impl<Representation, Period> From<JulianDate<Representation, Period>>
     for LocalTime<Representation, Period>
 where
-    Period: Ratio,
+    Period: Unit,
     Representation: Copy
         + From<i64>
         + Sub<Representation, Output = Representation>
         + Mul<Representation, Output = Representation>
         + Div<Representation, Output = Representation>
         + NumCast,
-    (): IsValidConversion<Representation, SecondsPerDay, Period>,
-    (): IsValidConversion<Representation, SecondsPerHour, Period>,
+    SecondsPerDay: IntoUnit<Period, Representation>,
+    SecondsPerHour: IntoUnit<Period, Representation>,
 {
     /// Transforming to `LocalDays` (since Unix epoch) from the equivalent `JulianDate` is
     /// nothing more than a constant offset of the number of days between the two epochs.
@@ -168,7 +168,7 @@ fn historic_dates_from_meeus() {
 impl<Representation, Period> Sub for JulianDate<Representation, Period>
 where
     Representation: Sub<Output = Representation>,
-    Period: Ratio,
+    Period: Unit,
 {
     type Output = Duration<Representation, Period>;
 
@@ -183,7 +183,7 @@ impl<Representation, Period> Add<Duration<Representation, Period>>
     for JulianDate<Representation, Period>
 where
     Representation: Add<Output = Representation>,
-    Period: Ratio,
+    Period: Unit,
 {
     type Output = JulianDate<Representation, Period>;
 

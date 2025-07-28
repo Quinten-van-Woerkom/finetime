@@ -6,11 +6,11 @@ use crate::{
     Date, LocalTime, Month, TaiTime, TimePoint, TryTimeScaleConversion, Unix, Utc,
     duration::MilliSeconds,
     time_scale::{Tai, TimeScale, TimeScaleConversion},
-    units::{IsValidConversion, LiteralRatio, Milli, MulExact, Ratio},
+    units::{IntoUnit, Milli, MulExact, Second, Unit},
 };
 
 /// A time point that is expressed in Terrestrial Time.
-pub type TtTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tt, Representation, Period>;
+pub type TtTime<Representation, Period = Second> = TimePoint<Tt, Representation, Period>;
 
 /// Terrestrial time is the proper time of a clock located on the Earth geoid. It is used in
 /// astronomical tables, mostly. Effectively, it is little more than a constant offset from TAI.
@@ -58,7 +58,7 @@ impl TimeScaleConversion<Utc, Tt> for () {}
 impl<Representation, Period> TryTimeScaleConversion<Unix, Tt, Representation, Period> for ()
 where
     (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
-    Period: Ratio,
+    Period: Unit,
     Representation: Copy + NumCast + NumOps + MulExact,
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
@@ -67,8 +67,8 @@ where
         from: TimePoint<Unix, Representation, Period>,
     ) -> Result<TimePoint<Tt, Representation, Period>, Self::Error>
     where
-        (): IsValidConversion<i64, <Unix as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <Tt as TimeScale>::NativePeriod, Period>,
+        <Unix as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <Tt as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         let utc =
             <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;

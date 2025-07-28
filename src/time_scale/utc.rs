@@ -17,13 +17,11 @@ use crate::{
         tai::{Tai, TaiTime},
         unix::UnixTime,
     },
-    units::{
-        IsValidConversion, LiteralRatio, Ratio, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
-    },
+    units::{IntoUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Unit},
 };
 
 /// `UtcTime` is a specialization of `TimePoint` that uses the UTC time scale.
-pub type UtcTime<Representation, Period = LiteralRatio<1>> = TimePoint<Utc, Representation, Period>;
+pub type UtcTime<Representation, Period = Second> = TimePoint<Utc, Representation, Period>;
 
 /// Representation of the Coordinated Universal Time (UTC) standard. UTC utilizes leap seconds to
 /// synchronize the time to within 0.9 seconds of UT1, the solar time of the Earth. Since these
@@ -135,7 +133,7 @@ fn roundtrip_near_leap_seconds() {
 }
 
 impl TimeScale for Utc {
-    type NativePeriod = LiteralRatio<1>;
+    type NativePeriod = Second;
 
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
     where
@@ -172,10 +170,10 @@ impl TimeScale for Utc {
         second: u8,
     ) -> Result<TimePoint<Self, i64>, DateTimeError>
     where
-        (): IsValidConversion<i64, SecondsPerDay, LiteralRatio<1>>
-            + IsValidConversion<i64, SecondsPerHour, LiteralRatio<1>>
-            + IsValidConversion<i64, SecondsPerMinute, LiteralRatio<1>>
-            + IsValidConversion<i64, LiteralRatio<1>, LiteralRatio<1>>,
+        SecondsPerDay: IntoUnit<Second, i64>,
+        SecondsPerHour: IntoUnit<Second, i64>,
+        SecondsPerMinute: IntoUnit<Second, i64>,
+        Second: IntoUnit<Second, i64>,
     {
         // Verify that the time-of-day is valid. Leap seconds are always assumed to be valid at
         // this point - this is checked later.
@@ -271,16 +269,12 @@ impl TimeScale for Utc {
         subseconds: Duration<Representation, Period>,
     ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
     where
-        Period: Ratio,
+        Period: Unit,
         Representation: NumCast + NumOps + From<u8> + PartialOrd + Clone + One + Zero,
-        (): IsValidConversion<Representation, SecondsPerDay, Period>
-            + IsValidConversion<Representation, SecondsPerHour, Period>
-            + IsValidConversion<Representation, SecondsPerMinute, Period>
-            + IsValidConversion<Representation, LiteralRatio<1>, Period>
-            + IsValidConversion<i64, SecondsPerDay, Self::NativePeriod>
-            + IsValidConversion<i64, SecondsPerHour, Self::NativePeriod>
-            + IsValidConversion<i64, SecondsPerMinute, Self::NativePeriod>
-            + IsValidConversion<i64, LiteralRatio<1>, Self::NativePeriod>,
+        SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
+        SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
+        SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
+        Second: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
     {
         let one = Seconds::new(Representation::one()).convert();
         let zero = Duration::zero();
@@ -300,9 +294,9 @@ impl TimeScaleConversion<Utc, Tai> for () {}
 
 impl<Representation, Period> TryTimeScaleConversion<Unix, Utc, Representation, Period> for ()
 where
-    Period: Ratio + core::fmt::Debug,
+    Period: Unit + core::fmt::Debug,
     Representation: Copy + NumCast + NumOps + Integer + core::fmt::Debug,
-    (): IsValidConversion<Representation, LiteralRatio<1>, Period>,
+    Second: IntoUnit<Period, Representation>,
 {
     type Error = LeapSecondError<Representation, Period>;
 

@@ -10,7 +10,7 @@ pub use fraction::*;
 ///
 /// Units that are larger than 1 second (e.g., a minute) shall have a `RATIO` that is larger than
 /// one. Smaller units shall have a smaller `RATIO` value.
-pub trait Ratio {
+pub trait Unit {
     const RATIO: Fraction;
 }
 
@@ -18,48 +18,65 @@ pub trait Ratio {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct LiteralRatio<const NUMERATOR: i128, const DENOMINATOR: i128 = 1> {}
 
-impl<const NUMERATOR: i128, const DENOMINATOR: i128> Ratio
-    for LiteralRatio<NUMERATOR, DENOMINATOR>
-{
+impl<const NUMERATOR: i128, const DENOMINATOR: i128> Unit for LiteralRatio<NUMERATOR, DENOMINATOR> {
     const RATIO: Fraction = Fraction::new(NUMERATOR, DENOMINATOR);
 }
 
-pub trait ConversionRatio<From: Ratio, To: Ratio> {
+/// This trait is used as helper trait to compute the conversion ratio between two units. It is
+/// separate from the `UnitConversion` trait because that trait depends on whether the
+/// underlying representation can store fractional results: the actual conversion ratio shall
+/// always remain the same, so is encoded separately. This allows it to be used in functions that
+/// dynamically test whether a conversion with a given representation succeed exactly (like
+/// `Duration::try_convert`).
+pub trait ConversionRatio<To: Unit>: Unit {
     const CONVERSION_RATIO: Fraction;
 }
 
-impl<From: Ratio, To: Ratio> ConversionRatio<From, To> for () {
+impl<From: Unit, To: Unit> ConversionRatio<To> for From {
     const CONVERSION_RATIO: Fraction = From::RATIO.divide_by(&To::RATIO);
 }
 
-pub trait IsValidConversion<Representation, From: Ratio, To: Ratio>:
-    ConversionRatio<From, To>
+/// This trait indicates whether it is possible to convert a `Duration` or `TimePoint` with the
+/// given underlying representation from units of `From` to `To`. It is advised not to implement
+/// this trait directly, but rather to implement `FromUnit`. This trait will then be derived
+/// automatically.
+pub trait IntoUnit<To: Unit, Representation>: ConversionRatio<To> {}
+
+/// This trait indicates whether it is possible to convert a `Duration` or `TimePoint` with the
+/// given underlying representation from units of `From` to `To`. It has a similar relationship to
+/// `IntoUnit` as `From` has to `Into`.
+///
+/// It is advised to always implement `FromUnit`: `IntoUnit` is derived automatically.
+pub trait FromUnit<From: Unit, Representation>: ConversionRatio<From> {}
+
+impl<From: Unit, To: Unit, Representation> IntoUnit<To, Representation> for From where
+    To: FromUnit<From, Representation>
 {
 }
 
 /// Floating point types support conversions to and from all unit ratios, because they do not lose
 /// significant precision when multiplying with non-integer values.
-impl<From: Ratio, To: Ratio> IsValidConversion<f32, From, To> for () {}
+impl<From: Unit, To: Unit> FromUnit<From, f32> for To {}
 
 /// Floating point types support conversions to and from all unit ratios, because they do not lose
 /// significant precision when multiplying with non-integer values.
-impl<From: Ratio, To: Ratio> IsValidConversion<f64, From, To> for () {}
+impl<From: Unit, To: Unit> FromUnit<From, f64> for To {}
 
 // For all integers, a conversion from a unit to itself is still valid.
-impl<R: Ratio> IsValidConversion<u8, R, R> for () {}
-impl<R: Ratio> IsValidConversion<u16, R, R> for () {}
-impl<R: Ratio> IsValidConversion<u32, R, R> for () {}
-impl<R: Ratio> IsValidConversion<u64, R, R> for () {}
-impl<R: Ratio> IsValidConversion<u128, R, R> for () {}
-impl<R: Ratio> IsValidConversion<i8, R, R> for () {}
-impl<R: Ratio> IsValidConversion<i16, R, R> for () {}
-impl<R: Ratio> IsValidConversion<i32, R, R> for () {}
-impl<R: Ratio> IsValidConversion<i64, R, R> for () {}
-impl<R: Ratio> IsValidConversion<i128, R, R> for () {}
+impl<R: Unit> FromUnit<R, u8> for R {}
+impl<R: Unit> FromUnit<R, u16> for R {}
+impl<R: Unit> FromUnit<R, u32> for R {}
+impl<R: Unit> FromUnit<R, u64> for R {}
+impl<R: Unit> FromUnit<R, u128> for R {}
+impl<R: Unit> FromUnit<R, i8> for R {}
+impl<R: Unit> FromUnit<R, i16> for R {}
+impl<R: Unit> FromUnit<R, i32> for R {}
+impl<R: Unit> FromUnit<R, i64> for R {}
+impl<R: Unit> FromUnit<R, i128> for R {}
 
 macro_rules! is_valid_conversion {
     ($type:ty, $from:ty, $to:ty) => {
-        impl IsValidConversion<$type, $from, $to> for () {}
+        impl FromUnit<$from, $type> for $to {}
     };
 }
 
@@ -114,17 +131,18 @@ valid_integer_conversions!(Micro => Nano, Pico, Femto, Atto);
 valid_integer_conversions!(Milli => Micro, Nano, Pico, Femto, Atto);
 valid_integer_conversions!(Centi => Milli, Micro, Nano, Pico, Femto, Atto);
 valid_integer_conversions!(Deci => Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(LiteralRatio<1> => Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(Deca => LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(Hecto => Deca, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(Kilo => Hecto, Deca, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(Mega => Kilo, Hecto, Deca, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(Giga => Mega, Kilo, Hecto, Deca, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(Tera => Mega, Kilo, Hecto, Deca, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(Peta => Tera, Giga, Mega, Kilo, Hecto, Deca, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(Exa => Peta, Tera, Giga, Mega, Kilo, Hecto, Deca, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Second => Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Deca => Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Hecto => Deca, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Kilo => Hecto, Deca, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Mega => Kilo, Hecto, Deca, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Giga => Mega, Kilo, Hecto, Deca, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Tera => Mega, Kilo, Hecto, Deca, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Peta => Tera, Giga, Mega, Kilo, Hecto, Deca, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(Exa => Peta, Tera, Giga, Mega, Kilo, Hecto, Deca, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
 
 // Time unit qualifiers
+pub type Second = LiteralRatio<1>;
 pub type SecondsPerMinute = LiteralRatio<60>;
 pub type SecondsPerHour = LiteralRatio<3600>;
 pub type SecondsPerDay = LiteralRatio<86400>;
@@ -135,12 +153,12 @@ pub type SecondsPerMonth = LiteralRatio<2629746>;
 pub type SecondsPerYear = LiteralRatio<31556952>;
 
 // Conversions specific to time units
-valid_integer_conversions!(SecondsPerMinute => LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerHour => SecondsPerMinute, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerDay => SecondsPerHour, SecondsPerMinute, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerWeek => SecondsPerDay, SecondsPerHour, SecondsPerMinute, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerMonth => SecondsPerWeek, SecondsPerDay, SecondsPerHour, SecondsPerMinute, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerYear => SecondsPerMonth, SecondsPerWeek, SecondsPerDay, SecondsPerHour, SecondsPerMinute, LiteralRatio<1>, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerMinute => Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerHour => SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerDay => SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerWeek => SecondsPerDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerMonth => SecondsPerWeek, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerYear => SecondsPerMonth, SecondsPerWeek, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
 
 // Binary fractions of X bytes
 pub type BinaryFraction1 = LiteralRatio<1, 0x100>;
@@ -156,7 +174,7 @@ valid_integer_conversions!(BinaryFraction4 => BinaryFraction5, BinaryFraction6);
 valid_integer_conversions!(BinaryFraction3 => BinaryFraction4, BinaryFraction5, BinaryFraction6);
 valid_integer_conversions!(BinaryFraction2 => BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
 valid_integer_conversions!(BinaryFraction1 => BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
-valid_integer_conversions!(LiteralRatio<1> => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
+valid_integer_conversions!(Second => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
 valid_integer_conversions!(Deca => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
 valid_integer_conversions!(Hecto => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);
 valid_integer_conversions!(Kilo => BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5, BinaryFraction6);

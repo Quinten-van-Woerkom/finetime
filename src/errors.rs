@@ -1,7 +1,7 @@
 //! Description of all types of errors that may appear in this library. Separated into a separate
 //! module to permit reuse without importing entire namespaces with unrelated functionality.
 
-use crate::{Duration, LocalDays, Month, units::Ratio};
+use crate::{Duration, LocalDays, Month, units::Unit};
 
 /// Error that is returned if a date is encountered that does not exist in the historic calendar.
 /// This may be either because the given day-of-month is not a valid day (for a given combination
@@ -66,7 +66,7 @@ pub enum DateTimeError {
 /// Errors that may be returned when combining a calendar date with a time-of-day and some given
 /// number of subseconds to create a subsecond-accurate `TimePoint`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum FineDateTimeError<T, P: Ratio> {
+pub enum FineDateTimeError<T, P: Unit> {
     /// Wrapper for regular date time errors that are not specific to subsecond precision.
     DateTimeError(DateTimeError),
     /// The number of subseconds must be 0 or larger but also may not exceed 1 second.
@@ -75,7 +75,7 @@ pub enum FineDateTimeError<T, P: Ratio> {
 
 impl<T, P> From<DateTimeError> for FineDateTimeError<T, P>
 where
-    P: Ratio,
+    P: Unit,
 {
     fn from(value: DateTimeError) -> Self {
         Self::DateTimeError(value)

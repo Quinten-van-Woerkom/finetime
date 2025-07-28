@@ -7,11 +7,11 @@ use crate::{
     calendar::{Date, Month},
     time_point::TimePoint,
     time_scale::TimeScale,
-    units::{IsValidConversion, LiteralRatio, MulExact, Ratio},
+    units::{IntoUnit, MulExact, Unit, Second},
 };
 
 /// `TaiTime` is a specialization of `TimePoint` that uses the TAI time scale.
-pub type TaiTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tai, Representation, Period>;
+pub type TaiTime<Representation, Period = Second> = TimePoint<Tai, Representation, Period>;
 
 /// Time scale representing the international atomic time standard (TAI). TAI has no leap seconds
 /// and increases monotonically at a constant interval, making it useful as fundamental time scale
@@ -20,7 +20,7 @@ pub type TaiTime<Representation, Period = LiteralRatio<1>> = TimePoint<Tai, Repr
 pub struct Tai;
 
 impl TimeScale for Tai {
-    type NativePeriod = LiteralRatio<1>;
+    type NativePeriod = Second;
 
     /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
     fn epoch_tai<T>() -> TaiTime<T, Self::NativePeriod>
@@ -50,7 +50,7 @@ impl TimeScale for Tai {
 impl<Representation, Period> TryTimeScaleConversion<Unix, Tai, Representation, Period> for ()
 where
     (): TryTimeScaleConversion<Unix, Utc, Representation, Period>,
-    Period: Ratio,
+    Period: Unit,
     Representation: Copy + NumCast + NumOps + MulExact,
 {
     type Error = <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::Error;
@@ -59,8 +59,8 @@ where
         from: TimePoint<Unix, Representation, Period>,
     ) -> Result<TimePoint<Tai, Representation, Period>, Self::Error>
     where
-        (): IsValidConversion<i64, <Unix as TimeScale>::NativePeriod, Period>
-            + IsValidConversion<i64, <Tai as TimeScale>::NativePeriod, Period>,
+        <Unix as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
+        <Tai as TimeScale>::NativePeriod: IntoUnit<Period, i64>,
     {
         let utc =
             <() as TryTimeScaleConversion<Unix, Utc, Representation, Period>>::try_convert(from)?;
