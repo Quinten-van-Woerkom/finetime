@@ -57,7 +57,7 @@ dependencies = [
 
 [[package]]
 name = "finetime"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "i256",
  "lazy_static",
