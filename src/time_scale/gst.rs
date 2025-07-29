@@ -1,29 +1,29 @@
-//! Implementation of the Global Positioning System (GPS) time scale, generally abbreviated as
-//! GPST.
+//! Implementation of the Galileo System Time (GST) time scale.
 
 use crate::{
-    FromTimeScale, Gst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
+    FromTimeScale, Gpst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
     TryFromTimeScale, Tt, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
 
-/// `GpsTime` is a time point that is expressed according to the GPS time scale.
-pub type GpsTime<Representation, Period = Second> = TimePoint<Gpst, Representation, Period>;
+/// `GalileoTime` is a time point that is expressed according to the Galileo System Time time
+/// scale.
+pub type GalileoTime<Representation, Period = Second> = TimePoint<Gst, Representation, Period>;
 
-/// The Global Positioning System (GPS) time scale is broadcast by GPS satellites. It is based on
+/// The Galileo System Time (GST) time scale is broadcast by Galileo satellites. It is based on
 /// internal atomic clocks that are synchronized with TAI. The signal is defined to be a constant
 /// 19 seconds behind TAI.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Gpst;
+pub struct Gst;
 
-impl TimeScale for Gpst {
+impl TimeScale for Gst {
     type NativePeriod = Second;
 
     type NativeRepresentation = i64;
 
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_generic_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
+        TaiTime::from_generic_datetime(Date::new(1999, Month::August, 22).unwrap(), 0, 0, 19)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -31,7 +31,7 @@ impl TimeScale for Gpst {
     }
 
     fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
-        Date::new(1980, Month::January, 6)
+        Date::new(1999, Month::August, 22)
             .unwrap()
             .to_local_days()
             .into_unit()
@@ -44,12 +44,12 @@ impl TimeScale for Gpst {
     }
 }
 
-impl FromTimeScale<Gst> for Gpst {}
-impl FromTimeScale<Tai> for Gpst {}
-impl FromTimeScale<Utc> for Gpst {}
-impl FromTimeScale<Tt> for Gpst {}
+impl FromTimeScale<Gpst> for Gst {}
+impl FromTimeScale<Tai> for Gst {}
+impl FromTimeScale<Utc> for Gst {}
+impl FromTimeScale<Tt> for Gst {}
 
-impl TryFromTimeScale<Unix> for Gpst {
+impl TryFromTimeScale<Unix> for Gst {
     type Error = LeapSecondError;
 
     fn try_from_time_scale<Representation, Period>(
@@ -69,15 +69,14 @@ impl TryFromTimeScale<Unix> for Gpst {
     }
 }
 
-/// Compares with a known timestamp as obtained from Vallado and McClain's "Fundamentals of
-/// Astrodynamics".
+/// Compares with a known timestamp as obtained from the definition of the Galileo System Time: the
+/// epoch itself of the system.
 #[test]
 fn known_timestamps() {
-    let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
-        .unwrap();
-    let gpst = GpsTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 13)
-        .unwrap();
-    assert_eq!(tai, gpst.into_time_scale());
+    use crate::UtcTime;
+    let utc = UtcTime::from_datetime(1999, Month::August, 21, 23, 59, 47).unwrap();
+    let gst = GalileoTime::from_datetime(1999, Month::August, 22, 0, 0, 0).unwrap();
+    assert_eq!(utc, gst.into_time_scale());
 }
 
 #[cfg(kani)]
@@ -85,7 +84,7 @@ mod proof_harness {
     use super::*;
     use crate::TaiTime;
 
-    /// Verifies that construction of a GPS time from a historic date and time stamp never panics.
+    /// Verifies that construction of a Galileo time from a historic date and time stamp never panics.
     #[kani::proof]
     fn from_datetime_never_panics() {
         let year: i32 = kani::any();
@@ -94,10 +93,10 @@ mod proof_harness {
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = GpsTime::from_datetime(year, month, day, hour, minute, second);
+        let _ = GalileoTime::from_datetime(year, month, day, hour, minute, second);
     }
 
-    /// Verifies that construction of a GPS time from a Gregorian date and time stamp never panics.
+    /// Verifies that construction of a Galileo time from a Gregorian date and time stamp never panics.
     #[kani::proof]
     fn from_gregorian_never_panics() {
         let year: i32 = kani::any();
@@ -106,10 +105,10 @@ mod proof_harness {
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = GpsTime::from_gregorian_datetime(year, month, day, hour, minute, second);
+        let _ = GalileoTime::from_gregorian_datetime(year, month, day, hour, minute, second);
     }
 
-    /// Verifies that all valid GPS time datetimes can be losslessly converted to and from
+    /// Verifies that all valid Galileo time datetimes can be losslessly converted to and from
     /// the equivalent TAI time.
     #[kani::proof]
     fn datetime_tai_roundtrip() {
@@ -123,9 +122,9 @@ mod proof_harness {
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1 = GpsTime::from_datetime(year, month, day, hour, minute, second).unwrap();
+        let time1 = GalileoTime::from_datetime(year, month, day, hour, minute, second).unwrap();
         let tai: TaiTime<_> = time1.into_time_scale();
-        let time2: GpsTime<_> = tai.into_time_scale();
+        let time2: GalileoTime<_> = tai.into_time_scale();
         assert_eq!(time1, time2);
     }
 }
