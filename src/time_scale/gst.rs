@@ -1,7 +1,7 @@
 //! Implementation of the Galileo System Time (GST) time scale.
 
 use crate::{
-    FromTimeScale, Gpst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
+    Bdt, FromTimeScale, Gpst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
     TryFromTimeScale, Tt, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
@@ -44,6 +44,7 @@ impl TimeScale for Gst {
     }
 }
 
+impl FromTimeScale<Bdt> for Gst {}
 impl FromTimeScale<Gpst> for Gst {}
 impl FromTimeScale<Tai> for Gst {}
 impl FromTimeScale<Utc> for Gst {}

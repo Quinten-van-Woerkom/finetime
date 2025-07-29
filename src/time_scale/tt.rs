@@ -1,8 +1,8 @@
 //! Implementation of the Terrestrial Time (TT) time scale.
 
 use crate::{
-    Date, FromTimeScale, Gpst, Gst, LeapSecondError, LocalTime, Month, Tai, TaiTime, TimePoint,
-    TimeScale, TryFromTimeScale, Unix, Utc,
+    Bdt, Date, FromTimeScale, Gpst, Gst, LeapSecondError, LocalTime, Month, Tai, TaiTime,
+    TimePoint, TimeScale, TryFromTimeScale, Unix, Utc,
     arithmetic::{FromUnit, Milli, Second, TimeRepresentation, TryFromExact, Unit},
     duration::MilliSeconds,
 };
@@ -48,6 +48,7 @@ impl FromTimeScale<Tai> for Tt {}
 impl FromTimeScale<Utc> for Tt {}
 impl FromTimeScale<Gpst> for Tt {}
 impl FromTimeScale<Gst> for Tt {}
+impl FromTimeScale<Bdt> for Tt {}
 
 impl TryFromTimeScale<Unix> for Tt {
     type Error = LeapSecondError;

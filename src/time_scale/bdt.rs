@@ -1,29 +1,29 @@
-//! Implementation of the Global Positioning System (GPS) time scale, generally abbreviated as
-//! GPST.
+//! Implementation of the BeiDou Time (BDT) time scale.
 
 use crate::{
-    Bdt, FromTimeScale, Gst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
+    FromTimeScale, Gpst, Gst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
     TryFromTimeScale, Tt, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
 
-/// `GpsTime` is a time point that is expressed according to the GPS time scale.
-pub type GpsTime<Representation, Period = Second> = TimePoint<Gpst, Representation, Period>;
+/// `BeiDouTime` is a time point that is expressed according to the BeiDou Time time
+/// scale.
+pub type BeiDouTime<Representation, Period = Second> = TimePoint<Bdt, Representation, Period>;
 
-/// The Global Positioning System (GPS) time scale is broadcast by GPS satellites. It is based on
-/// internal atomic clocks that are synchronized with TAI. The signal is defined to be a constant
-/// 19 seconds behind TAI.
+/// The BeiDou Time (BDT) time scale is broadcast by BeiDou satellites. It is a continuous time
+/// scale, but may apply frequency adjustments to stay consistent with UTC (beyond the leap
+/// seconds, which are not applied). It starts at 00:00:00 UTC, January 1, 2006.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Gpst;
+pub struct Bdt;
 
-impl TimeScale for Gpst {
+impl TimeScale for Bdt {
     type NativePeriod = Second;
 
     type NativeRepresentation = i64;
 
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_generic_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
+        TaiTime::from_datetime(2006, Month::January, 1, 0, 0, 33)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -31,7 +31,7 @@ impl TimeScale for Gpst {
     }
 
     fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
-        Date::new(1980, Month::January, 6)
+        Date::new(2006, Month::January, 1)
             .unwrap()
             .to_local_days()
             .into_unit()
@@ -44,13 +44,13 @@ impl TimeScale for Gpst {
     }
 }
 
-impl FromTimeScale<Bdt> for Gpst {}
-impl FromTimeScale<Gst> for Gpst {}
-impl FromTimeScale<Tai> for Gpst {}
-impl FromTimeScale<Utc> for Gpst {}
-impl FromTimeScale<Tt> for Gpst {}
+impl FromTimeScale<Gst> for Bdt {}
+impl FromTimeScale<Gpst> for Bdt {}
+impl FromTimeScale<Tai> for Bdt {}
+impl FromTimeScale<Utc> for Bdt {}
+impl FromTimeScale<Tt> for Bdt {}
 
-impl TryFromTimeScale<Unix> for Gpst {
+impl TryFromTimeScale<Unix> for Bdt {
     type Error = LeapSecondError;
 
     fn try_from_time_scale<Representation, Period>(
@@ -70,15 +70,14 @@ impl TryFromTimeScale<Unix> for Gpst {
     }
 }
 
-/// Compares with a known timestamp as obtained from Vallado and McClain's "Fundamentals of
-/// Astrodynamics".
+/// Compares with a known timestamp as obtained from the definition of the BeiDou Time: the
+/// epoch itself of the system.
 #[test]
 fn known_timestamps() {
-    let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
-        .unwrap();
-    let gpst = GpsTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 13)
-        .unwrap();
-    assert_eq!(tai, gpst.into_time_scale());
+    use crate::UtcTime;
+    let utc = UtcTime::from_datetime(2006, Month::January, 1, 0, 0, 0).unwrap();
+    let bdt = BeiDouTime::from_datetime(2006, Month::January, 1, 0, 0, 0).unwrap();
+    assert_eq!(utc, bdt.into_time_scale());
 }
 
 #[cfg(kani)]
@@ -86,7 +85,7 @@ mod proof_harness {
     use super::*;
     use crate::TaiTime;
 
-    /// Verifies that construction of a GPS time from a historic date and time stamp never panics.
+    /// Verifies that construction of a BeiDou time from a historic date and time stamp never panics.
     #[kani::proof]
     fn from_datetime_never_panics() {
         let year: i32 = kani::any();
@@ -95,10 +94,10 @@ mod proof_harness {
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = GpsTime::from_datetime(year, month, day, hour, minute, second);
+        let _ = BeiDouTime::from_datetime(year, month, day, hour, minute, second);
     }
 
-    /// Verifies that construction of a GPS time from a Gregorian date and time stamp never panics.
+    /// Verifies that construction of a BeiDou time from a Gregorian date and time stamp never panics.
     #[kani::proof]
     fn from_gregorian_never_panics() {
         let year: i32 = kani::any();
@@ -107,10 +106,10 @@ mod proof_harness {
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = GpsTime::from_gregorian_datetime(year, month, day, hour, minute, second);
+        let _ = BeiDouTime::from_gregorian_datetime(year, month, day, hour, minute, second);
     }
 
-    /// Verifies that all valid GPS time datetimes can be losslessly converted to and from
+    /// Verifies that all valid BeiDou time datetimes can be losslessly converted to and from
     /// the equivalent TAI time.
     #[kani::proof]
     fn datetime_tai_roundtrip() {
@@ -124,9 +123,9 @@ mod proof_harness {
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1 = GpsTime::from_datetime(year, month, day, hour, minute, second).unwrap();
+        let time1 = BeiDouTime::from_datetime(year, month, day, hour, minute, second).unwrap();
         let tai: TaiTime<_> = time1.into_time_scale();
-        let time2: GpsTime<_> = tai.into_time_scale();
+        let time2: BeiDouTime<_> = tai.into_time_scale();
         assert_eq!(time1, time2);
     }
 }
