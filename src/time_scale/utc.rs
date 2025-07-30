@@ -6,8 +6,8 @@ use num::Zero;
 use tinyvec::ArrayVec;
 
 use crate::{
-    Bdt, DateTimeError, FineDateTimeError, FromTimeScale, Gpst, Gst, LocalDays, LocalTime, Tai,
-    TaiTime, TimeScale, TryFromTimeScale, Tt, Unix, UnixTime,
+    Bdt, DateTimeError, FineDateTimeError, FromTimeScale, Glonasst, Gpst, Gst, LocalDays,
+    LocalTime, Qzsst, Tai, TaiTime, TimeScale, TryFromTimeScale, Tt, Unix, UnixTime,
     arithmetic::{
         FromUnit, IntoUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
         TimeRepresentation, TryFromExact, Unit,
@@ -287,6 +287,8 @@ impl TimeScale for Utc {
 
 impl FromTimeScale<Tai> for Utc {}
 impl FromTimeScale<Tt> for Utc {}
+impl FromTimeScale<Glonasst> for Utc {}
+impl FromTimeScale<Qzsst> for Utc {}
 impl FromTimeScale<Gpst> for Utc {}
 impl FromTimeScale<Gst> for Utc {}
 impl FromTimeScale<Bdt> for Utc {}

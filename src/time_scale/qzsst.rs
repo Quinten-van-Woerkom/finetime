@@ -1,23 +1,25 @@
-//! Implementation of the Global Positioning System (GPS) time scale, generally abbreviated as
-//! GPST.
+//! Implementation of the Japanse Quasi-Zenith Satellite System (QZSS) time scale, generally
+//! abbreviated as QZSST.
 
 use crate::{
-    Bdt, FromTimeScale, Glonasst, Gst, LeapSecondError, LocalTime, Qzsst, Tai, TaiTime, TimePoint,
+    Bdt, FromTimeScale, Glonasst, Gst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint,
     TimeScale, TryFromTimeScale, Tt, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
 
-/// `GpsTime` is a time point that is expressed according to the GPS time scale.
-pub type GpsTime<Representation, Period = Second> = TimePoint<Gpst, Representation, Period>;
+/// `QzssTime` is a time point that is expressed according to the QZSS time scale.
+pub type QzssTime<Representation, Period = Second> = TimePoint<Qzsst, Representation, Period>;
 
-/// The Global Positioning System (GPS) time scale is broadcast by GPS satellites. It is based on
-/// internal atomic clocks that are synchronized with TAI. The signal is defined to be a constant
-/// 19 seconds behind TAI.
+/// The Quasi-Zenith Satellite System (QZSS) time scale is broadcast by QZSS satellites. It is
+/// effectively defined in the same manner as GPS, for interoperability. However, it uses different
+/// clocks for its realization. Hence, we define it separately, to make this distinction clear and
+/// to permit type safety in cases where this difference is important (like when comparing the
+/// realization accuracy of different time scales).
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Gpst;
+pub struct Qzsst;
 
-impl TimeScale for Gpst {
+impl TimeScale for Qzsst {
     type NativePeriod = Second;
 
     type NativeRepresentation = i64;
@@ -44,15 +46,14 @@ impl TimeScale for Gpst {
     }
 }
 
-impl FromTimeScale<Bdt> for Gpst {}
-impl FromTimeScale<Glonasst> for Gpst {}
-impl FromTimeScale<Gst> for Gpst {}
-impl FromTimeScale<Qzsst> for Gpst {}
-impl FromTimeScale<Tai> for Gpst {}
-impl FromTimeScale<Utc> for Gpst {}
-impl FromTimeScale<Tt> for Gpst {}
+impl FromTimeScale<Bdt> for Qzsst {}
+impl FromTimeScale<Glonasst> for Qzsst {}
+impl FromTimeScale<Gst> for Qzsst {}
+impl FromTimeScale<Tai> for Qzsst {}
+impl FromTimeScale<Utc> for Qzsst {}
+impl FromTimeScale<Tt> for Qzsst {}
 
-impl TryFromTimeScale<Unix> for Gpst {
+impl TryFromTimeScale<Unix> for Qzsst {
     type Error = LeapSecondError;
 
     fn try_from_time_scale<Representation, Period>(
@@ -78,9 +79,10 @@ impl TryFromTimeScale<Unix> for Gpst {
 fn known_timestamps() {
     let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
         .unwrap();
-    let gpst = GpsTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 13)
-        .unwrap();
-    assert_eq!(tai, gpst.into_time_scale());
+    let qzsst =
+        QzssTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 13)
+            .unwrap();
+    assert_eq!(tai, qzsst.into_time_scale());
 }
 
 #[cfg(kani)]
@@ -97,7 +99,7 @@ mod proof_harness {
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = GpsTime::from_datetime(year, month, day, hour, minute, second);
+        let _ = QzssTime::from_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that construction of a GPS time from a Gregorian date and time stamp never panics.
@@ -109,7 +111,7 @@ mod proof_harness {
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = GpsTime::from_gregorian_datetime(year, month, day, hour, minute, second);
+        let _ = QzssTime::from_gregorian_datetime(year, month, day, hour, minute, second);
     }
 
     /// Verifies that all valid GPS time datetimes can be losslessly converted to and from
@@ -126,9 +128,9 @@ mod proof_harness {
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1 = GpsTime::from_datetime(year, month, day, hour, minute, second).unwrap();
+        let time1 = QzssTime::from_datetime(year, month, day, hour, minute, second).unwrap();
         let tai: TaiTime<_> = time1.into_time_scale();
-        let time2: GpsTime<_> = tai.into_time_scale();
+        let time2: QzssTime<_> = tai.into_time_scale();
         assert_eq!(time1, time2);
     }
 }

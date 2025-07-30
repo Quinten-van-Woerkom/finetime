@@ -1,8 +1,8 @@
 //! Implementation of the BeiDou Time (BDT) time scale.
 
 use crate::{
-    FromTimeScale, Gpst, Gst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint, TimeScale,
-    TryFromTimeScale, Tt, Unix, Utc,
+    FromTimeScale, Glonasst, Gpst, Gst, LeapSecondError, LocalTime, Qzsst, Tai, TaiTime, TimePoint,
+    TimeScale, TryFromTimeScale, Tt, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
@@ -44,8 +44,10 @@ impl TimeScale for Bdt {
     }
 }
 
+impl FromTimeScale<Glonasst> for Bdt {}
 impl FromTimeScale<Gst> for Bdt {}
 impl FromTimeScale<Gpst> for Bdt {}
+impl FromTimeScale<Qzsst> for Bdt {}
 impl FromTimeScale<Tai> for Bdt {}
 impl FromTimeScale<Utc> for Bdt {}
 impl FromTimeScale<Tt> for Bdt {}

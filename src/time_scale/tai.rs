@@ -3,8 +3,8 @@
 use num::Zero;
 
 use crate::{
-    Bdt, FromTimeScale, Gpst, Gst, LeapSecondError, LocalTime, Seconds, TryFromTimeScale, Tt, Unix,
-    Utc,
+    Bdt, FromTimeScale, Glonasst, Gpst, Gst, LeapSecondError, LocalTime, Qzsst, Seconds,
+    TryFromTimeScale, Tt, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
     time_point::TimePoint,
@@ -46,6 +46,8 @@ impl TimeScale for Tai {
 
 impl FromTimeScale<Bdt> for Tai {}
 impl FromTimeScale<Tt> for Tai {}
+impl FromTimeScale<Glonasst> for Tai {}
+impl FromTimeScale<Qzsst> for Tai {}
 impl FromTimeScale<Gpst> for Tai {}
 impl FromTimeScale<Gst> for Tai {}
 impl FromTimeScale<Utc> for Tai {}
