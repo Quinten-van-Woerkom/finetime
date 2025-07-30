@@ -62,12 +62,18 @@ impl<Scale> TimePoint<Scale, u128, Nano> {
 #[cfg(feature = "std")]
 #[test]
 fn get_current_time() {
-    use crate::{GpsTime, TaiTime, TtTime, UnixTime, UtcTime};
+    use crate::{
+        BeiDouTime, GalileoTime, GlonassTime, GpsTime, QzssTime, TaiTime, TtTime, UnixTime, UtcTime,
+    };
     let _ = UnixTime::now().unwrap();
     let _ = GpsTime::now();
     let _ = TaiTime::now();
     let _ = TtTime::now();
     let _ = UtcTime::now();
+    let _ = BeiDouTime::now();
+    let _ = GalileoTime::now();
+    let _ = GlonassTime::now();
+    let _ = QzssTime::now();
 }
 
 impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
