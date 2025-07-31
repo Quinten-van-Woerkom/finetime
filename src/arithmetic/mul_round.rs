@@ -6,12 +6,19 @@ use num::{Integer, ToPrimitive};
 
 use crate::arithmetic::Fraction;
 
-/// Trait that represents rounding multiplication by a fraction. If the result must be an integer,
-/// rounds to the nearest representable value of the input type. Useful in cases where an integer
-/// is multiplied by a non-integer value.
+/// Trait that represents multiplication by a fraction. If the result must be an integer, rounds
+/// to the nearest representable value of the input type. Useful in cases where an integer is
+/// multiplied by a non-integer value.
 ///
 /// May still panic if the end result is not representable by the output type, e.g., if overflow
 /// occurs.
+pub trait MulExact {
+    fn mul_exact(self, fraction: Fraction) -> Self;
+}
+
+/// Trait that represents rounding multiplication by a fraction. Rounds even if the result is a
+/// float: this in contrast to `MulExact`, which only rounds-to-nearest for integers. For integers,
+/// the behaviour is exactly identical to `MulExact`.
 pub trait MulRound {
     fn mul_round(self, fraction: Fraction) -> Self;
 }
@@ -62,13 +69,31 @@ fn mul_round_bigint(value: i256, fraction: Fraction) -> i256 {
 
 impl MulRound for f32 {
     fn mul_round(self, fraction: Fraction) -> Self {
-        use crate::arithmetic::MulNaive;
-        self.mul_naive(fraction)
+        use num::FromPrimitive;
+        let numerator: f32 = f32::from_i128(fraction.numerator()).unwrap();
+        let denominator: f32 = f32::from_i128(fraction.denominator()).unwrap();
+        ((self * numerator) / denominator).round()
     }
 }
 
 impl MulRound for f64 {
     fn mul_round(self, fraction: Fraction) -> Self {
+        use num::FromPrimitive;
+        let numerator: f64 = f64::from_i128(fraction.numerator()).unwrap();
+        let denominator: f64 = f64::from_i128(fraction.denominator()).unwrap();
+        ((self * numerator) / denominator).round()
+    }
+}
+
+impl MulExact for f32 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        use crate::arithmetic::MulNaive;
+        self.mul_naive(fraction)
+    }
+}
+
+impl MulExact for f64 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
         use crate::arithmetic::MulNaive;
         self.mul_naive(fraction)
     }
@@ -130,6 +155,66 @@ impl MulRound for u64 {
 
 impl MulRound for u128 {
     fn mul_round(self, fraction: Fraction) -> Self {
+        mul_round_bigint(self.into(), fraction).to_u128().unwrap()
+    }
+}
+
+impl MulExact for i8 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round(self.into(), fraction).try_into().unwrap()
+    }
+}
+
+impl MulExact for i16 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round(self.into(), fraction).try_into().unwrap()
+    }
+}
+
+impl MulExact for i32 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round(self.into(), fraction).try_into().unwrap()
+    }
+}
+
+impl MulExact for i64 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round(self.into(), fraction).try_into().unwrap()
+    }
+}
+
+impl MulExact for i128 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round_bigint(self.into(), fraction).to_i128().unwrap()
+    }
+}
+
+impl MulExact for u8 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round(self.into(), fraction).try_into().unwrap()
+    }
+}
+
+impl MulExact for u16 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round(self.into(), fraction).try_into().unwrap()
+    }
+}
+
+impl MulExact for u32 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round(self.into(), fraction).try_into().unwrap()
+    }
+}
+
+impl MulExact for u64 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
+        mul_round(self.into(), fraction).try_into().unwrap()
+    }
+}
+
+impl MulExact for u128 {
+    fn mul_exact(self, fraction: Fraction) -> Self {
         mul_round_bigint(self.into(), fraction).to_u128().unwrap()
     }
 }

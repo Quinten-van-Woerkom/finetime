@@ -26,6 +26,7 @@ use num::{FromPrimitive, One, Zero, traits::NumOps};
 pub trait TimeRepresentation:
     Clone
     + NumOps
+    + MulExact
     + MulRound
     + MulNaive
     + DivCeil
@@ -43,8 +44,9 @@ pub trait TimeRepresentation:
 impl<T> TimeRepresentation for T where
     T: Clone
         + NumOps
-        + MulRound
+        + MulExact
         + MulNaive
+        + MulRound
         + DivCeil
         + DivFloor
         + Zero

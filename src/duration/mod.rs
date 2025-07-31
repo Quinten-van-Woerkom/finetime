@@ -130,7 +130,7 @@ where
     /// applies rounding-to-nearest.
     pub fn multiply_fraction(self, fraction: Fraction) -> Self {
         Self {
-            count: self.count.mul_round(fraction),
+            count: self.count.mul_exact(fraction),
             period: core::marker::PhantomData,
         }
     }
@@ -477,6 +477,23 @@ fn convert_binary_fraction_seconds() {
     assert_eq!(fraction4.count(), 0x100000000);
     assert_eq!(fraction5.count(), 0x10000000000);
     assert_eq!(fraction6.count(), 0x1000000000000);
+}
+
+/// Verification of the rounding behaviour of `Duration`s when a float is used as underlying
+/// representation.
+#[test]
+fn rounding_floats() {
+    let thirteen_hours = Hours::new(13.);
+    assert_eq!(thirteen_hours.round(), Days::new(1.));
+
+    let eleven_hours = Hours::new(11.);
+    assert_eq!(eleven_hours.round(), Days::new(0.));
+
+    let six_days = Days::new(6.);
+    assert_eq!(six_days.round(), Weeks::new(1.));
+
+    let year_fraction = Days::new(550.);
+    assert_eq!(year_fraction.round(), Years::new(2.));
 }
 
 #[cfg(kani)]
