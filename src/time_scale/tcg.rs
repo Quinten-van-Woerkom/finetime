@@ -26,10 +26,6 @@ impl TimeScale for Tcg {
         let epoch = date.to_local_days().into_unit() + MilliSeconds::new(32_184);
         epoch.try_cast().unwrap()
     }
-
-    fn counts_leap_seconds() -> bool {
-        false
-    }
 }
 
 impl FromTimeScale<Tcg> for Tt {

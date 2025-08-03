@@ -30,10 +30,6 @@ impl TimeScale for Gst {
             .try_cast()
             .unwrap()
     }
-
-    fn counts_leap_seconds() -> bool {
-        false
-    }
 }
 
 impl TerrestrialTimeScale for Gst {

@@ -32,10 +32,6 @@ impl TimeScale for Tai {
             .try_cast()
             .unwrap()
     }
-
-    fn counts_leap_seconds() -> bool {
-        false
-    }
 }
 
 impl TerrestrialTimeScale for Tai {
@@ -44,14 +40,6 @@ impl TerrestrialTimeScale for Tai {
         TimePoint::from_time_since_epoch(Seconds::<i64>::zero().try_cast().unwrap())
     }
 }
-
-// impl FromTimeScale<Bdt> for Tai {}
-// impl FromTimeScale<Tt> for Tai {}
-// impl FromTimeScale<Glonasst> for Tai {}
-// impl FromTimeScale<Qzsst> for Tai {}
-// impl FromTimeScale<Gpst> for Tai {}
-// impl FromTimeScale<Gst> for Tai {}
-// impl FromTimeScale<Utc> for Tai {}
 
 impl TryFromTimeScale<Unix> for Tai {
     type Error = LeapSecondError;

@@ -37,10 +37,6 @@ impl TimeScale for Glonasst {
             .unwrap()
     }
 
-    fn counts_leap_seconds() -> bool {
-        false
-    }
-
     fn from_local_datetime(
         date: super::LocalDays<i64>,
         hour: u8,

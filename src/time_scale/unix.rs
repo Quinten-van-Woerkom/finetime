@@ -54,10 +54,6 @@ impl TimeScale for Unix {
             .try_cast()
             .unwrap()
     }
-
-    fn counts_leap_seconds() -> bool {
-        false
-    }
 }
 
 impl FromTimeScale<Unix> for Unix {

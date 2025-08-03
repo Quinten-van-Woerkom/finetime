@@ -146,10 +146,6 @@ impl TimeScale for Utc {
             .unwrap()
     }
 
-    fn counts_leap_seconds() -> bool {
-        true
-    }
-
     fn from_local_datetime(
         date: LocalDays<i64>,
         hour: u8,

@@ -57,12 +57,6 @@ pub trait TimeScale: Sized {
     /// be represented by a value of type `T`.
     fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod>;
 
-    /// Returns whether this time scales incorporates leap seconds, i.e., whether the underlying
-    /// "seconds since epoch" count also increases one second when a leap second is inserted.
-    fn counts_leap_seconds() -> bool {
-        false
-    }
-
     /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
     /// time-of-day to it.
     fn from_local_datetime(

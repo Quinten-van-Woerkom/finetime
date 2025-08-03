@@ -32,10 +32,6 @@ impl TimeScale for Qzsst {
             .try_cast()
             .unwrap()
     }
-
-    fn counts_leap_seconds() -> bool {
-        false
-    }
 }
 
 impl TerrestrialTimeScale for Qzsst {
