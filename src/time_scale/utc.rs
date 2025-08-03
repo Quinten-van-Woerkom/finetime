@@ -45,93 +45,6 @@ impl Utc {
     }
 }
 
-/// Tests the creation of UTC time points from calendar dates for some known values. We explicitly
-/// try out times near leap second insertions to see if those are handled properly, including:
-/// - Durations should be handled correctly before, during, and after a leap second.
-/// - If a leap second format (61 seconds) datetime is given for a non-leap second datetime, this
-///   shall be caught and indicated.
-#[test]
-fn calendar_dates_near_insertion() {
-    // Leap second insertion of June 2015.
-    let date = Date::new(2015, June, 30).unwrap();
-    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
-    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
-    assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
-    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60).unwrap();
-    assert_eq!(leap_second - regular_second2, Seconds::new(1i64));
-    assert_eq!(leap_second - regular_second1, Seconds::new(2i64));
-    let date2 = Date::new(2015, July, 1).unwrap();
-    let regular_second3 = UtcTime::from_generic_datetime(date2, 0, 0, 0).unwrap();
-    assert_eq!(regular_second3 - leap_second, Seconds::new(1i64));
-
-    // Leap second insertion of December 2016.
-    let date = Date::new(2016, December, 31).unwrap();
-    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
-    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
-    assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
-    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60).unwrap();
-    assert_eq!(leap_second - regular_second2, Seconds::new(1i64));
-    assert_eq!(leap_second - regular_second1, Seconds::new(2i64));
-    let date2 = Date::new(2017, January, 1).unwrap();
-    let regular_second3 = UtcTime::from_generic_datetime(date2, 0, 0, 0).unwrap();
-    assert_eq!(regular_second3 - leap_second, Seconds::new(1i64));
-
-    // Non-leap second date: June 2016
-    let date = Date::new(2016, June, 30).unwrap();
-    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
-    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
-    assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
-    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60);
-    assert_eq!(
-        leap_second,
-        Err(DateTimeError::NoLeapSecondInsertion {
-            date: date.into(),
-            hour: 23,
-            minute: 59,
-            second: 60
-        })
-    );
-}
-
-/// If a given conversion from Unix time to UTC succeeds or is ambiguous, all results shall map
-/// back to the exact same Unix time.
-#[test]
-fn roundtrip_near_leap_seconds() {
-    // Leap second insertion of June 2015.
-    let date = Date::new(2015, June, 30).unwrap();
-    let date2 = Date::new(2015, July, 1).unwrap();
-    let date3 = Date::new(2016, December, 31).unwrap();
-    let date4 = Date::new(2017, January, 1).unwrap();
-    let date5 = Date::new(2016, June, 30).unwrap();
-
-    let times = [
-        UnixTime::from_generic_datetime(date, 23, 59, 58).unwrap(),
-        UnixTime::from_generic_datetime(date, 23, 59, 59).unwrap(),
-        UnixTime::from_generic_datetime(date2, 0, 0, 0).unwrap(),
-        UnixTime::from_generic_datetime(date2, 0, 0, 1).unwrap(),
-        UnixTime::from_generic_datetime(date3, 23, 59, 58).unwrap(),
-        UnixTime::from_generic_datetime(date3, 23, 59, 59).unwrap(),
-        UnixTime::from_generic_datetime(date4, 0, 0, 0).unwrap(),
-        UnixTime::from_generic_datetime(date5, 23, 59, 58).unwrap(),
-        UnixTime::from_generic_datetime(date5, 23, 59, 59).unwrap(),
-    ];
-
-    for &time in times.iter() {
-        match LEAP_SECONDS.to_utc(time) {
-            LeapSecondsResult::Unambiguous(time_point) => {
-                assert_eq!(LEAP_SECONDS.to_unix(time_point), time);
-            }
-            LeapSecondsResult::InsertionPoint { start, end } => {
-                assert_eq!(LEAP_SECONDS.to_unix(start), time);
-                assert_eq!(LEAP_SECONDS.to_unix(end), time);
-            }
-            LeapSecondsResult::DeletionPoint => {
-                panic!("Unexpected deleted leap second found at {time:?}")
-            }
-        }
-    }
-}
-
 impl TimeScale for Utc {
     type NativePeriod = Second;
 
@@ -438,6 +351,93 @@ impl Default for LeapSecondsEntry {
 enum LeapSecondsEvent {
     Insertion,
     Deletion,
+}
+
+/// Tests the creation of UTC time points from calendar dates for some known values. We explicitly
+/// try out times near leap second insertions to see if those are handled properly, including:
+/// - Durations should be handled correctly before, during, and after a leap second.
+/// - If a leap second format (61 seconds) datetime is given for a non-leap second datetime, this
+///   shall be caught and indicated.
+#[test]
+fn calendar_dates_near_insertion() {
+    // Leap second insertion of June 2015.
+    let date = Date::new(2015, June, 30).unwrap();
+    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
+    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
+    assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
+    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60).unwrap();
+    assert_eq!(leap_second - regular_second2, Seconds::new(1i64));
+    assert_eq!(leap_second - regular_second1, Seconds::new(2i64));
+    let date2 = Date::new(2015, July, 1).unwrap();
+    let regular_second3 = UtcTime::from_generic_datetime(date2, 0, 0, 0).unwrap();
+    assert_eq!(regular_second3 - leap_second, Seconds::new(1i64));
+
+    // Leap second insertion of December 2016.
+    let date = Date::new(2016, December, 31).unwrap();
+    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
+    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
+    assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
+    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60).unwrap();
+    assert_eq!(leap_second - regular_second2, Seconds::new(1i64));
+    assert_eq!(leap_second - regular_second1, Seconds::new(2i64));
+    let date2 = Date::new(2017, January, 1).unwrap();
+    let regular_second3 = UtcTime::from_generic_datetime(date2, 0, 0, 0).unwrap();
+    assert_eq!(regular_second3 - leap_second, Seconds::new(1i64));
+
+    // Non-leap second date: June 2016
+    let date = Date::new(2016, June, 30).unwrap();
+    let regular_second1 = UtcTime::from_generic_datetime(date, 23, 59, 58).unwrap();
+    let regular_second2 = UtcTime::from_generic_datetime(date, 23, 59, 59).unwrap();
+    assert_eq!(regular_second2 - regular_second1, Seconds::new(1i64));
+    let leap_second = UtcTime::from_generic_datetime(date, 23, 59, 60);
+    assert_eq!(
+        leap_second,
+        Err(DateTimeError::NoLeapSecondInsertion {
+            date: date.into(),
+            hour: 23,
+            minute: 59,
+            second: 60
+        })
+    );
+}
+
+/// If a given conversion from Unix time to UTC succeeds or is ambiguous, all results shall map
+/// back to the exact same Unix time.
+#[test]
+fn roundtrip_near_leap_seconds() {
+    // Leap second insertion of June 2015.
+    let date = Date::new(2015, June, 30).unwrap();
+    let date2 = Date::new(2015, July, 1).unwrap();
+    let date3 = Date::new(2016, December, 31).unwrap();
+    let date4 = Date::new(2017, January, 1).unwrap();
+    let date5 = Date::new(2016, June, 30).unwrap();
+
+    let times = [
+        UnixTime::from_generic_datetime(date, 23, 59, 58).unwrap(),
+        UnixTime::from_generic_datetime(date, 23, 59, 59).unwrap(),
+        UnixTime::from_generic_datetime(date2, 0, 0, 0).unwrap(),
+        UnixTime::from_generic_datetime(date2, 0, 0, 1).unwrap(),
+        UnixTime::from_generic_datetime(date3, 23, 59, 58).unwrap(),
+        UnixTime::from_generic_datetime(date3, 23, 59, 59).unwrap(),
+        UnixTime::from_generic_datetime(date4, 0, 0, 0).unwrap(),
+        UnixTime::from_generic_datetime(date5, 23, 59, 58).unwrap(),
+        UnixTime::from_generic_datetime(date5, 23, 59, 59).unwrap(),
+    ];
+
+    for &time in times.iter() {
+        match LEAP_SECONDS.to_utc(time) {
+            LeapSecondsResult::Unambiguous(time_point) => {
+                assert_eq!(LEAP_SECONDS.to_unix(time_point), time);
+            }
+            LeapSecondsResult::InsertionPoint { start, end } => {
+                assert_eq!(LEAP_SECONDS.to_unix(start), time);
+                assert_eq!(LEAP_SECONDS.to_unix(end), time);
+            }
+            LeapSecondsResult::DeletionPoint => {
+                panic!("Unexpected deleted leap second found at {time:?}")
+            }
+        }
+    }
 }
 
 #[cfg(kani)]
