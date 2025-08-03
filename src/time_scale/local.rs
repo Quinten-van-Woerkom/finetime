@@ -22,6 +22,11 @@ pub struct Local;
 /// Hence, it may not be compared with time points from other scales, as there is no way to link
 /// them in time. It is best seen as an intermediate type that may be linked to some kind of time
 /// scale identification to instantiate a "full" time point.
+///
+/// Note that a `LocalTime` can consequently also not be connected to a specific datetime. The
+/// actual date and time may depend on the insertion/deletion of leap seconds, which is handled
+/// differently between time scales. A `LocalTime` really can only be taken to mean the elapsed
+/// time since some arbitrary epoch: nothing more.
 pub type LocalTime<Representation, Period = Second> = TimePoint<Local, Representation, Period>;
 
 /// Typedef for a specialization of `LocalTime` to a unit of days. Useful as intermediate type for
