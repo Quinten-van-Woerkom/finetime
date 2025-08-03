@@ -189,9 +189,8 @@ where
     }
 
     /// Creates a `TimePoint` from a given week number and second within that week. The week number
-    /// is modulo the given rollover count, as it is for most GNSS constellations. Instead, an
-    /// estimated time must be given that disambiguates which of the week rollover blocks is the
-    /// correct one: the date closest to that time is chosen.
+    /// must be unambiguous: this function cannot be used directly with GPS week counts, for
+    /// example, since those might be ambiguous over some given week rollover number.
     pub fn from_week_time(
         week_number: Representation,
         time_of_week: Duration<Representation, Period>,
