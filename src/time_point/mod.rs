@@ -311,7 +311,6 @@ where
     }
 
     /// Tries to transform a time point into another time scale.
-    #[allow(clippy::type_complexity)]
     pub fn try_into_time_scale<Target>(
         self,
     ) -> Result<TimePoint<Target, Representation, Period>, <Scale as TryIntoTimeScale<Target>>::Error>
