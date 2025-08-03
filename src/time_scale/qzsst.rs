@@ -40,7 +40,7 @@ impl TimeScale for Qzsst {
 
 impl TerrestrialTimeScale for Qzsst {
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_generic_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
+        TaiTime::from_datetime(1980, Month::January, 6, 0, 0, 19)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -72,11 +72,8 @@ impl TryFromTimeScale<Unix> for Qzsst {
 /// Astrodynamics".
 #[test]
 fn known_timestamps() {
-    let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
-        .unwrap();
-    let qzsst =
-        QzssTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 13)
-            .unwrap();
+    let tai = TaiTime::from_datetime(2004, Month::May, 14, 16, 43, 32).unwrap();
+    let qzsst = QzssTime::from_datetime(2004, Month::May, 14, 16, 43, 13).unwrap();
     assert_eq!(tai, qzsst.into_time_scale());
 }
 

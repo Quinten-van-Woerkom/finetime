@@ -88,65 +88,65 @@ impl From<std::time::SystemTime> for UnixTime<u128, crate::arithmetic::Nano> {
 /// Verifies this implementation by computing the `UnixTime` for some known time stamps.
 #[test]
 fn known_timestamps() {
-    use crate::{Date, Month, Seconds};
+    use crate::{Month, Seconds};
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
+        UnixTime::from_datetime(1970, Month::January, 1, 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(0)
     );
 
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(1970, Month::January, 2).unwrap(), 0, 0, 0)
+        UnixTime::from_datetime(1970, Month::January, 2, 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(24 * 60 * 60),
     );
 
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(1972, Month::January, 1).unwrap(), 0, 0, 0)
+        UnixTime::from_datetime(1972, Month::January, 1, 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(2 * 365 * 24 * 60 * 60),
     );
 
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(1973, Month::January, 1).unwrap(), 0, 0, 0)
+        UnixTime::from_datetime(1973, Month::January, 1, 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new((3 * 365 + 1) * 24 * 60 * 60),
     );
 
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(1976, Month::January, 1).unwrap(), 0, 0, 0)
+        UnixTime::from_datetime(1976, Month::January, 1, 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(189302400),
     );
 
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(2025, Month::July, 16).unwrap(), 16, 23, 24)
+        UnixTime::from_datetime(2025, Month::July, 16, 16, 23, 24)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(1752683004),
     );
 
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(2034, Month::December, 26).unwrap(), 8, 2, 37)
+        UnixTime::from_datetime(2034, Month::December, 26, 8, 2, 37)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(2050732957),
     );
 
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(2760, Month::April, 1).unwrap(), 21, 59, 58)
+        UnixTime::from_datetime(2760, Month::April, 1, 21, 59, 58)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(24937883998),
     );
 
     assert_eq!(
-        UnixTime::from_generic_datetime(Date::new(1643, Month::January, 4).unwrap(), 1, 1, 33)
+        UnixTime::from_datetime(1643, Month::January, 4, 1, 1, 33)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(-10318834707),

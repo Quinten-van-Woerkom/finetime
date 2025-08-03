@@ -71,7 +71,7 @@ impl TryFromTimeScale<Unix> for Tt {
 #[test]
 fn known_timestamps() {
     use crate::{Date, Month, TaiTime};
-    let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
+    let tai = TaiTime::from_datetime(2004, Month::May, 14, 16, 43, 32)
         .unwrap()
         .into_unit();
     let tt = TtTime::from_subsecond_generic_datetime(

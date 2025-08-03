@@ -178,7 +178,7 @@ fn datetime_tt_tcg_conversion() {
 
     // At J2000, the difference should be about 505.833 ms (see "Report of the IAU WGAS Sub-group
     // on Issues on Time", P.K. Seidelmann).
-    let time1 = TtTime::from_generic_datetime(Date::new(2000, January, 1).unwrap(), 12, 0, 0)
+    let time1 = TtTime::from_datetime(2000, January, 1, 12, 0, 0)
         .unwrap()
         .into_unit::<Micro>();
     let time2 = TcgTime::from_subsecond_generic_datetime(
@@ -196,7 +196,7 @@ fn datetime_tt_tcg_conversion() {
     // of the IAU WGAS Sub-group on Issues on Time", P.K. Seidelmann). Redoing the math using
     // exact arithmetic leads to an expected result of 2.705173778 seconds (which is also our
     // result), so we only check this to microsecond precision.
-    let time1 = TtTime::from_generic_datetime(Date::new(2100, January, 1).unwrap(), 12, 0, 0)
+    let time1 = TtTime::from_datetime(2100, January, 1, 12, 0, 0)
         .unwrap()
         .into_unit::<Micro>();
     let time2 = TcgTime::from_subsecond_generic_datetime(

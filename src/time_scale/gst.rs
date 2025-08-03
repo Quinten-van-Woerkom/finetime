@@ -38,7 +38,7 @@ impl TimeScale for Gst {
 
 impl TerrestrialTimeScale for Gst {
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_generic_datetime(Date::new(1999, Month::August, 22).unwrap(), 0, 0, 19)
+        TaiTime::from_datetime(1999, Month::August, 22, 0, 0, 19)
             .unwrap()
             .into_unit()
             .try_cast()

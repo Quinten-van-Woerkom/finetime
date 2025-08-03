@@ -251,8 +251,7 @@ impl TimeScale for Utc {
 
 impl TerrestrialTimeScale for Utc {
     fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        let date = Date::new(1970, January, 1).unwrap();
-        TaiTime::from_generic_datetime(date, 0, 0, 10)
+        TaiTime::from_datetime(1970, January, 1, 0, 0, 10)
             .unwrap()
             .into_unit()
             .try_cast()
@@ -558,42 +557,42 @@ include!(concat!(env!("OUT_DIR"), "/leap_seconds.rs"));
 #[test]
 fn known_leap_seconds() {
     assert_eq!(
-        UtcTime::from_generic_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
+        UtcTime::from_datetime(1970, Month::January, 1, 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(0)
     );
 
     assert_eq!(
-        UtcTime::from_generic_datetime(Date::new(1973, Month::December, 31).unwrap(), 23, 59, 59)
+        UtcTime::from_datetime(1973, Month::December, 31, 23, 59, 59)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(126230401)
     );
 
     assert_eq!(
-        UtcTime::from_generic_datetime(Date::new(1973, Month::December, 31).unwrap(), 23, 59, 60)
+        UtcTime::from_datetime(1973, Month::December, 31, 23, 59, 60)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(126230402)
     );
 
     assert_eq!(
-        UtcTime::from_generic_datetime(Date::new(1974, Month::January, 1).unwrap(), 0, 0, 0)
+        UtcTime::from_datetime(1974, Month::January, 1, 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(126230403)
     );
 
     assert_eq!(
-        UtcTime::from_generic_datetime(Date::new(2025, Month::July, 16).unwrap(), 0, 0, 0)
+        UtcTime::from_datetime(2025, Month::July, 16, 0, 0, 0)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(1752624027)
     );
 
     assert_eq!(
-        UtcTime::from_generic_datetime(Date::new(2025, Month::July, 16).unwrap(), 17, 36, 4)
+        UtcTime::from_datetime(2025, Month::July, 16, 17, 36, 4)
             .unwrap()
             .elapsed_time_since_epoch(),
         Seconds::new(1752687391)
@@ -604,9 +603,8 @@ fn known_leap_seconds() {
 /// Astrodynamics".
 #[test]
 fn known_timestamps() {
-    let utc = UtcTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 0)
-        .unwrap();
-    let tai = TaiTime::from_generic_datetime(Date::new(2004, Month::May, 14).unwrap(), 16, 43, 32)
+    let utc = UtcTime::from_datetime(2004, Month::May, 14, 16, 43, 0).unwrap();
+    let tai = TaiTime::from_datetime(2004, Month::May, 14, 16, 43, 32)
         .unwrap()
         .into_time_scale();
     assert_eq!(utc, tai);
