@@ -129,7 +129,7 @@ pub trait FromTimeScale<From: TimeScale>: TimeScale {
         from: TimePoint<From, Representation, Period>,
     ) -> TimePoint<Self, Representation, Period>
     where
-        Period: Unit,
+        Period: Unit + FromUnit<Second, Representation>,
         Representation: TimeRepresentation
             + TryFromExact<From::NativeRepresentation>
             + TryFromExact<Self::NativeRepresentation>,
@@ -205,7 +205,7 @@ pub trait IntoTimeScale<Into: TimeScale>: TimeScale {
         from: TimePoint<Self, Representation, Period>,
     ) -> TimePoint<Into, Representation, Period>
     where
-        Period: Unit,
+        Period: Unit + FromUnit<Second, Representation>,
         Representation: TimeRepresentation
             + TryFromExact<Self::NativeRepresentation>
             + TryFromExact<Into::NativeRepresentation>,
@@ -221,7 +221,7 @@ where
         from: TimePoint<Self, Representation, Period>,
     ) -> TimePoint<Into, Representation, Period>
     where
-        Period: Unit,
+        Period: Unit + FromUnit<Second, Representation>,
         Representation: TimeRepresentation
             + TryFromExact<Self::NativeRepresentation>
             + TryFromExact<Into::NativeRepresentation>,

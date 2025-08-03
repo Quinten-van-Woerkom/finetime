@@ -330,6 +330,7 @@ where
         Scale: TimeScale,
         Target: TimeScale + FromTimeScale<Scale>,
         Period: Unit
+            + FromUnit<Second, Representation>
             + FromUnit<Scale::NativePeriod, Scale::NativeRepresentation>
             + FromUnit<Target::NativePeriod, Target::NativeRepresentation>,
         Representation: TimeRepresentation

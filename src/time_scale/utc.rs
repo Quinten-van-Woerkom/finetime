@@ -183,21 +183,43 @@ impl TryFromTimeScale<Unix> for Utc {
             + TryFromExact<<Unix as TimeScale>::NativeRepresentation>
             + TryFromExact<Self::NativeRepresentation>,
     {
-        let utc = {
-            let unix_time_seconds: UnixTime<_> = from.clone().floor();
-            let subseconds = from - unix_time_seconds.clone().into_unit();
-            let unix_time_seconds = unix_time_seconds.try_cast().unwrap();
-            match LEAP_SECONDS.to_utc(unix_time_seconds) {
-                LeapSecondsResult::Unambiguous(utc_time) => {
-                    utc_time.try_cast().unwrap().into_unit() + subseconds
-                }
-                LeapSecondsResult::InsertionPoint { start, end } => {
-                    return Err(LeapSecondError::Ambiguous { start, end })?;
-                }
-                LeapSecondsResult::DeletionPoint => return Err(LeapSecondError::Deletion),
+        let unix_time_seconds: UnixTime<_> = from.clone().floor();
+        let subseconds = from - unix_time_seconds.clone().into_unit();
+        let unix_time_seconds = unix_time_seconds.try_cast().unwrap();
+        match LEAP_SECONDS.to_utc(unix_time_seconds) {
+            LeapSecondsResult::Unambiguous(utc_time) => {
+                Ok(utc_time.try_cast().unwrap().into_unit() + subseconds)
             }
-        };
-        Ok(Self::from_time_scale(utc))
+            LeapSecondsResult::InsertionPoint { start, end } => {
+                Err(LeapSecondError::Ambiguous { start, end })
+            }
+            LeapSecondsResult::DeletionPoint => Err(LeapSecondError::Deletion),
+        }
+    }
+}
+
+impl FromTimeScale<Utc> for Unix {
+    fn from_time_scale<Representation, Period>(
+        from: UtcTime<Representation, Period>,
+    ) -> UnixTime<Representation, Period>
+    where
+        Period: Unit
+            + FromUnit<<Utc as TimeScale>::NativePeriod, <Utc as TimeScale>::NativeRepresentation>
+            + FromUnit<Self::NativePeriod, Self::NativeRepresentation>
+            + FromUnit<Second, Representation>,
+        Representation: TimeRepresentation
+            + TryFromExact<<Utc as TimeScale>::NativeRepresentation>
+            + TryFromExact<Self::NativeRepresentation>,
+    {
+        let utc_time_seconds: UtcTime<_> = from.clone().floor();
+        let subseconds = from - utc_time_seconds.clone().into_unit();
+        let utc_time_seconds = utc_time_seconds.try_cast().unwrap();
+        LEAP_SECONDS
+            .to_unix(utc_time_seconds)
+            .try_cast()
+            .unwrap()
+            .into_unit()
+            + subseconds
     }
 }
 
@@ -263,7 +285,6 @@ impl LeapSecondsTable {
     /// Converts a given UTC timestamp to Unix time by removing the leap seconds. Rather than the
     /// reverse transformation, this one will always succeed: all UTC times map to a Unix time,
     /// even if the reverse is not true.
-    #[allow(dead_code)]
     pub fn to_unix(&self, utc_time: UtcTime<i64>) -> UnixTime<i64> {
         for leap_second in self.table.iter().rev() {
             if leap_second.utc_time <= utc_time {
