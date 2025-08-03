@@ -83,6 +83,24 @@ fn known_timestamps() {
     assert_eq!(tai, gpst.into_time_scale());
 }
 
+/// Compares with some week numbers as computed using the LabSat GPS time calculator (found at
+/// https://www.labsat.co.uk/index.php/en/gps-time-calculator).
+#[test]
+fn week_numbers() {
+    use crate::{Seconds, UtcTime};
+    let from_week = GpsTime::from_week_time(1625, Seconds::new(364379));
+    let expected = UtcTime::from_datetime(2011, Month::March, 3, 5, 12, 44).unwrap();
+    assert_eq!(from_week, expected.into_time_scale());
+
+    let from_week = GpsTime::from_week_time(854, Seconds::new(845));
+    let expected = UtcTime::from_datetime(1996, Month::May, 19, 0, 13, 54).unwrap();
+    assert_eq!(from_week, expected.into_time_scale());
+
+    let from_week = GpsTime::from_week_time(2378, Seconds::new(64617));
+    let expected = UtcTime::from_datetime(2025, Month::August, 3, 17, 56, 39).unwrap();
+    assert_eq!(from_week, expected.into_time_scale());
+}
+
 #[cfg(kani)]
 mod proof_harness {
     use super::*;

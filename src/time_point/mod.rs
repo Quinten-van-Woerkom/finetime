@@ -2,6 +2,7 @@
 //! similar to the C++ definition used in the `<chrono>` library.
 
 use core::{
+    fmt::Debug,
     hash::Hash,
     ops::{Add, AddAssign, Sub},
 };
@@ -10,8 +11,9 @@ use num::Integer;
 
 use crate::{
     Date, DateTimeError, FineDateTimeError, FromTimeScale, GregorianDate, Month, TryIntoTimeScale,
+    Weeks,
     arithmetic::{
-        IntoUnit, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
+        IntoUnit, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerWeek,
         TimeRepresentation, TryFromExact, TryIntoExact, Unit,
     },
     duration::Duration,
@@ -184,6 +186,23 @@ where
     {
         let date = Date::from_year_day(year, day_of_year)?;
         Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
+    }
+
+    /// Creates a `TimePoint` from a given week number and second within that week. The week number
+    /// is modulo the given rollover count, as it is for most GNSS constellations. Instead, an
+    /// estimated time must be given that disambiguates which of the week rollover blocks is the
+    /// correct one: the date closest to that time is chosen.
+    pub fn from_week_time(
+        week_number: Representation,
+        time_of_week: Duration<Representation, Period>,
+    ) -> Self
+    where
+        Scale: TimeScale,
+        Representation: From<u32> + Debug,
+        Period: FromUnit<SecondsPerWeek, Representation> + Debug,
+    {
+        let week_number = Weeks::new(week_number).into_unit::<Period>();
+        Self::from_time_since_epoch(week_number + time_of_week)
     }
 
     /// Converts towards a different time unit, rounding towards the nearest whole unit.
