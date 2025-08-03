@@ -339,13 +339,30 @@ where
 {
     type Output = Duration<<R1 as Div<R2>>::Output, Period>;
 
-    /// A `Duration` may not be divided by another `Duration` (as that is undefined), but it may be
-    /// divided by unitless numbers.
+    /// A `Duration` may may be divided by unitless numbers to obtain a new `Duration`.
     fn div(self, rhs: R2) -> Self::Output {
         Self::Output {
             count: self.count / rhs,
             period: core::marker::PhantomData,
         }
+    }
+}
+
+impl<R1, R2, Period> Div<Duration<R2, Period>> for Duration<R1, Period>
+where
+    R1: TimeRepresentation,
+    R2: TimeRepresentation,
+    R1: Div<R2>,
+    Period: Unit,
+{
+    type Output = <R1 as Div<R2>>::Output;
+
+    /// A `Duration` may be divided by another `Duration` of the same `Period` to obtain a unitless
+    /// number, reflecting the number of times that the one fits into the other. Note that
+    /// explicitly the raw output is returned rather than a `Duration` to signal that the result is
+    /// not a `Duration`, but simply a division.
+    fn div(self, rhs: Duration<R2, Period>) -> Self::Output {
+        self.count / rhs.count
     }
 }
 
