@@ -7,11 +7,11 @@ use core::{
     ops::{Add, AddAssign, Sub},
 };
 
-use num::Integer;
+use num::{Integer, Zero};
 
 use crate::{
-    Date, DateTimeError, FineDateTimeError, FromTimeScale, GregorianDate, Month, TryIntoTimeScale,
-    Weeks,
+    Date, DateTimeError, FineDateTimeError, FromTimeScale, GregorianDate, LocalTime, Month,
+    Seconds, TryIntoTimeScale, Weeks,
     arithmetic::{
         IntoUnit, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerWeek,
         TimeRepresentation, TryFromExact, TryIntoExact, Unit,
@@ -99,6 +99,36 @@ where
         self.duration.clone()
     }
 
+    /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
+    /// time-of-day and subsecond fraction to it.
+    fn from_subsecond_local_datetime(
+        date: LocalDays<i64>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<TimePoint<Scale, Representation, Period>, FineDateTimeError<Representation, Period>>
+    where
+        Scale: TimeScale,
+        Representation: TimeRepresentation + TryFromExact<Scale::NativeRepresentation>,
+        Period: Unit + FromDate<Representation> + FromUnit<Scale::NativePeriod, Representation>,
+        Second: FromDate<Scale::NativeRepresentation>,
+        Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
+    {
+        // We check that the number of subseconds does not exceed one second.
+        let one = Seconds::new(Representation::one()).into_unit();
+        let zero = Duration::zero();
+        if subseconds < zero || subseconds >= one {
+            return Err(FineDateTimeError::InvalidSubseconds { subseconds });
+        }
+
+        let seconds = Scale::from_local_datetime(date, hour, minute, second)?
+            .try_cast::<Representation>()
+            .unwrap()
+            .into_unit();
+        Ok(seconds + subseconds)
+    }
+
     /// Creates a `TimePoint` from some datetime and time-of-day, plus some additional subseconds.
     pub fn from_subsecond_generic_datetime(
         date: impl Into<LocalDays<i64>>,
@@ -114,7 +144,7 @@ where
         Second: FromDate<Scale::NativeRepresentation>,
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
     {
-        Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subseconds)
+        Self::from_subsecond_local_datetime(date.into(), hour, minute, second, subseconds)
     }
 
     /// Creates a `TimePoint` from a historic calendar date and an associated subsecond
@@ -141,7 +171,7 @@ where
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
     {
         let date = Date::new(year, month, day)?;
-        Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
+        Self::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
     }
 
     /// Creates a `TimePoint` from a Gregorian calendar date and an associated subsecond
@@ -164,7 +194,7 @@ where
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
     {
         let date = GregorianDate::new(year, month, day)?;
-        Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
+        Self::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
     }
 
     /// Creates a `TimePoint` from a given year and day-of-year, with an associated time-of-day.
@@ -185,7 +215,7 @@ where
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
     {
         let date = Date::from_year_day(year, day_of_year)?;
-        Scale::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
+        Self::from_subsecond_local_datetime(date.into(), hour, minute, second, subsecond)
     }
 
     /// Creates a `TimePoint` from a given week number and second within that week. The week number
@@ -196,7 +226,6 @@ where
         time_of_week: Duration<Representation, Period>,
     ) -> Self
     where
-        Scale: TimeScale,
         Representation: From<u32> + Debug,
         Period: FromUnit<SecondsPerWeek, Representation> + Debug,
     {
@@ -326,6 +355,23 @@ where
     {
         Target::try_from_time_scale(self)
     }
+
+    /// Reinterprets this `TimePoint` as the underlying `LocalTime`. Effectively, type-erases the
+    /// underlying time scale. This is useful in implementing generic calendrical functionality,
+    /// which is independent of the underlying scale.
+    pub fn as_local_time(&self) -> LocalTime<Representation, Period>
+    where
+        Scale: TimeScale,
+        Period: FromUnit<Scale::NativePeriod, Representation>,
+        Representation: TimeRepresentation + TryFromExact<Scale::NativeRepresentation>,
+    {
+        let time_since_epoch = self.elapsed_time_since_epoch();
+        let epoch_native = Scale::epoch();
+        let epoch_cast: LocalTime<Representation, Scale::NativePeriod> =
+            epoch_native.try_cast::<Representation>().unwrap();
+        let epoch: LocalTime<Representation, Period> = epoch_cast.into_unit();
+        epoch + time_since_epoch
+    }
 }
 
 /// The functions in this `impl` block are only valid for `TimePoint`s that are expressed in terms
@@ -344,7 +390,6 @@ where
         second: u8,
     ) -> Result<Self, DateTimeError>
     where
-        Scale: TimeScale,
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
         Second: FromDate<Scale::NativeRepresentation>,
     {
@@ -367,7 +412,6 @@ where
         second: u8,
     ) -> Result<Self, DateTimeError>
     where
-        Scale: TimeScale,
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
         Second: FromDate<Scale::NativeRepresentation>,
     {
@@ -386,7 +430,6 @@ where
         second: u8,
     ) -> Result<Self, DateTimeError>
     where
-        Scale: TimeScale,
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
         Second: FromDate<Scale::NativeRepresentation>,
     {
@@ -404,7 +447,6 @@ where
         second: u8,
     ) -> Result<Self, DateTimeError>
     where
-        Scale: TimeScale,
         Scale::NativePeriod: FromDate<Scale::NativeRepresentation>,
         Second: FromDate<Scale::NativeRepresentation>,
     {

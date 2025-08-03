@@ -2,10 +2,8 @@
 //! link instances in time to a number of elapsed seconds since some epoch. The manner in which
 //! this relation is established differs per time scale.
 
-use num::Zero;
-
 use crate::{
-    DateTimeError, FineDateTimeError, FromDate,
+    DateTimeError,
     arithmetic::{
         FromUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, TimeRepresentation,
         TryFromExact, Unit,
@@ -53,15 +51,11 @@ pub trait TimeScale: Sized {
     /// `NativePeriod` unit.
     type NativeRepresentation: TimeRepresentation;
 
-    /// Returns the epoch of this time scale but expressed in TAI. This is useful for performing
-    /// conversions between different time scales.
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod>;
-
     /// Returns the epoch of a time scale, expressed as a `LocalTime` in its own time scale. The
     /// result may be expressed in any type `T`, as long as this type can be constructed from some
     /// primitive. This function is allowed to panic if the epoch, expressed as `LocalDays`, cannot
     /// be represented by a value of type `T`.
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod>;
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod>;
 
     /// Returns whether this time scales incorporates leap seconds, i.e., whether the underlying
     /// "seconds since epoch" count also increases one second when a leap second is inserted.
@@ -99,7 +93,7 @@ pub trait TimeScale: Sized {
         let hours = Hours::new(hour).try_cast().unwrap();
         let minutes = Minutes::new(minute).try_cast().unwrap();
         let seconds = Seconds::new(second).try_cast().unwrap();
-        let epoch = Self::epoch_local();
+        let epoch = Self::epoch();
         let local_time: LocalTime<Self::NativeRepresentation> =
             date.try_cast().unwrap().into_unit()
                 + hours.into_unit()
@@ -108,35 +102,16 @@ pub trait TimeScale: Sized {
         let time_since_epoch = local_time.into_unit() - epoch;
         Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
+}
 
-    /// Creates a `TimePoint` from some previously created `LocalDays` instance by adding a given
-    /// time-of-day and subsecond fraction to it.
-    fn from_subsecond_local_datetime<Representation, Period>(
-        date: LocalDays<i64>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-        subseconds: Duration<Representation, Period>,
-    ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
-    where
-        Representation: TimeRepresentation + TryFromExact<Self::NativeRepresentation>,
-        Period: Unit + FromDate<Representation> + FromUnit<Self::NativePeriod, Representation>,
-        Second: FromDate<Self::NativeRepresentation>,
-        Self::NativePeriod: FromDate<Self::NativeRepresentation>,
-    {
-        // We check that the number of subseconds does not exceed one second.
-        let one = Seconds::new(Representation::one()).into_unit();
-        let zero = Duration::zero();
-        if subseconds < zero || subseconds >= one {
-            return Err(FineDateTimeError::InvalidSubseconds { subseconds });
-        }
-
-        let seconds = Self::from_local_datetime(date, hour, minute, second)?
-            .try_cast::<Representation>()
-            .unwrap()
-            .into_unit();
-        Ok(seconds + subseconds)
-    }
+/// With "terrestrial time scale", a time scale is meant whose Platonic clock ticks in sync with an
+/// ideal clock that is located on the Earth geoid. Because of this, conversion to and from TAI and
+/// other terrestrial time scales is only a simple epoch offset. This makes it trivial to implement
+/// efficient conversions between all such time scales.
+pub trait TerrestrialTimeScale: TimeScale {
+    /// Returns the epoch of this time scale but expressed in TAI. This is useful for performing
+    /// conversions between different time scales.
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod>;
 }
 
 /// Used to indicate that it is possible to convert from one `TimeScale` to another.
@@ -165,10 +140,28 @@ pub trait FromTimeScale<From: TimeScale>: TimeScale {
             + TryFromExact<From::NativeRepresentation>
             + TryFromExact<Self::NativeRepresentation>,
         Period: FromUnit<From::NativePeriod, From::NativeRepresentation>,
+        Period: FromUnit<Self::NativePeriod, Self::NativeRepresentation>;
+}
+
+impl<From, Into> FromTimeScale<From> for Into
+where
+    From: TerrestrialTimeScale,
+    Into: TerrestrialTimeScale,
+{
+    fn from_time_scale<Representation, Period>(
+        from: TimePoint<From, Representation, Period>,
+    ) -> TimePoint<Self, Representation, Period>
+    where
+        Period: Unit,
+        Representation: TimeRepresentation
+            + TryFromExact<<From as TimeScale>::NativeRepresentation>
+            + TryFromExact<Self::NativeRepresentation>,
+        Period:
+            FromUnit<<From as TimeScale>::NativePeriod, <From as TimeScale>::NativeRepresentation>,
         Period: FromUnit<Self::NativePeriod, Self::NativeRepresentation>,
     {
         let time_since_from_epoch = from.elapsed_time_since_epoch();
-        let from_epoch = From::epoch_tai()
+        let from_epoch = <From>::epoch_tai()
             .into_unit::<Period>()
             .try_cast::<Representation>()
             .unwrap();
@@ -242,19 +235,6 @@ where
         Period: FromUnit<Into::NativePeriod, Into::NativeRepresentation>,
     {
         Into::from_time_scale(from)
-    }
-}
-
-impl<T: TimeScale> FromTimeScale<T> for T {
-    /// Conversion from a clock to itself is always possible and a no-op.
-    fn from_time_scale<Representation, Period>(
-        from: TimePoint<T, Representation, Period>,
-    ) -> TimePoint<T, Representation, Period>
-    where
-        Representation: TimeRepresentation,
-        Period: Unit,
-    {
-        from
     }
 }
 

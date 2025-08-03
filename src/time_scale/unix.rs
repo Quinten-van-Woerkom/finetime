@@ -1,12 +1,11 @@
 //! Implementation of a time scale that represents that used by Unix time, i.e., the system clock.
 
 use crate::{
-    LocalTime,
-    arithmetic::Second,
-    calendar::{Date, Month},
+    FromTimeScale, LocalTime,
+    arithmetic::{Second, TimeRepresentation, Unit},
     duration::Duration,
     time_point::TimePoint,
-    time_scale::{TimeScale, local::LocalDays, tai::TaiTime},
+    time_scale::{TimeScale, local::LocalDays},
 };
 
 /// `UnixTime` is a `TimePoint` that uses the `Unix` time scale.
@@ -47,19 +46,9 @@ impl TimeScale for Unix {
 
     type NativeRepresentation = i64;
 
-    /// The Unix reference epoch is 1 January 1970 midnight UTC.
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        let date = Date::new(1970, Month::January, 1).unwrap();
-        TaiTime::from_generic_datetime(date, 0, 0, 10)
-            .unwrap()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
-
     /// Because the Unix epoch coincides with the `LocalDays` epoch, it can be constructed simply
     /// as a zero value.
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         LocalDays::from_time_since_epoch(Duration::new(0))
             .into_unit()
             .try_cast()
@@ -68,6 +57,18 @@ impl TimeScale for Unix {
 
     fn counts_leap_seconds() -> bool {
         false
+    }
+}
+
+impl FromTimeScale<Unix> for Unix {
+    fn from_time_scale<Representation, Period>(
+        from: TimePoint<Unix, Representation, Period>,
+    ) -> TimePoint<Self, Representation, Period>
+    where
+        Period: Unit,
+        Representation: TimeRepresentation,
+    {
+        from
     }
 }
 
@@ -87,7 +88,7 @@ impl From<std::time::SystemTime> for UnixTime<u128, crate::arithmetic::Nano> {
 /// Verifies this implementation by computing the `UnixTime` for some known time stamps.
 #[test]
 fn known_timestamps() {
-    use crate::duration::Seconds;
+    use crate::{Date, Month, Seconds};
     assert_eq!(
         UnixTime::from_generic_datetime(Date::new(1970, Month::January, 1).unwrap(), 0, 0, 0)
             .unwrap()
@@ -155,6 +156,7 @@ fn known_timestamps() {
 #[cfg(kani)]
 mod proof_harness {
     use super::*;
+    use crate::Month;
 
     /// Verifies that construction of a Unix time from a historic date and time stamp never panics.
     #[kani::proof]

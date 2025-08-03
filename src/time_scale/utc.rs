@@ -6,8 +6,8 @@ use num::Zero;
 use tinyvec::ArrayVec;
 
 use crate::{
-    Bdt, DateTimeError, FineDateTimeError, FromTimeScale, Glonasst, Gpst, Gst, LocalDays,
-    LocalTime, Qzsst, Tai, TaiTime, TimeScale, TryFromTimeScale, Tt, Unix, UnixTime,
+    DateTimeError, FromTimeScale, LocalDays, LocalTime, TaiTime, TerrestrialTimeScale, TimeScale,
+    TryFromTimeScale, Unix, UnixTime,
     arithmetic::{
         FromUnit, IntoUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute,
         TimeRepresentation, TryFromExact, Unit,
@@ -137,18 +137,9 @@ impl TimeScale for Utc {
 
     type NativeRepresentation = i64;
 
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        let date = Date::new(1970, January, 1).unwrap();
-        TaiTime::from_generic_datetime(date, 0, 0, 10)
-            .unwrap()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
-
     /// Because the UTC epoch coincides with the `LocalDays` epoch, it can be constructed simply
     /// as a zero value.
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         LocalDays::from_time_since_epoch(Duration::new(0i64))
             .into_unit()
             .try_cast()
@@ -256,42 +247,18 @@ impl TimeScale for Utc {
             }),
         }
     }
-
-    fn from_subsecond_local_datetime<Representation, Period>(
-        date: LocalDays<i64>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-        subseconds: Duration<Representation, Period>,
-    ) -> Result<TimePoint<Self, Representation, Period>, FineDateTimeError<Representation, Period>>
-    where
-        Period: Unit,
-        Representation: TimeRepresentation,
-        SecondsPerDay: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
-        SecondsPerHour: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
-        SecondsPerMinute: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
-        Second: IntoUnit<Period, Representation> + IntoUnit<Self::NativePeriod, i64>,
-    {
-        let one = Seconds::new(Representation::one()).into_unit();
-        let zero = Duration::zero();
-        if subseconds < zero || subseconds >= one {
-            return Err(FineDateTimeError::InvalidSubseconds { subseconds });
-        }
-
-        let seconds = Self::from_local_datetime(date, hour, minute, second)?
-            .try_cast()
-            .unwrap();
-        Ok(seconds.into_unit() + subseconds)
-    }
 }
 
-impl FromTimeScale<Tai> for Utc {}
-impl FromTimeScale<Tt> for Utc {}
-impl FromTimeScale<Glonasst> for Utc {}
-impl FromTimeScale<Qzsst> for Utc {}
-impl FromTimeScale<Gpst> for Utc {}
-impl FromTimeScale<Gst> for Utc {}
-impl FromTimeScale<Bdt> for Utc {}
+impl TerrestrialTimeScale for Utc {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
+        let date = Date::new(1970, January, 1).unwrap();
+        TaiTime::from_generic_datetime(date, 0, 0, 10)
+            .unwrap()
+            .into_unit()
+            .try_cast()
+            .unwrap()
+    }
+}
 
 impl TryFromTimeScale<Unix> for Utc {
     type Error = LeapSecondError;

@@ -2,8 +2,8 @@
 //! abbreviated as QZSST.
 
 use crate::{
-    Bdt, FromTimeScale, Glonasst, Gst, LeapSecondError, LocalTime, Tai, TaiTime, TimePoint,
-    TimeScale, TryFromTimeScale, Tt, Unix, Utc,
+    LeapSecondError, LocalTime, TaiTime, TerrestrialTimeScale, TimePoint, TimeScale,
+    TryFromTimeScale, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
@@ -24,15 +24,7 @@ impl TimeScale for Qzsst {
 
     type NativeRepresentation = i64;
 
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_generic_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
-            .unwrap()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
-
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         Date::new(1980, Month::January, 6)
             .unwrap()
             .to_local_days()
@@ -46,12 +38,15 @@ impl TimeScale for Qzsst {
     }
 }
 
-impl FromTimeScale<Bdt> for Qzsst {}
-impl FromTimeScale<Glonasst> for Qzsst {}
-impl FromTimeScale<Gst> for Qzsst {}
-impl FromTimeScale<Tai> for Qzsst {}
-impl FromTimeScale<Utc> for Qzsst {}
-impl FromTimeScale<Tt> for Qzsst {}
+impl TerrestrialTimeScale for Qzsst {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
+        TaiTime::from_generic_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
+            .unwrap()
+            .into_unit()
+            .try_cast()
+            .unwrap()
+    }
+}
 
 impl TryFromTimeScale<Unix> for Qzsst {
     type Error = LeapSecondError;

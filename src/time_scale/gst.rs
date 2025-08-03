@@ -1,8 +1,8 @@
 //! Implementation of the Galileo System Time (GST) time scale.
 
 use crate::{
-    Bdt, FromTimeScale, Glonasst, Gpst, LeapSecondError, LocalTime, Qzsst, Tai, TaiTime, TimePoint,
-    TimeScale, TryFromTimeScale, Tt, Unix, Utc,
+    LeapSecondError, LocalTime, TaiTime, TerrestrialTimeScale, TimePoint, TimeScale,
+    TryFromTimeScale, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
@@ -22,15 +22,7 @@ impl TimeScale for Gst {
 
     type NativeRepresentation = i64;
 
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_generic_datetime(Date::new(1999, Month::August, 22).unwrap(), 0, 0, 19)
-            .unwrap()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
-
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         Date::new(1999, Month::August, 22)
             .unwrap()
             .to_local_days()
@@ -44,13 +36,15 @@ impl TimeScale for Gst {
     }
 }
 
-impl FromTimeScale<Bdt> for Gst {}
-impl FromTimeScale<Glonasst> for Gst {}
-impl FromTimeScale<Gpst> for Gst {}
-impl FromTimeScale<Qzsst> for Gst {}
-impl FromTimeScale<Tai> for Gst {}
-impl FromTimeScale<Utc> for Gst {}
-impl FromTimeScale<Tt> for Gst {}
+impl TerrestrialTimeScale for Gst {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
+        TaiTime::from_generic_datetime(Date::new(1999, Month::August, 22).unwrap(), 0, 0, 19)
+            .unwrap()
+            .into_unit()
+            .try_cast()
+            .unwrap()
+    }
+}
 
 impl TryFromTimeScale<Unix> for Gst {
     type Error = LeapSecondError;

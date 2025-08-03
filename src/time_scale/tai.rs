@@ -3,8 +3,7 @@
 use num::Zero;
 
 use crate::{
-    Bdt, FromTimeScale, Glonasst, Gpst, Gst, LeapSecondError, LocalTime, Qzsst, Seconds,
-    TryFromTimeScale, Tt, Unix, Utc,
+    LeapSecondError, LocalTime, Seconds, TerrestrialTimeScale, TryFromTimeScale, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
     time_point::TimePoint,
@@ -25,12 +24,7 @@ impl TimeScale for Tai {
 
     type NativeRepresentation = i64;
 
-    /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TimePoint::from_time_since_epoch(Seconds::<i64>::zero().try_cast().unwrap())
-    }
-
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         Date::new(1958, Month::January, 1)
             .unwrap()
             .to_local_days()
@@ -44,13 +38,20 @@ impl TimeScale for Tai {
     }
 }
 
-impl FromTimeScale<Bdt> for Tai {}
-impl FromTimeScale<Tt> for Tai {}
-impl FromTimeScale<Glonasst> for Tai {}
-impl FromTimeScale<Qzsst> for Tai {}
-impl FromTimeScale<Gpst> for Tai {}
-impl FromTimeScale<Gst> for Tai {}
-impl FromTimeScale<Utc> for Tai {}
+impl TerrestrialTimeScale for Tai {
+    /// Since TAI is used as central time scale, its own reference epoch is at time point 0.
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
+        TimePoint::from_time_since_epoch(Seconds::<i64>::zero().try_cast().unwrap())
+    }
+}
+
+// impl FromTimeScale<Bdt> for Tai {}
+// impl FromTimeScale<Tt> for Tai {}
+// impl FromTimeScale<Glonasst> for Tai {}
+// impl FromTimeScale<Qzsst> for Tai {}
+// impl FromTimeScale<Gpst> for Tai {}
+// impl FromTimeScale<Gst> for Tai {}
+// impl FromTimeScale<Utc> for Tai {}
 
 impl TryFromTimeScale<Unix> for Tai {
     type Error = LeapSecondError;

@@ -1,8 +1,8 @@
 //! Implementation of the BeiDou Time (BDT) time scale.
 
 use crate::{
-    FromTimeScale, Glonasst, Gpst, Gst, LeapSecondError, LocalTime, Qzsst, Tai, TaiTime, TimePoint,
-    TimeScale, TryFromTimeScale, Tt, Unix, Utc,
+    LeapSecondError, LocalTime, TaiTime, TerrestrialTimeScale, TimePoint, TimeScale,
+    TryFromTimeScale, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
@@ -22,15 +22,7 @@ impl TimeScale for Bdt {
 
     type NativeRepresentation = i64;
 
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_datetime(2006, Month::January, 1, 0, 0, 33)
-            .unwrap()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
-
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         Date::new(2006, Month::January, 1)
             .unwrap()
             .to_local_days()
@@ -44,13 +36,15 @@ impl TimeScale for Bdt {
     }
 }
 
-impl FromTimeScale<Glonasst> for Bdt {}
-impl FromTimeScale<Gst> for Bdt {}
-impl FromTimeScale<Gpst> for Bdt {}
-impl FromTimeScale<Qzsst> for Bdt {}
-impl FromTimeScale<Tai> for Bdt {}
-impl FromTimeScale<Utc> for Bdt {}
-impl FromTimeScale<Tt> for Bdt {}
+impl TerrestrialTimeScale for Bdt {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
+        TaiTime::from_datetime(2006, Month::January, 1, 0, 0, 33)
+            .unwrap()
+            .into_unit()
+            .try_cast()
+            .unwrap()
+    }
+}
 
 impl TryFromTimeScale<Unix> for Bdt {
     type Error = LeapSecondError;

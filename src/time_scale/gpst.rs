@@ -2,8 +2,8 @@
 //! GPST.
 
 use crate::{
-    Bdt, FromTimeScale, Glonasst, Gst, LeapSecondError, LocalTime, Qzsst, Tai, TaiTime, TimePoint,
-    TimeScale, TryFromTimeScale, Tt, Unix, Utc,
+    LeapSecondError, LocalTime, TaiTime, TerrestrialTimeScale, TimePoint, TimeScale,
+    TryFromTimeScale, Unix, Utc,
     arithmetic::{FromUnit, Second, TimeRepresentation, TryFromExact, Unit},
     calendar::{Date, Month},
 };
@@ -22,15 +22,7 @@ impl TimeScale for Gpst {
 
     type NativeRepresentation = i64;
 
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_generic_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
-            .unwrap()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
-
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         Date::new(1980, Month::January, 6)
             .unwrap()
             .to_local_days()
@@ -44,13 +36,15 @@ impl TimeScale for Gpst {
     }
 }
 
-impl FromTimeScale<Bdt> for Gpst {}
-impl FromTimeScale<Glonasst> for Gpst {}
-impl FromTimeScale<Gst> for Gpst {}
-impl FromTimeScale<Qzsst> for Gpst {}
-impl FromTimeScale<Tai> for Gpst {}
-impl FromTimeScale<Utc> for Gpst {}
-impl FromTimeScale<Tt> for Gpst {}
+impl TerrestrialTimeScale for Gpst {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
+        TaiTime::from_generic_datetime(Date::new(1980, Month::January, 6).unwrap(), 0, 0, 19)
+            .unwrap()
+            .into_unit()
+            .try_cast()
+            .unwrap()
+    }
+}
 
 impl TryFromTimeScale<Unix> for Gpst {
     type Error = LeapSecondError;

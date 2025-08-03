@@ -1,8 +1,8 @@
 //! Implementation of the Terrestrial Time (TT) time scale.
 
 use crate::{
-    Bdt, Date, FromTimeScale, Glonasst, Gpst, Gst, LeapSecondError, LocalTime, Month, Qzsst, Tai,
-    TaiTime, TimePoint, TimeScale, TryFromTimeScale, Unix, Utc,
+    Date, LeapSecondError, LocalTime, Month, TaiTime, TerrestrialTimeScale, TimePoint, TimeScale,
+    TryFromTimeScale, Unix, Utc,
     arithmetic::{FromUnit, Milli, Second, TimeRepresentation, TryFromExact, Unit},
     duration::MilliSeconds,
 };
@@ -20,20 +20,9 @@ impl TimeScale for Tt {
 
     type NativeRepresentation = i128;
 
-    /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI. This means that
-    /// its epoch is precisely 1977-01-01T00:00:00 TAI.
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        let date = Date::new(1977, Month::January, 1).unwrap();
-        TaiTime::from_generic_datetime(date, 0, 0, 0)
-            .unwrap()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
-
     /// For practical reasons (conversion to and from TCG), it is convenient to set the TT epoch to
     /// 1977-01-01T00:00:32.184: at this time, TT and TCG match exactly (by definition).
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         let date = Date::new(1977, Month::January, 1).unwrap();
         let epoch = date.to_local_days().into_unit() + MilliSeconds::new(32_184);
         epoch.try_cast().unwrap()
@@ -44,13 +33,18 @@ impl TimeScale for Tt {
     }
 }
 
-impl FromTimeScale<Tai> for Tt {}
-impl FromTimeScale<Utc> for Tt {}
-impl FromTimeScale<Glonasst> for Tt {}
-impl FromTimeScale<Qzsst> for Tt {}
-impl FromTimeScale<Gpst> for Tt {}
-impl FromTimeScale<Gst> for Tt {}
-impl FromTimeScale<Bdt> for Tt {}
+impl TerrestrialTimeScale for Tt {
+    /// Terrestrial time is exactly (by definition) 32.184 seconds ahead of TAI. This means that
+    /// its epoch is precisely 1977-01-01T00:00:00 TAI.
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
+        let date = Date::new(1977, Month::January, 1).unwrap();
+        TaiTime::from_generic_datetime(date, 0, 0, 0)
+            .unwrap()
+            .into_unit()
+            .try_cast()
+            .unwrap()
+    }
+}
 
 impl TryFromTimeScale<Unix> for Tt {
     type Error = LeapSecondError;

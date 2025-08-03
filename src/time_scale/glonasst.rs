@@ -1,8 +1,8 @@
 //! Implementation of the GLONASS Time (GLONASST) time scale.
 
 use crate::{
-    Bdt, DateTimeError, Days, FromTimeScale, Gpst, Gst, LeapSecondError, LocalTime, Qzsst, Tai,
-    TaiTime, TimePoint, TimeScale, TryFromTimeScale, Tt, Unix, Utc,
+    DateTimeError, Days, LeapSecondError, LocalTime, TaiTime, TerrestrialTimeScale, TimePoint,
+    TimeScale, TryFromTimeScale, Unix, Utc,
     arithmetic::{
         FromUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, TimeRepresentation,
         TryFromExact, Unit,
@@ -25,18 +25,10 @@ impl TimeScale for Glonasst {
 
     type NativeRepresentation = i64;
 
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_datetime(1995, Month::December, 31, 21, 0, 29)
-            .unwrap()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
-
     /// The GLONASS epoch is 1996-01-01T00:00:00 UTC(SU). However, the GLONASS broadcast time is
     /// offset by +3h from UTC(SU) to match Moscow time. This means that its broadcast time (MSK)
     /// would have been 0 at 1996-01-01T00:00:00 MSK, which is what we define as epoch.
-    fn epoch_local() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
+    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
         Date::new(1996, Month::January, 1)
             .unwrap()
             .to_local_days()
@@ -132,13 +124,15 @@ impl TimeScale for Glonasst {
     }
 }
 
-impl FromTimeScale<Bdt> for Glonasst {}
-impl FromTimeScale<Gst> for Glonasst {}
-impl FromTimeScale<Gpst> for Glonasst {}
-impl FromTimeScale<Qzsst> for Glonasst {}
-impl FromTimeScale<Tai> for Glonasst {}
-impl FromTimeScale<Utc> for Glonasst {}
-impl FromTimeScale<Tt> for Glonasst {}
+impl TerrestrialTimeScale for Glonasst {
+    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
+        TaiTime::from_datetime(1995, Month::December, 31, 21, 0, 29)
+            .unwrap()
+            .into_unit()
+            .try_cast()
+            .unwrap()
+    }
+}
 
 impl TryFromTimeScale<Unix> for Glonasst {
     type Error = LeapSecondError;
