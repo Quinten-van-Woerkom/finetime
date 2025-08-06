@@ -7,7 +7,8 @@ use core::{
     ops::{Add, AddAssign, Div, Mul, Neg, Sub},
 };
 
-use num::{Bounded, Integer, Signed, Zero, traits::ConstZero};
+use num_integer::Integer;
+use num_traits::{Bounded, ConstZero, Signed, Zero};
 
 use crate::arithmetic::{
     Atto, ConversionRatio, Femto, Fraction, IntoUnit, Micro, Milli, Nano, Pico, Second,

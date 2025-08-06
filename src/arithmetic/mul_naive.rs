@@ -3,7 +3,7 @@
 
 use core::ops::{Div, Mul};
 
-use num::cast::FromPrimitive;
+use num_traits::cast::FromPrimitive;
 
 use crate::arithmetic::Fraction;
 

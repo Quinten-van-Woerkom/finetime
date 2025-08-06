@@ -2,7 +2,8 @@
 //! this is just regular multiplication.
 
 use i256::i256;
-use num::{Integer, ToPrimitive};
+use num_integer::Integer;
+use num_traits::{FromPrimitive, ToPrimitive};
 
 use crate::arithmetic::Fraction;
 
@@ -54,7 +55,7 @@ fn mul_round_bigint(value: i256, fraction: Fraction) -> i256 {
     let (result, remainder) = intermediate.div_rem(denominator);
     let twice = remainder + remainder;
 
-    use num::traits::{One, Zero};
+    use num_traits::{One, Zero};
     let one = i256::one();
     let zero = i256::zero();
 
@@ -69,7 +70,6 @@ fn mul_round_bigint(value: i256, fraction: Fraction) -> i256 {
 
 impl MulRound for f32 {
     fn mul_round(self, fraction: Fraction) -> Self {
-        use num::FromPrimitive;
         let numerator: f32 = f32::from_i128(fraction.numerator()).unwrap();
         let denominator: f32 = f32::from_i128(fraction.denominator()).unwrap();
         ((self * numerator) / denominator).round()
@@ -78,7 +78,6 @@ impl MulRound for f32 {
 
 impl MulRound for f64 {
     fn mul_round(self, fraction: Fraction) -> Self {
-        use num::FromPrimitive;
         let numerator: f64 = f64::from_i128(fraction.numerator()).unwrap();
         let denominator: f64 = f64::from_i128(fraction.denominator()).unwrap();
         ((self * numerator) / denominator).round()

@@ -1,6 +1,7 @@
 //! This file contains all logic related to `Fraction`s and operations on them.
 
-use num::{FromPrimitive, Integer, traits::NumOps};
+use num_integer::Integer;
+use num_traits::{FromPrimitive, NumOps};
 
 use crate::arithmetic::{DivCeil, DivFloor, TryFromExact};
 

@@ -2,7 +2,7 @@
 
 use core::fmt::Debug;
 
-use num::Zero;
+use num_traits::Zero;
 use tinyvec::ArrayVec;
 
 use crate::{

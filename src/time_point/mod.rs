@@ -7,7 +7,8 @@ use core::{
     ops::{Add, AddAssign, Sub},
 };
 
-use num::{Integer, Zero};
+use num_integer::Integer;
+use num_traits::Zero;
 
 use crate::{
     Date, DateTimeError, FineDateTimeError, FromTimeScale, GregorianDate, LocalTime, Month,

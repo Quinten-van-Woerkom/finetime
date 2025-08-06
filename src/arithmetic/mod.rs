@@ -18,7 +18,7 @@ pub use mul_naive::*;
 mod try_from_exact;
 pub use try_from_exact::*;
 
-use num::{FromPrimitive, One, Zero, traits::NumOps};
+use num_traits::{FromPrimitive, NumOps, One, Zero};
 
 /// Auxiliary trait that describes all functionality that is required of a time implementation.
 /// Primarily used to reduce the size of the `where` clauses in generic implementations, but also

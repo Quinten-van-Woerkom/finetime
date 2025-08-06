@@ -1,6 +1,6 @@
 //! Implementation of international atomic time (TAI).
 
-use num::Zero;
+use num_traits::Zero;
 
 use crate::{
     LeapSecondError, LocalTime, Seconds, TerrestrialTimeScale, TryFromTimeScale, Unix, Utc,
