@@ -1,9 +1,9 @@
 [package]
 name = "finetime"
 description = "High-fidelity time library for applications where sub-nanosecond accuracy and exact arithmetic are needed"
-version = "0.3.2"
+version = "0.3.3"
 edition = "2024"
-license = "AGPL-3.0-or-later"
+license = "MIT or Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/Quinten-van-Woerkom/finetime"
 
