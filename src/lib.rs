@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(not(feature = "std"), no_std)]
+#![forbid(unsafe_code)]
 mod calendar;
 pub use calendar::*;
 mod duration;
