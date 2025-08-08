@@ -125,4 +125,4 @@ Additionally, this means that the `Epoch` type cannot easily be extended to admi
 Additionally, the `finetime` `TimePoint` type is generic over the time scale used, the underlying tick count representation, and the units in which it is expressed.
 This makes it possible to natively use multiple time stamp types of differing time scale, bitwidth, and precision: all encoded safely and statically, to prevent mix-ups.
 Conversion routines are written to support convenient and zero-overhead casting to other `TimePoint` times, where they are compatible.
-Consequently, `hifitime` is suitable for subnanosecond applications as well as for scenarios where a wide time range must be represented, or at low storage overhead; even within the same program.
+Consequently, `finetime` is suitable for subnanosecond applications as well as for scenarios where a wide time range must be represented, or at low storage overhead; even within the same program.
