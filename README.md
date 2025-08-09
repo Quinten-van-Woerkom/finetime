@@ -107,17 +107,18 @@ assert_eq!(count, 32_184);
 ```
 This representation is nothing more than the number of time units contained in the `Duration`.
 
-## Comparison with `hifitime`, `chrono`, and `time`.
+## Comparison with `hifitime`, `chrono`, `time`, and `jiff`.
 There are a multitude of high-quality Rust timekeeping crates out there already.
-In particular, `chrono`, `time`, and `hifitime` will already cover most people's use cases.
-Most users will be interested in `chrono` and `time`, which are highly suitable for day-to-day timekeeping.
+In particular, `chrono`, `time`, `jiff`, and `hifitime` will already cover most people's use cases.
+Most users will be interested in `jiff`, `chrono` and `time`, which are highly suitable for day-to-day timekeeping.
 They handle civilian time zones (which `finetime` does not) and integrate much better with the operating system: however, they do not permit high-accuracy timestamps in frequently-used scientific and engineering time scales, like GPS, TAI, and TT. This makes them unsuitable for astrodynamics, physics, and engineering.
+For users that are not interested in such niche applications and time scales, any of `jiff`, `chrono`, and `time` will certainly handle your needs: `finetime` might as well, but is certainly not the only option.
 
-On the other hand, `hifitime` does handle such specialist time scales.
+On the other hand, `hifitime` does handle such specialist time scales (although, in turn, it does not cover civilian time scales beyond UTC).
 Additionally, `hifitime` supports nanosecond precision and is validated against the timekeeping part of the SPICE astrodynamics library.
 Yet, `hifitime`'s `Epoch` type is limited to nanosecond precision and uses a segmented time type that dynamically stores the underlying time standard used.
 This introduces quite some complexity in what could be a simple tick counting type.
-This complexity definitely does not affect its correctness: `hifitime` is well-validated.
+This complexity definitely does not affect its correctness at all: `hifitime` is well-validated.
 However, it does affect the efficiency of the time representation used: `Epoch` always consists of at least an 80-bit `Duration` and an at minimum 8-bit `TimeScale`.
 Additionally, this means that the `Epoch` type cannot easily be extended to admit subnanosecond accuracy: in some GNSS applications, such accuracy is becoming necessary.
 
