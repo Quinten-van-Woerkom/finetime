@@ -148,7 +148,7 @@ impl TimeScale for Utc {
             }
             // If the requested Unix time coincides with a leap second deletion, that means that we
             // cannot convert it to a valid UTC time.
-            LeapSecondsResult::DeletionPoint => Err(DateTimeError::LeapSecondDeletion {
+            LeapSecondsResult::DeletionPoint { .. } => Err(DateTimeError::LeapSecondDeletion {
                 date,
                 hour,
                 minute,
@@ -193,7 +193,9 @@ impl TryFromTimeScale<Unix> for Utc {
             LeapSecondsResult::InsertionPoint { start, end } => {
                 Err(LeapSecondError::Ambiguous { start, end })
             }
-            LeapSecondsResult::DeletionPoint => Err(LeapSecondError::Deletion),
+            LeapSecondsResult::DeletionPoint { start, end } => {
+                Err(LeapSecondError::Deletion { start, end })
+            }
         }
     }
 }
@@ -229,7 +231,10 @@ pub enum LeapSecondError {
         start: UtcTime<i64, Second>,
         end: UtcTime<i64, Second>,
     },
-    Deletion,
+    Deletion {
+        start: UtcTime<i64, Second>,
+        end: UtcTime<i64, Second>,
+    },
 }
 
 /// Describes the evolution of leap seconds over time.
@@ -255,22 +260,25 @@ impl LeapSecondsTable {
             // If we find a Unix time that coincides exactly with our desired Unix time, we must
             // inspect the leap second information to determine what is appropriate.
             if leap_second.unix_time == unix_time {
+                let time_since_epoch = unix_time.elapsed_time_since_epoch();
+                let start = time_since_epoch + leap_second_offset;
+                let start = UtcTime::from_time_since_epoch(start);
+                let end = time_since_epoch + leap_second.cumulative_offset;
+                let end = UtcTime::from_time_since_epoch(end);
                 match leap_second.event {
                     // If we find a leap second insertion, the Unix time stamp may be mapped to
                     // any time point within that range. We do not choose, but simply return the
                     // start (leap second, 23:59:60) and end (regular second, 00:00:00) of that
                     // range.
                     LeapSecondsEvent::Insertion => {
-                        let time_since_epoch = unix_time.elapsed_time_since_epoch();
-                        let start = time_since_epoch + leap_second_offset;
-                        let start = UtcTime::from_time_since_epoch(start);
-                        let end = time_since_epoch + leap_second.cumulative_offset;
-                        let end = UtcTime::from_time_since_epoch(end);
                         return LeapSecondsResult::InsertionPoint { start, end };
                     }
                     // If we encounter a deletion, we return a flag indicating as such so that the
-                    // caller can try to recover.
-                    LeapSecondsEvent::Deletion => return LeapSecondsResult::DeletionPoint,
+                    // caller can try to recover. We also return the start and end points of this
+                    // deletion, so that the caller may choose to clamp to one of those.
+                    LeapSecondsEvent::Deletion => {
+                        return LeapSecondsResult::DeletionPoint { start, end };
+                    }
                 }
             }
             // Otherwise, we update the leap second offset with the latest one and continue
@@ -339,7 +347,10 @@ pub(crate) enum LeapSecondsResult {
         start: UtcTime<i64>,
         end: UtcTime<i64>,
     },
-    DeletionPoint,
+    DeletionPoint {
+        start: UtcTime<i64>,
+        end: UtcTime<i64>,
+    },
 }
 
 /// Describes a leap second instance. Right after a leap second instance, the leap second offset
@@ -454,7 +465,7 @@ fn roundtrip_near_leap_seconds() {
                 assert_eq!(LEAP_SECONDS.to_unix(start), time);
                 assert_eq!(LEAP_SECONDS.to_unix(end), time);
             }
-            LeapSecondsResult::DeletionPoint => {
+            LeapSecondsResult::DeletionPoint { .. } => {
                 panic!("Unexpected deleted leap second found at {time:?}")
             }
         }
