@@ -96,6 +96,23 @@ pub trait TimeScale: Sized {
         let time_since_epoch = local_time.into_unit() - epoch;
         Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
+
+    /// Determines the calendar date to which this `TimePoint` belongs. Effectively the converse of
+    /// the `from_local_datetime` function, but the additional split into time-of-day is not made
+    /// because that is highly dependent on the accuracy of the incoming `TimePoint` and
+    /// `TimeScale`.
+    fn into_date(
+        time_point: TimePoint<Self, Self::NativeRepresentation, Self::NativePeriod>,
+    ) -> LocalDays<i64>
+    where
+        Self::NativePeriod: FromUnit<Self::NativePeriod, Self::NativeRepresentation>
+            + FromUnit<SecondsPerDay, Self::NativeRepresentation>,
+        Self::NativeRepresentation: TimeRepresentation + TryFromExact<Self::NativeRepresentation>,
+    {
+        // This default implementation is valid only for non-leap second implementations.
+        let local_time = time_point.as_local_time();
+        local_time.floor().try_cast().unwrap()
+    }
 }
 
 /// With "terrestrial time scale", a time scale is meant whose Platonic clock ticks in sync with an

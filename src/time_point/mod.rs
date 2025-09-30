@@ -11,8 +11,8 @@ use num_integer::Integer;
 use num_traits::Zero;
 
 use crate::{
-    Date, DateTimeError, FineDateTimeError, FromTimeScale, GregorianDate, LocalTime, Month,
-    Seconds, TryIntoTimeScale, Weeks,
+    Date, DateTimeError, FineDateTimeError, FromTimeScale, GregorianDate, Hours, LocalTime,
+    Minutes, Month, Seconds, TryIntoTimeScale, Weeks,
     arithmetic::{
         IntoUnit, Nano, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerWeek,
         TimeRepresentation, TryFromExact, TryIntoExact, Unit,
@@ -373,6 +373,118 @@ where
             epoch_native.try_cast::<Representation>().unwrap();
         let epoch: LocalTime<Representation, Period> = epoch_cast.into_unit();
         epoch + time_since_epoch
+    }
+
+    /// Returns the Gregorian date to which this time point corresponds.
+    pub fn gregorian_date(&self) -> GregorianDate
+    where
+        Scale: TimeScale,
+        Period:
+            FromUnit<Scale::NativePeriod, Representation> + FromUnit<SecondsPerDay, Representation>,
+        Representation: TimeRepresentation + TryFromExact<Scale::NativeRepresentation>,
+        Scale::NativeRepresentation:
+            TryFromExact<Representation> + TryFromExact<Scale::NativeRepresentation>,
+        Scale::NativePeriod: FromUnit<Period, Scale::NativeRepresentation>
+            + FromUnit<Scale::NativePeriod, Scale::NativeRepresentation>
+            + FromUnit<SecondsPerDay, Scale::NativeRepresentation>,
+    {
+        let native_time = self
+            .clone()
+            .try_cast::<Scale::NativeRepresentation>()
+            .unwrap()
+            .into_unit();
+        let local_time = Scale::into_date(native_time);
+        let local_days: LocalDays<i64> = local_time.floor().try_cast().unwrap();
+        local_days.into()
+    }
+
+    /// Returns the Gregorian date to which this time point corresponds, as well as the hours,
+    /// minutes, and seconds within that date.
+    pub fn gregorian_date_hms(&self) -> (GregorianDate, u8, u8, u8)
+    where
+        Scale: TimeScale,
+        Period: FromUnit<Scale::NativePeriod, Representation>
+            + FromUnit<SecondsPerDay, Representation>
+            + FromUnit<SecondsPerHour, Representation>
+            + FromUnit<SecondsPerMinute, Representation>
+            + FromUnit<Second, Representation>,
+        Representation:
+            TimeRepresentation + TryFromExact<Scale::NativeRepresentation> + TryInto<u8> + Copy,
+    {
+        let local_time = self.as_local_time();
+        let local_days_floor: LocalDays<Representation> = local_time.floor();
+        let local_days_accurate: LocalTime<Representation, Period> = local_days_floor.into_unit();
+        let local_days: LocalDays<i64> = local_days_floor.try_cast().unwrap();
+        let gregorian_date = local_days.into();
+
+        let hours: Hours<Representation> = (local_time - local_days_accurate).floor();
+        let minutes: Minutes<Representation> =
+            (local_time - local_days_accurate - hours.into_unit()).floor();
+        let seconds: Seconds<Representation> =
+            (local_time - local_days_accurate - hours.into_unit() - minutes.into_unit()).floor();
+
+        let hours = match hours.count().try_into() {
+            Ok(hours) => hours,
+            Err(_) => panic!("Internal error: encountered hours value that cannot fit in u8"),
+        };
+        let minutes = match minutes.count().try_into() {
+            Ok(minutes) => minutes,
+            Err(_) => panic!("Internal error: encountered minutes value that cannot fit in u8"),
+        };
+        let seconds = match seconds.count().try_into() {
+            Ok(seconds) => seconds,
+            Err(_) => panic!("Internal error: encountered seconds value that cannot fit in u8"),
+        };
+
+        (gregorian_date, hours, minutes, seconds)
+    }
+
+    /// Returns the Gregorian date to which this time point corresponds, as well as the hours,
+    /// minutes, seconds, and subseconds within that date.
+    pub fn gregorian_date_hms_subseconds(
+        &self,
+    ) -> (GregorianDate, u8, u8, u8, Duration<Representation, Period>)
+    where
+        Scale: TimeScale,
+        Period: FromUnit<Scale::NativePeriod, Representation>
+            + FromUnit<SecondsPerDay, Representation>
+            + FromUnit<SecondsPerHour, Representation>
+            + FromUnit<SecondsPerMinute, Representation>
+            + FromUnit<Second, Representation>,
+        Representation:
+            TimeRepresentation + TryFromExact<Scale::NativeRepresentation> + TryInto<u8> + Copy,
+    {
+        let local_time = self.as_local_time();
+        let local_days_floor: LocalDays<Representation> = local_time.floor();
+        let local_days_accurate: LocalTime<Representation, Period> = local_days_floor.into_unit();
+        let local_days: LocalDays<i64> = local_days_floor.try_cast().unwrap();
+        let gregorian_date = local_days.into();
+
+        let hours: Hours<Representation> = (local_time - local_days_accurate).floor();
+        let minutes: Minutes<Representation> =
+            (local_time - local_days_accurate - hours.into_unit()).floor();
+        let seconds: Seconds<Representation> =
+            (local_time - local_days_accurate - hours.into_unit() - minutes.into_unit()).floor();
+        let subseconds = local_time
+            - local_days_accurate
+            - hours.into_unit()
+            - minutes.into_unit()
+            - seconds.into_unit();
+
+        let hours = match hours.count().try_into() {
+            Ok(hours) => hours,
+            Err(_) => panic!("Internal error: encountered hours value that cannot fit in u8"),
+        };
+        let minutes = match minutes.count().try_into() {
+            Ok(minutes) => minutes,
+            Err(_) => panic!("Internal error: encountered minutes value that cannot fit in u8"),
+        };
+        let seconds = match seconds.count().try_into() {
+            Ok(seconds) => seconds,
+            Err(_) => panic!("Internal error: encountered seconds value that cannot fit in u8"),
+        };
+
+        (gregorian_date, hours, minutes, seconds, subseconds)
     }
 }
 

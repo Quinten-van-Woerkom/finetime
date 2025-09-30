@@ -72,6 +72,17 @@ fn known_timestamps() {
     assert_eq!(utc, gst.into_time_scale());
 }
 
+#[test]
+fn date_decomposition() {
+    let time = GalileoTime::from_datetime(1999, Month::August, 22, 0, 0, 0).unwrap();
+    assert_eq!(time.gregorian_date().year(), 1999);
+    assert_eq!(time.gregorian_date().month(), Month::August);
+    assert_eq!(time.gregorian_date().day(), 22);
+    assert_eq!(time.gregorian_date_hms().1, 0);
+    assert_eq!(time.gregorian_date_hms().2, 0);
+    assert_eq!(time.gregorian_date_hms().3, 0);
+}
+
 #[cfg(kani)]
 mod proof_harness {
     use super::*;

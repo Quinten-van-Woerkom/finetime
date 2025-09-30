@@ -167,3 +167,30 @@ fn known_timestamps() {
     assert_eq!(utc, glonasst.into_time_scale());
     assert_eq!(glonasst.elapsed_time_since_epoch(), Seconds::new(0));
 }
+
+#[cfg(test)]
+fn date_roundtrip(year: i32, month: Month, day: u8, hour: u8, minute: u8, second: u8) {
+    let time = GlonassTime::from_datetime(year, month, day, hour, minute, second).unwrap();
+    assert_eq!(time.gregorian_date().year(), year);
+    assert_eq!(time.gregorian_date().month(), month);
+    assert_eq!(time.gregorian_date().day(), day);
+    assert_eq!(time.gregorian_date_hms().1, hour);
+    assert_eq!(time.gregorian_date_hms().2, minute);
+    assert_eq!(time.gregorian_date_hms().3, second);
+}
+
+#[test]
+fn date_decomposition() {
+    date_roundtrip(1999, Month::August, 22, 0, 0, 0);
+    date_roundtrip(1958, Month::January, 1, 0, 0, 0);
+    date_roundtrip(1958, Month::January, 2, 0, 0, 0);
+    date_roundtrip(1960, Month::January, 1, 0, 0, 0);
+    date_roundtrip(1961, Month::January, 1, 0, 0, 0);
+    date_roundtrip(1970, Month::January, 1, 0, 0, 0);
+    date_roundtrip(1976, Month::January, 1, 0, 0, 0);
+    date_roundtrip(2025, Month::July, 16, 16, 23, 24);
+    date_roundtrip(2034, Month::December, 26, 8, 2, 37);
+    date_roundtrip(2760, Month::April, 1, 21, 59, 58);
+    date_roundtrip(1643, Month::January, 4, 1, 1, 33);
+    date_roundtrip(1996, Month::January, 1, 3, 0, 0);
+}

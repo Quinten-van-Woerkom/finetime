@@ -71,6 +71,16 @@ fn known_timestamps() {
     let bdt = BeiDouTime::from_datetime(2006, Month::January, 1, 0, 0, 0).unwrap();
     assert_eq!(utc, bdt.into_time_scale());
 }
+#[test]
+fn date_decomposition() {
+    let time = BeiDouTime::from_datetime(2006, Month::January, 12, 13, 1, 24).unwrap();
+    assert_eq!(time.gregorian_date().year(), 2006);
+    assert_eq!(time.gregorian_date().month(), Month::January);
+    assert_eq!(time.gregorian_date().day(), 12);
+    assert_eq!(time.gregorian_date_hms().1, 13);
+    assert_eq!(time.gregorian_date_hms().2, 1);
+    assert_eq!(time.gregorian_date_hms().3, 24);
+}
 
 #[cfg(kani)]
 mod proof_harness {

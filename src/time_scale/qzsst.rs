@@ -73,6 +73,17 @@ fn known_timestamps() {
     assert_eq!(tai, qzsst.into_time_scale());
 }
 
+#[test]
+fn date_decomposition() {
+    let time = QzssTime::from_datetime(2004, Month::May, 14, 16, 43, 13).unwrap();
+    assert_eq!(time.gregorian_date().year(), 2004);
+    assert_eq!(time.gregorian_date().month(), Month::May);
+    assert_eq!(time.gregorian_date().day(), 14);
+    assert_eq!(time.gregorian_date_hms().1, 16);
+    assert_eq!(time.gregorian_date_hms().2, 43);
+    assert_eq!(time.gregorian_date_hms().3, 13);
+}
+
 #[cfg(kani)]
 mod proof_harness {
     use super::*;

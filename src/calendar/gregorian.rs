@@ -36,6 +36,49 @@ impl GregorianDate {
         }
     }
 
+    /// Constructs a Gregorian date from a given `LocalDays<i64>` instance. Useful primarily when
+    /// an existing `LocalDays` must be printed in human-readable format.
+    ///
+    /// Uses Howard Hinnant's `civil_from_days` algorithm.
+    pub fn from_local_days(local_days: LocalDays<i64>) -> Self {
+        let days = local_days.elapsed_time_since_epoch().count();
+        // Shift epoch from 1970-01-01 to 0000-03-01
+        let z = days + 719468; // 719468 days from 0000-03-01 to 1970-01-01
+
+        let era = if z >= 0 {
+            z / 146097
+        } else {
+            (z - 146096) / 146097
+        };
+
+        let doe = z - era * 146097; // [0, 146096]
+        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365; // [0, 399]
+        let y = yoe + era * 400;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
+        let mp = (5 * doy + 2) / 153; // [0, 11]
+        let d = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
+        let m = mp + if mp < 10 { 3 } else { -9 }; // [1, 12]
+        let year = (y + if m <= 2 { 1 } else { 0 }) as i32;
+        let month = match m as u8 {
+            1 => Month::January,
+            2 => Month::February,
+            3 => Month::March,
+            4 => Month::April,
+            5 => Month::May,
+            6 => Month::June,
+            7 => Month::July,
+            8 => Month::August,
+            9 => Month::September,
+            10 => Month::October,
+            11 => Month::November,
+            12 => Month::December,
+            _ => unreachable!(),
+        };
+        let day = d as u8;
+
+        Self { year, month, day }
+    }
+
     /// Constructs a MJD from a given Gregorian date. Applies a slight variation on the approach
     /// described by Meeus in Astronomical Algorithms (Chapter 7, Julian Day). This variation
     /// adapts the algorithm to the Unix epoch, and removes the dependency on floating point
@@ -117,6 +160,12 @@ impl GregorianDate {
 impl From<GregorianDate> for LocalDays<i64> {
     fn from(value: GregorianDate) -> Self {
         value.to_local_days()
+    }
+}
+
+impl From<LocalDays<i64>> for GregorianDate {
+    fn from(value: LocalDays<i64>) -> Self {
+        Self::from_local_days(value)
     }
 }
 
