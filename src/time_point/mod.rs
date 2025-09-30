@@ -393,7 +393,7 @@ where
             .try_cast::<Scale::NativeRepresentation>()
             .unwrap()
             .into_unit();
-        let local_time = Scale::into_date(native_time);
+        let local_time = Scale::epoch() + native_time.elapsed_time_since_epoch();
         let local_days: LocalDays<i64> = local_time.floor().try_cast().unwrap();
         local_days.into()
     }
