@@ -13,8 +13,9 @@ use crate::{
     TryMul,
     fraction::{Fraction, MulCeil, MulFloor, MulRound},
     units::{
-        Atto, Convert, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay, SecondsPerHour,
-        SecondsPerMinute, SecondsPerMonth, SecondsPerWeek, SecondsPerYear, TryConvert, UnitRatio,
+        Atto, Convert, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay, SecondsPerHalfDay,
+        SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek, SecondsPerYear,
+        TryConvert, UnitRatio,
     },
 };
 
@@ -22,7 +23,7 @@ use crate::{
 /// `Representation`, which determines how the count of elapsed ticks is stored. The `Period`
 /// determines the integer (!) ratio of each tick to seconds. This may be used to convert between
 /// `Duration`s of differing time units.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug)]
 pub struct Duration<Representation, Period = Second> {
     count: Representation,
     period: core::marker::PhantomData<Period>,
@@ -40,7 +41,7 @@ impl<Representation, Period> Duration<Representation, Period> {
     /// Returns the raw number of time units contained in this `Duration`. It is advised not to
     /// use this function unless absolutely necessary, as it effectively throws away all time unit
     /// information and safety.
-    pub fn count(&self) -> Representation
+    pub const fn count(&self) -> Representation
     where
         Representation: Copy,
     {
@@ -145,6 +146,58 @@ impl<Representation: kani::Arbitrary, Period> kani::Arbitrary for Duration<Repre
     }
 }
 
+impl<Representation, Period> Copy for Duration<Representation, Period> where Representation: Copy {}
+
+impl<Representation, Period> Clone for Duration<Representation, Period>
+where
+    Representation: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            count: self.count.clone(),
+            period: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<Representation, Period> PartialEq for Duration<Representation, Period>
+where
+    Representation: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.count == other.count
+    }
+}
+
+impl<Representation, Period> Eq for Duration<Representation, Period> where Representation: Eq {}
+
+impl<Representation, Period> PartialOrd for Duration<Representation, Period>
+where
+    Representation: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.count.partial_cmp(&other.count)
+    }
+}
+
+impl<Representation, Period> Ord for Duration<Representation, Period>
+where
+    Representation: Ord,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.count.cmp(&other.count)
+    }
+}
+
+impl<Representation, Period> Hash for Duration<Representation, Period>
+where
+    Representation: Hash,
+{
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.count.hash(state);
+    }
+}
+
 /// A duration that is expressed in terms of attoseconds.
 pub type AttoSeconds<T> = Duration<T, Atto>;
 /// A duration that is expressed in units of femtoseconds.
@@ -163,6 +216,8 @@ pub type Seconds<T> = Duration<T, Second>;
 pub type Minutes<T> = Duration<T, SecondsPerMinute>;
 /// A duration that is expressed in units of hours.
 pub type Hours<T> = Duration<T, SecondsPerHour>;
+/// A duration that is expressed in units of half days.
+pub type HalfDays<T> = Duration<T, SecondsPerHalfDay>;
 /// A duration that is expressed in units of days.
 pub type Days<T> = Duration<T, SecondsPerDay>;
 /// A duration that is expressed in terms of weeks.

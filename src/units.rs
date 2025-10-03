@@ -13,6 +13,30 @@ pub trait Convert<From, Into> {
     fn convert(self) -> Self;
 }
 
+macro_rules! impl_identity_conversion {
+    ($repr:ty) => {
+        impl<T> Convert<T, T> for $repr
+        where
+            T: UnitRatio,
+        {
+            fn convert(self) -> Self {
+                self
+            }
+        }
+    };
+}
+
+impl_identity_conversion!(u8);
+impl_identity_conversion!(u16);
+impl_identity_conversion!(u32);
+impl_identity_conversion!(u64);
+impl_identity_conversion!(u128);
+impl_identity_conversion!(i8);
+impl_identity_conversion!(i16);
+impl_identity_conversion!(i32);
+impl_identity_conversion!(i64);
+impl_identity_conversion!(i128);
+
 impl<From, Into> Convert<From, Into> for f64
 where
     From: UnitRatio,
@@ -143,6 +167,9 @@ valid_integer_conversions!(Exa => Peta, Tera, Giga, Mega, Kilo, Hecto, Deca, Sec
 pub type Second = LiteralRatio<1>;
 pub type SecondsPerMinute = LiteralRatio<60>;
 pub type SecondsPerHour = LiteralRatio<3600>;
+/// Represents the number of seconds in half a day. Rather arbitrary "unit ratio", but turns out to
+/// be useful in representing Julian days and modified Julian days.
+pub type SecondsPerHalfDay = LiteralRatio<43200>;
 pub type SecondsPerDay = LiteralRatio<86400>;
 pub type SecondsPerWeek = LiteralRatio<604800>;
 /// The number of seconds in 1/12 the average Gregorian year.
@@ -153,10 +180,11 @@ pub type SecondsPerYear = LiteralRatio<31556952>;
 // Conversions specific to time units
 valid_integer_conversions!(SecondsPerMinute => Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
 valid_integer_conversions!(SecondsPerHour => SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerDay => SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerWeek => SecondsPerDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerMonth => SecondsPerWeek, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
-valid_integer_conversions!(SecondsPerYear => SecondsPerMonth, SecondsPerWeek, SecondsPerDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerHalfDay => SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerDay => SecondsPerHalfDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerWeek => SecondsPerDay, SecondsPerHalfDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerMonth => SecondsPerWeek, SecondsPerDay, SecondsPerHalfDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
+valid_integer_conversions!(SecondsPerYear => SecondsPerMonth, SecondsPerWeek, SecondsPerDay, SecondsPerHalfDay, SecondsPerHour, SecondsPerMinute, Second, Deci, Centi, Milli, Micro, Nano, Pico, Femto, Atto);
 
 // Binary fractions of X bytes
 pub type BinaryFraction1 = LiteralRatio<1, 0x100>;
