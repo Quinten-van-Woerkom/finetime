@@ -2,96 +2,73 @@
 //! types are little more than labels that are associated with a given ratio to SI seconds, as may
 //! be used to convert between arbitrary time periods.
 
-use crate::arithmetic::Fraction;
+use crate::fraction::{Fraction, TryMul};
 
-/// Trait used to describe a time unit. Such units are always defined as an exact ratio to SI
-/// seconds. Based on this ratio, conversions to other units are defined.
-///
-/// Units that are larger than 1 second (e.g., a minute) shall have a `RATIO` that is larger than
-/// one. Smaller units shall have a smaller `RATIO` value.
-pub trait Unit {
-    const RATIO: Fraction;
+/// Trait representing a lossless conversion from one unit to another. Note that the underlying
+/// value representation stays the same. For floating point representations, floating point
+/// rounding is permitted.
+pub trait Convert<From, Into> {
+    /// Converts from one unit into another. Shall only be used for exact conversions, without
+    /// rounding error. Floating point errors are permitted.
+    fn convert(self) -> Self;
 }
 
-/// Time unit that is described as an exact ratio with respect to seconds.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct LiteralRatio<const NUMERATOR: i128, const DENOMINATOR: i128 = 1> {}
-
-impl<const NUMERATOR: i128, const DENOMINATOR: i128> Unit for LiteralRatio<NUMERATOR, DENOMINATOR> {
-    const RATIO: Fraction = Fraction::new(NUMERATOR, DENOMINATOR);
-}
-
-/// This trait is used as helper trait to compute the conversion ratio between two units. It is
-/// separate from the `UnitConversion` trait because that trait depends on whether the
-/// underlying representation can store fractional results: the actual conversion ratio shall
-/// always remain the same, so is encoded separately. This allows it to be used in functions that
-/// dynamically test whether a conversion with a given representation succeed exactly (like
-/// `Duration::try_convert`).
-pub trait ConversionRatio<To: Unit>: Unit {
-    const CONVERSION_RATIO: Fraction;
-}
-
-impl<From: Unit, To: Unit> ConversionRatio<To> for From {
-    const CONVERSION_RATIO: Fraction = From::RATIO.divide_by(&To::RATIO);
-}
-
-/// This trait indicates whether it is possible to convert a `Duration` or `TimePoint` with the
-/// given underlying representation from units of `From` to `To`. It is advised not to implement
-/// this trait directly, but rather to implement `FromUnit`. This trait will then be derived
-/// automatically.
-pub trait IntoUnit<To: Unit, Representation>: ConversionRatio<To> {}
-
-/// This trait indicates whether it is possible to convert a `Duration` or `TimePoint` with the
-/// given underlying representation from units of `From` to `To`. It has a similar relationship to
-/// `IntoUnit` as `From` has to `Into`.
-///
-/// It is advised to always implement `FromUnit`: `IntoUnit` is derived automatically.
-pub trait FromUnit<From: Unit, Representation>: ConversionRatio<From> {}
-
-impl<From: Unit, To: Unit, Representation> IntoUnit<To, Representation> for From where
-    To: FromUnit<From, Representation>
+impl<From, Into> Convert<From, Into> for f64
+where
+    From: UnitRatio,
+    Into: UnitRatio,
 {
+    fn convert(self) -> Self {
+        let combined_ratio = From::FRACTION.divide_by(&Into::FRACTION);
+        combined_ratio * self
+    }
 }
 
-/// Floating point types support conversions to and from all unit ratios, because they do not lose
-/// significant precision when multiplying with non-integer values.
-impl<From: Unit, To: Unit> FromUnit<From, f32> for To {}
-
-/// Floating point types support conversions to and from all unit ratios, because they do not lose
-/// significant precision when multiplying with non-integer values.
-impl<From: Unit, To: Unit> FromUnit<From, f64> for To {}
-
-// For all integers, a conversion from a unit to itself is still valid.
-impl<R: Unit> FromUnit<R, u8> for R {}
-impl<R: Unit> FromUnit<R, u16> for R {}
-impl<R: Unit> FromUnit<R, u32> for R {}
-impl<R: Unit> FromUnit<R, u64> for R {}
-impl<R: Unit> FromUnit<R, u128> for R {}
-impl<R: Unit> FromUnit<R, i8> for R {}
-impl<R: Unit> FromUnit<R, i16> for R {}
-impl<R: Unit> FromUnit<R, i32> for R {}
-impl<R: Unit> FromUnit<R, i64> for R {}
-impl<R: Unit> FromUnit<R, i128> for R {}
-
-macro_rules! is_valid_conversion {
-    ($type:ty, $from:ty, $to:ty) => {
-        impl FromUnit<$from, $type> for $to {}
-    };
+impl<From, Into> Convert<From, Into> for f32
+where
+    From: UnitRatio,
+    Into: UnitRatio,
+{
+    fn convert(self) -> Self {
+        let combined_ratio = From::FRACTION.divide_by(&Into::FRACTION);
+        combined_ratio * self
+    }
 }
 
-macro_rules! is_valid_integer_conversion {
-    ($from:ty, $to:ty) => {
-        is_valid_conversion!(u8, $from, $to);
-        is_valid_conversion!(u16, $from, $to);
-        is_valid_conversion!(u32, $from, $to);
-        is_valid_conversion!(u64, $from, $to);
-        is_valid_conversion!(u128, $from, $to);
-        is_valid_conversion!(i8, $from, $to);
-        is_valid_conversion!(i16, $from, $to);
-        is_valid_conversion!(i32, $from, $to);
-        is_valid_conversion!(i64, $from, $to);
-        is_valid_conversion!(i128, $from, $to);
-    };
+/// Trait representing a fallible conversion from one unit to another, failing if the requested
+/// conversion cannot be computed losslessly. For floating point representations, this conversion
+/// shall always succeed.
+pub trait TryConvert<From, Into>: Sized {
+    /// Tries to convert from one unit into another. If the conversion would result in significant
+    /// (non floating point) rounding error, returns `None`.
+    fn try_convert(self) -> Option<Self>;
+}
+
+impl<T, From, Into> TryConvert<From, Into> for T
+where
+    T: TryMul<Fraction, Output = T>,
+    From: UnitRatio,
+    Into: UnitRatio,
+{
+    fn try_convert(self) -> Option<Self> {
+        let combined_ratio = From::FRACTION.divide_by(&Into::FRACTION);
+        self.try_mul(combined_ratio)
+    }
+}
+
+/// Trait representing the fact that something is a unit ratio.
+pub trait UnitRatio {
+    const FRACTION: Fraction;
+}
+
+/// Unit that is described as an exact ratio with respect to unity.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum LiteralRatio<const NUMERATOR: u64, const DENOMINATOR: u64 = 1> {}
+
+impl<const NUMERATOR: u64, const DENOMINATOR: u64> UnitRatio
+    for LiteralRatio<NUMERATOR, DENOMINATOR>
+{
+    const FRACTION: Fraction = Fraction::new(NUMERATOR, DENOMINATOR);
 }
 
 macro_rules! valid_integer_conversions {
@@ -99,9 +76,31 @@ macro_rules! valid_integer_conversions {
         $from:ty => $( $to:ty ),+ $(,)?
     ) => {
         $(
-            is_valid_integer_conversion!($from, $to);
+            valid_integer_conversion!(u8, $from, $to);
+            valid_integer_conversion!(u16, $from, $to);
+            valid_integer_conversion!(u32, $from, $to);
+            valid_integer_conversion!(u64, $from, $to);
+            valid_integer_conversion!(u128, $from, $to);
+            valid_integer_conversion!(i8, $from, $to);
+            valid_integer_conversion!(i16, $from, $to);
+            valid_integer_conversion!(i32, $from, $to);
+            valid_integer_conversion!(i64, $from, $to);
+            valid_integer_conversion!(i128, $from, $to);
         )+
-    }
+    };
+}
+
+macro_rules! valid_integer_conversion {
+    ($repr:ty, $from:ty, $into:ty) => {
+        impl Convert<$from, $into> for $repr {
+            fn convert(self) -> Self {
+                let combined_ratio = <$from>::FRACTION.divide_by(&<$into>::FRACTION);
+                // For any conversion ratio that is lossless, this division will not truncate.
+                let factor = combined_ratio.numerator() / combined_ratio.denominator();
+                self * (factor as Self)
+            }
+        }
+    };
 }
 
 // SI unit qualifiers
