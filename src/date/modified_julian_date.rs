@@ -6,30 +6,33 @@ use core::ops::{Add, Sub};
 
 use crate::{
     Convert, Date, Duration, InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate, Month,
-    UnitRatio, duration::Days, units::SecondsPerDay,
+    duration::Days, units::SecondsPerDay,
 };
 
 /// The Modified Julian Day (MJD) representation of any given date.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ModifiedJulianDate<Representation, Period = SecondsPerDay> {
-    day: Duration<Representation, Period>,
+    time_since_epoch: Duration<Representation, Period>,
 }
 
-/// The Julian date of the Unix epoch is useful as constant in some calculations.
-pub const MODIFIED_JULIAN_DATE_UNIX_EPOCH: Days<i32> = Days::new(40587);
-
-impl<Representation, Period> ModifiedJulianDate<Representation, Period>
-where
-    Period: UnitRatio,
-{
-    /// Constructs a new MJD directly from some duration since the MJD epoch, November 17 1858.
-    pub const fn from_time_since_epoch(day: Duration<Representation, Period>) -> Self {
-        Self { day }
-    }
-}
+/// The modified Julian date of the Unix epoch is useful as constant in some calculations.
+const MODIFIED_JULIAN_DATE_UNIX_EPOCH: Days<i32> = Days::new(40587);
 
 impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
-    /// Constructs a Julian date from some given calendar date.
+    /// Constructs a new MJD directly from some duration since the MJD epoch, November 17 1858.
+    pub const fn from_time_since_epoch(time_since_epoch: Duration<Representation, Period>) -> Self {
+        Self { time_since_epoch }
+    }
+
+    /// Returns the time since the MJD epoch of this day.
+    pub const fn time_since_epoch(&self) -> Duration<Representation, Period>
+    where
+        Representation: Copy,
+    {
+        self.time_since_epoch
+    }
+
+    /// Constructs a modified Julian date from some given calendar date.
     pub fn from_date(date: Date<Representation>) -> Self
     where
         Representation: Copy
@@ -38,11 +41,12 @@ impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
             + Convert<SecondsPerDay, Period>,
     {
         Self {
-            day: date.time_since_epoch().into_unit()
+            time_since_epoch: date.time_since_epoch().into_unit()
                 + MODIFIED_JULIAN_DATE_UNIX_EPOCH.cast().into_unit(),
         }
     }
 
+    /// Converts this modified Julian date into the equivalent "universal" calendar date.
     pub fn to_date(&self) -> Date<Representation>
     where
         Representation: Copy
@@ -50,11 +54,34 @@ impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
             + Sub<Representation, Output = Representation>
             + Convert<Period, SecondsPerDay>,
     {
-        Date::from_time_since_epoch(self.day.into_unit() - MODIFIED_JULIAN_DATE_UNIX_EPOCH.cast())
+        Date::from_time_since_epoch(
+            self.time_since_epoch.into_unit() - MODIFIED_JULIAN_DATE_UNIX_EPOCH.cast(),
+        )
+    }
+
+    /// Infallibly converts towards a different representation.
+    pub fn cast<Target>(self) -> ModifiedJulianDate<Target, Period>
+    where
+        Representation: Into<Target>,
+    {
+        ModifiedJulianDate::from_time_since_epoch(self.time_since_epoch.cast())
+    }
+
+    /// Converts towards a different representation. If the underlying representation cannot store
+    /// the result of this cast, returns `None`.
+    pub fn try_cast<Target>(
+        self,
+    ) -> Result<ModifiedJulianDate<Target, Period>, <Representation as TryInto<Target>>::Error>
+    where
+        Representation: TryInto<Target>,
+    {
+        Ok(ModifiedJulianDate::from_time_since_epoch(
+            self.time_since_epoch.try_cast()?,
+        ))
     }
 }
 
-impl ModifiedJulianDate<i64> {
+impl ModifiedJulianDate<i32> {
     /// Creates a `Date` based on a year-month-day date in the historic calendar.
     pub fn from_historic_date(
         year: i32,
@@ -186,23 +213,31 @@ fn historic_dates_from_meeus() {
     );
 }
 
+/// In practical astrodynamical calculations, it is often useful to be able to create a modified
+/// Julian date directly from some known calendar date. However, such calculations must generally
+/// be done in floating point arithmetic: this test shows that it is possible to straightforwardly
+/// create a float MJD value from some calendar date using a single `cast()`.
+#[test]
+fn float_mjd_from_date() {
+    let mjd = ModifiedJulianDate::from_historic_date(1997, Month::April, 20)
+        .unwrap()
+        .cast();
+    let time_since_epoch = mjd.time_since_epoch();
+    assert_eq!(time_since_epoch, Days::new(50558.0f64));
+}
+
 #[cfg(kani)]
 mod proof_harness {
     use super::*;
 
-    /// Verifies that construction of a MJD based on a historic date never panics.
+    /// Verifies that construction of a MJD based on a date never panics, assuming that the input
+    /// date is between validity bounds based on `i32` limits.
     #[kani::proof]
-    fn from_historic_date_never_panics() {
-        use crate::HistoricDate;
-        let date: HistoricDate = kani::any();
-        let _ = ModifiedJulianDate::<i64>::from_date(date.into());
-    }
-
-    /// Verifies that construction of a MJD based on a Gregorian date never panics.
-    #[kani::proof]
-    fn from_gregorian_never_panics() {
-        use crate::GregorianDate;
-        let date: GregorianDate = kani::any();
-        let _ = ModifiedJulianDate::<i64>::from_date(date.into());
+    fn from_date_never_panics() {
+        let date: Date<i32> = kani::any();
+        kani::assume(
+            date.time_since_epoch().count() <= i32::MAX - MODIFIED_JULIAN_DATE_UNIX_EPOCH.count(),
+        );
+        let _ = ModifiedJulianDate::<i32>::from_date(date);
     }
 }

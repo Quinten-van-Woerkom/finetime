@@ -46,9 +46,33 @@ impl<Representation> Date<Representation> {
     {
         self.time_since_epoch
     }
+
+    /// Casts this date into an equivalent one with another underlying representation. Only
+    /// supports lossless conversions.
+    pub fn cast<Target>(self) -> Date<Target>
+    where
+        Representation: Into<Target>,
+    {
+        Date {
+            time_since_epoch: self.time_since_epoch.cast(),
+        }
+    }
+
+    /// Casts this date into an equivalent one with another underlying representation. Only
+    /// supports lossless conversions: if the result would lose information, returns `None`.
+    pub fn try_cast<Target>(
+        self,
+    ) -> Result<Date<Target>, <Representation as TryInto<Target>>::Error>
+    where
+        Representation: TryInto<Target>,
+    {
+        Ok(Date {
+            time_since_epoch: self.time_since_epoch.try_cast()?,
+        })
+    }
 }
 
-impl Date<i64> {
+impl Date<i32> {
     /// Creates a `Date` based on a year-month-day date in the historic calendar.
     pub const fn from_historic_date(
         year: i32,

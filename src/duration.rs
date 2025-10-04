@@ -128,11 +128,13 @@ impl<Representation, Period> Duration<Representation, Period> {
 
     /// Converts towards a different representation. If the underlying representation cannot store
     /// the result of this cast, returns `None`.
-    pub fn try_cast<Target>(self) -> Option<Duration<Target, Period>>
+    pub fn try_cast<Target>(
+        self,
+    ) -> Result<Duration<Target, Period>, <Representation as TryInto<Target>>::Error>
     where
         Representation: TryInto<Target>,
     {
-        Some(Duration::new(self.count.try_into().ok()?))
+        Ok(Duration::new(self.count.try_into()?))
     }
 }
 

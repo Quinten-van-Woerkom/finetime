@@ -32,11 +32,11 @@ impl JulianDate {
         }
     }
 
-    /// Constructs a Julian date from a given `Date<i64>` instance. Useful primarily when an
+    /// Constructs a Julian date from a given `Date<i32>` instance. Useful primarily when an
     /// existing `Date` must be printed in human-readable format.
     ///
     /// Uses Howard Hinnant's `julian_from_days` algorithm.
-    pub const fn from_date(date: Date<i64>) -> Self {
+    pub const fn from_date(date: Date<i32>) -> Self {
         let days = date.time_since_epoch().count();
         // Shift epoch from 1970-01-01 to 0000-03-01
         let z = days + 719470;
@@ -49,7 +49,7 @@ impl JulianDate {
         let mp = (5 * doy + 2) / 153; // [0, 11]
         let day = doy - (153 * mp + 2) / 5 + 1; // [1, 31]
         let month = if mp < 10 { mp + 3 } else { mp - 9 }; // [1, 12]
-        let year = if month <= 2 { year + 1 } else { year } as i32;
+        let year = if month <= 2 { year + 1 } else { year };
         let month = match Month::from_raw(month as u8) {
             Ok(month) => month,
             Err(_) => unreachable!(),
@@ -61,10 +61,10 @@ impl JulianDate {
 
     /// Constructs a `Date` from a given Julian date. Uses Howard Hinnant's `days_from_julian`
     /// algorithm.
-    pub const fn to_date(&self) -> Date<i64> {
-        let mut year = self.year as i64;
-        let month = self.month as i64;
-        let day = self.day as i64;
+    pub const fn to_date(&self) -> Date<i32> {
+        let mut year = self.year;
+        let month = self.month as i32;
+        let day = self.day as i32;
         if month <= 2 {
             year -= 1;
         }
@@ -123,14 +123,14 @@ impl JulianDate {
     }
 }
 
-impl From<JulianDate> for Date<i64> {
+impl From<JulianDate> for Date<i32> {
     fn from(value: JulianDate) -> Self {
         value.to_date()
     }
 }
 
-impl From<Date<i64>> for JulianDate {
-    fn from(value: Date<i64>) -> Self {
+impl From<Date<i32>> for JulianDate {
+    fn from(value: Date<i32>) -> Self {
         Self::from_date(value)
     }
 }
@@ -149,13 +149,11 @@ fn roundtrip() {
     // We check some simple and edge case timestamps.
     let times_since_epoch = [
         Days::new(42),
-        Days::new(719469),
-        Days::new(i32::MAX as i64),
-        Days::new(i32::MAX as i64 * 365),
-        Days::new(-42i64),
-        Days::new(-719469),
-        Days::new(-i32::MAX as i64),
-        Days::new(-i32::MAX as i64 * 365),
+        Days::new(719470),
+        Days::new(-42i32),
+        Days::new(-719470),
+        Days::new(i32::MAX - 719470),
+        Days::new(i32::MIN),
     ];
 
     for time_since_epoch in times_since_epoch.iter() {
@@ -171,7 +169,7 @@ fn roundtrip() {
     use rand::prelude::*;
     let mut rng = rand::rng();
     for _ in 0..10000 {
-        let days_since_epoch = rng.random::<i64>() % (i32::MAX as i64 * 365);
+        let days_since_epoch = rng.random::<i32>() % (i32::MAX - 719470);
         let time_since_epoch = Days::new(days_since_epoch);
         let date = Date::from_time_since_epoch(time_since_epoch);
         let julian_date = JulianDate::from_date(date);
@@ -234,8 +232,25 @@ mod proof_harness {
         let year: i32 = kani::any();
         let month: Month = kani::any();
         let day: u8 = kani::any();
-        if let Ok(julian_date) = JulianDate::new(year, month, day) {
-            let _ = julian_date.to_date();
-        }
+        let _ = JulianDate::new(year, month, day);
+    }
+
+    /// Verifies that conversion of a Julian date into a "universal" date never panics for all
+    /// values within a well-defined range.
+    #[kani::proof]
+    fn conversion_to_date_never_panics() {
+        let julian_date: JulianDate = kani::any();
+        kani::assume(julian_date >= JulianDate::new(-5877520, Month::March, 3).unwrap());
+        kani::assume(julian_date <= JulianDate::new(5879489, Month::December, 16).unwrap());
+        let _ = julian_date.to_date();
+    }
+
+    /// Verifies that conversion from a "universal" date into a Julian date never panics for all
+    /// values within a well-defined range.
+    #[kani::proof]
+    fn conversion_from_date_never_panics() {
+        let date: Date<i32> = kani::any();
+        kani::assume(date <= Date::from_time_since_epoch(Days::new(i32::MAX - 719470)));
+        let _ = JulianDate::from_date(date);
     }
 }
