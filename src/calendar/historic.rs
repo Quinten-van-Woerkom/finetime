@@ -40,7 +40,7 @@ impl HistoricDate {
     /// algorithm found by A. Pouplier and reported by Jean Meeus in Astronomical Algorithms.
     ///
     /// This function will never panic.
-    pub const fn from_year_day(year: i32, day_of_year: u16) -> Result<Self, InvalidDayOfYear> {
+    pub const fn from_ordinal_date(year: i32, day_of_year: u16) -> Result<Self, InvalidDayOfYear> {
         // Validate the input
         let is_leap_year = Self::is_leap_year(year);
         if day_of_year == 0 || day_of_year > 366 || (day_of_year == 366 && !is_leap_year) {
@@ -224,9 +224,9 @@ fn day_of_year() {
     assert_eq!(date2.day_of_year(), 113);
 
     // The reverse procedure: computing the date based on a year and day-of-year.
-    let date3 = HistoricDate::from_year_day(1978, 318).unwrap();
+    let date3 = HistoricDate::from_ordinal_date(1978, 318).unwrap();
     assert_eq!(date3, date1);
-    let date4 = HistoricDate::from_year_day(1988, 113).unwrap();
+    let date4 = HistoricDate::from_ordinal_date(1988, 113).unwrap();
     assert_eq!(date4, date2);
 }
 
@@ -276,7 +276,7 @@ mod proof_harness {
     fn day_of_year_never_panics() {
         let year: i32 = kani::any();
         let day_of_year: u16 = kani::any();
-        let _ = HistoricDate::from_year_day(year, day_of_year);
+        let _ = HistoricDate::from_ordinal_date(year, day_of_year);
     }
 
     /// Verifies that, for any correct date, computing its day-of-year and using that to
@@ -286,7 +286,7 @@ mod proof_harness {
         let date: HistoricDate = kani::any();
         let year = date.year();
         let day_of_year = date.day_of_year();
-        let reconstructed = HistoricDate::from_year_day(year, day_of_year).unwrap();
+        let reconstructed = HistoricDate::from_ordinal_date(year, day_of_year).unwrap();
         assert_eq!(date, reconstructed);
     }
 
