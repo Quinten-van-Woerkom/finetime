@@ -256,8 +256,8 @@ fn day_of_year() {
 fn gregorian_reform() {
     use crate::Days;
     use crate::Month::*;
-    let date1 = HistoricDate::new(1582, October, 4).unwrap().to_date();
-    let date2 = HistoricDate::new(1582, October, 15).unwrap().to_date();
+    let date1 = Date::from_historic_date(1582, October, 4).unwrap();
+    let date2 = Date::from_historic_date(1582, October, 15).unwrap();
     assert_eq!(date1 + Days::new(1), date2);
 }
 

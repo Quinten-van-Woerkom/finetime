@@ -48,6 +48,44 @@ impl<Representation> Date<Representation> {
     }
 }
 
+impl Date<i64> {
+    /// Creates a `Date` based on a year-month-day date in the historic calendar.
+    pub const fn from_historic_date(
+        year: i32,
+        month: Month,
+        day: u8,
+    ) -> Result<Self, InvalidHistoricDate> {
+        match HistoricDate::new(year, month, day) {
+            Ok(historic_date) => Ok(historic_date.to_date()),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Creates a `Date` based on a year-month-day date in the proleptic Gregorian calendar.
+    pub const fn from_gregorian_date(
+        year: i32,
+        month: Month,
+        day: u8,
+    ) -> Result<Self, InvalidGregorianDate> {
+        match GregorianDate::new(year, month, day) {
+            Ok(gregorian_date) => Ok(gregorian_date.to_date()),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Creates a `Date` based on a year-month-day date in the proleptic Julian calendar.
+    pub const fn from_julian_date(
+        year: i32,
+        month: Month,
+        day: u8,
+    ) -> Result<Self, InvalidJulianDate> {
+        match JulianDate::new(year, month, day) {
+            Ok(julian_date) => Ok(julian_date.to_date()),
+            Err(error) => Err(error),
+        }
+    }
+}
+
 impl<Representation> Add<Days<Representation>> for Date<Representation>
 where
     Representation: Add,
@@ -136,4 +174,15 @@ impl kani::Arbitrary for Month {
             _ => unreachable!(),
         }
     }
+}
+
+/// Verifies that the epoch of `Date` is found at 1970-01-01 (historic calendar).
+#[test]
+fn epoch_at_1970_01_01() {
+    let epoch = Date::from_historic_date(1970, Month::January, 1).unwrap();
+    assert_eq!(epoch.time_since_epoch.count(), 0);
+
+    let historic_date = HistoricDate::new(1970, Month::January, 1).unwrap();
+    let historic_date2 = HistoricDate::from_date(epoch);
+    assert_eq!(historic_date, historic_date2);
 }

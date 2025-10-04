@@ -4,7 +4,8 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    Convert, Date, Days, Duration, HalfDays,
+    Convert, Date, Days, Duration, HalfDays, InvalidGregorianDate, InvalidHistoricDate,
+    InvalidJulianDate, Month,
     units::{SecondsPerDay, SecondsPerHalfDay},
 };
 
@@ -60,6 +61,40 @@ impl<Representation, Period> JulianDay<Representation, Period> {
     }
 }
 
+impl JulianDay<i64, SecondsPerHalfDay> {
+    /// Creates a `Date` based on a year-month-day date in the historic calendar.
+    pub fn from_historic_date(
+        year: i32,
+        month: Month,
+        day: u8,
+    ) -> Result<Self, InvalidHistoricDate> {
+        match Date::from_historic_date(year, month, day) {
+            Ok(date) => Ok(Self::from_date(date)),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Creates a `Date` based on a year-month-day date in the proleptic Gregorian calendar.
+    pub fn from_gregorian_date(
+        year: i32,
+        month: Month,
+        day: u8,
+    ) -> Result<Self, InvalidGregorianDate> {
+        match Date::from_gregorian_date(year, month, day) {
+            Ok(date) => Ok(Self::from_date(date)),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Creates a `Date` based on a year-month-day date in the proleptic Julian calendar.
+    pub fn from_julian_date(year: i32, month: Month, day: u8) -> Result<Self, InvalidJulianDate> {
+        match Date::from_julian_date(year, month, day) {
+            Ok(date) => Ok(Self::from_date(date)),
+            Err(error) => Err(error),
+        }
+    }
+}
+
 impl<Representation, Period> From<JulianDay<Representation, Period>> for Date<Representation>
 where
     Representation: Copy
@@ -91,70 +126,69 @@ where
 /// historic date structure should be able to capture that.
 #[test]
 fn historic_dates_from_meeus() {
-    use crate::HistoricDate;
     use crate::Month::*;
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(2000, January, 1).unwrap().to_date()),
+        JulianDay::from_historic_date(2000, January, 1).unwrap(),
         JulianDay::new(Days::new(2451544).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(1999, January, 1).unwrap().to_date()),
+        JulianDay::from_historic_date(1999, January, 1).unwrap(),
         JulianDay::new(Days::new(2451179).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(1987, January, 27).unwrap().to_date()),
+        JulianDay::from_historic_date(1987, January, 27).unwrap(),
         JulianDay::new(Days::new(2446822).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(1987, June, 19).unwrap().to_date()),
+        JulianDay::from_historic_date(1987, June, 19).unwrap(),
         JulianDay::new(Days::new(2446965).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(1988, January, 27).unwrap().to_date()),
+        JulianDay::from_historic_date(1988, January, 27).unwrap(),
         JulianDay::new(Days::new(2447187).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(1988, June, 19).unwrap().to_date()),
+        JulianDay::from_historic_date(1988, June, 19).unwrap(),
         JulianDay::new(Days::new(2447331).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(1900, January, 1).unwrap().to_date()),
+        JulianDay::from_historic_date(1900, January, 1).unwrap(),
         JulianDay::new(Days::new(2415020).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(1600, January, 1).unwrap().to_date()),
+        JulianDay::from_historic_date(1600, January, 1).unwrap(),
         JulianDay::new(Days::new(2305447).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(1600, December, 31).unwrap().to_date()),
+        JulianDay::from_historic_date(1600, December, 31).unwrap(),
         JulianDay::new(Days::new(2305812).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(837, April, 10).unwrap().to_date()),
+        JulianDay::from_historic_date(837, April, 10).unwrap(),
         JulianDay::new(Days::new(2026871).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(-123, December, 31).unwrap().to_date()),
+        JulianDay::from_historic_date(-123, December, 31).unwrap(),
         JulianDay::new(Days::new(1676496).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(-122, January, 1).unwrap().to_date()),
+        JulianDay::from_historic_date(-122, January, 1).unwrap(),
         JulianDay::new(Days::new(1676497).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(-1000, July, 12).unwrap().to_date()),
+        JulianDay::from_historic_date(-1000, July, 12).unwrap(),
         JulianDay::new(Days::new(1356000).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(-1000, February, 29).unwrap().to_date()),
+        JulianDay::from_historic_date(-1000, February, 29).unwrap(),
         JulianDay::new(Days::new(1355866).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(-1001, August, 17).unwrap().to_date()),
+        JulianDay::from_historic_date(-1001, August, 17).unwrap(),
         JulianDay::new(Days::new(1355670).into_unit() + HalfDays::new(1i64))
     );
     assert_eq!(
-        JulianDay::from_date(HistoricDate::new(-4712, January, 1).unwrap().to_date()),
+        JulianDay::from_historic_date(-4712, January, 1).unwrap(),
         JulianDay::new(-HalfDays::new(1i64))
     );
 }

@@ -4,7 +4,10 @@
 
 use core::ops::{Add, Sub};
 
-use crate::{Convert, Date, Duration, UnitRatio, duration::Days, units::SecondsPerDay};
+use crate::{
+    Convert, Date, Duration, InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate, Month,
+    UnitRatio, duration::Days, units::SecondsPerDay,
+};
 
 /// The Modified Julian Day (MJD) representation of any given date.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -12,12 +15,15 @@ pub struct ModifiedJulianDate<Representation, Period = SecondsPerDay> {
     day: Duration<Representation, Period>,
 }
 
+/// The Julian date of the Unix epoch is useful as constant in some calculations.
+pub const MODIFIED_JULIAN_DATE_UNIX_EPOCH: Days<i32> = Days::new(40587);
+
 impl<Representation, Period> ModifiedJulianDate<Representation, Period>
 where
     Period: UnitRatio,
 {
     /// Constructs a new MJD directly from some duration since the MJD epoch, November 17 1858.
-    pub const fn new(day: Duration<Representation, Period>) -> Self {
+    pub const fn from_time_since_epoch(day: Duration<Representation, Period>) -> Self {
         Self { day }
     }
 }
@@ -32,7 +38,8 @@ impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
             + Convert<SecondsPerDay, Period>,
     {
         Self {
-            day: date.time_since_epoch().into_unit() + Days::new(40587i32).cast().into_unit(),
+            day: date.time_since_epoch().into_unit()
+                + MODIFIED_JULIAN_DATE_UNIX_EPOCH.cast().into_unit(),
         }
     }
 
@@ -43,7 +50,41 @@ impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
             + Sub<Representation, Output = Representation>
             + Convert<Period, SecondsPerDay>,
     {
-        Date::from_time_since_epoch(self.day.into_unit() - Days::new(40587i32).cast())
+        Date::from_time_since_epoch(self.day.into_unit() - MODIFIED_JULIAN_DATE_UNIX_EPOCH.cast())
+    }
+}
+
+impl ModifiedJulianDate<i64> {
+    /// Creates a `Date` based on a year-month-day date in the historic calendar.
+    pub fn from_historic_date(
+        year: i32,
+        month: Month,
+        day: u8,
+    ) -> Result<Self, InvalidHistoricDate> {
+        match Date::from_historic_date(year, month, day) {
+            Ok(date) => Ok(Self::from_date(date)),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Creates a `Date` based on a year-month-day date in the proleptic Gregorian calendar.
+    pub fn from_gregorian_date(
+        year: i32,
+        month: Month,
+        day: u8,
+    ) -> Result<Self, InvalidGregorianDate> {
+        match Date::from_gregorian_date(year, month, day) {
+            Ok(date) => Ok(Self::from_date(date)),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Creates a `Date` based on a year-month-day date in the proleptic Julian calendar.
+    pub fn from_julian_date(year: i32, month: Month, day: u8) -> Result<Self, InvalidJulianDate> {
+        match Date::from_julian_date(year, month, day) {
+            Ok(date) => Ok(Self::from_date(date)),
+            Err(error) => Err(error),
+        }
     }
 }
 
@@ -78,116 +119,70 @@ where
 /// historic date structure should be able to capture that.
 #[test]
 fn historic_dates_from_meeus() {
-    use crate::HistoricDate;
     use crate::Month::*;
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(2000, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(51544))
+        ModifiedJulianDate::from_historic_date(2000, January, 1).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(51544))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(1999, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(51179))
+        ModifiedJulianDate::from_historic_date(1999, January, 1).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(51179))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(1987, January, 27).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(46822))
+        ModifiedJulianDate::from_historic_date(1987, January, 27).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(46822))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(1987, June, 19).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(46965))
+        ModifiedJulianDate::from_historic_date(1987, June, 19).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(46965))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(1988, January, 27).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(47187))
+        ModifiedJulianDate::from_historic_date(1988, January, 27).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(47187))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(1988, June, 19).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(47331))
+        ModifiedJulianDate::from_historic_date(1988, June, 19).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(47331))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(1900, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(15020))
+        ModifiedJulianDate::from_historic_date(1900, January, 1).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(15020))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(1600, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-94553))
+        ModifiedJulianDate::from_historic_date(1600, January, 1).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-94553))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(1600, December, 31).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-94188))
+        ModifiedJulianDate::from_historic_date(1600, December, 31).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-94188))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(837, April, 10).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-373129))
+        ModifiedJulianDate::from_historic_date(837, April, 10).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-373129))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(-123, December, 31).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-723504))
+        ModifiedJulianDate::from_historic_date(-123, December, 31).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-723504))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(-122, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-723503))
+        ModifiedJulianDate::from_historic_date(-122, January, 1).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-723503))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(-1000, July, 12).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-1044000))
+        ModifiedJulianDate::from_historic_date(-1000, July, 12).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-1044000))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(-1000, February, 29).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-1044134))
+        ModifiedJulianDate::from_historic_date(-1000, February, 29).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-1044134))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(-1001, August, 17).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-1044330))
+        ModifiedJulianDate::from_historic_date(-1001, August, 17).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-1044330))
     );
     assert_eq!(
-        ModifiedJulianDate::from_date(HistoricDate::new(-4712, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-2400001))
-    );
-}
-
-/// Compares some computed MJD values with known values from Meeus' Astronomical Algorithms. Note
-/// that Meeus switches to the Julian calendar in dates preceding the Gregorian reform (i.e., prior
-/// to 15 October 1582). Hence, we only consider dates after this reform.
-#[test]
-fn gregorian_dates_from_meeus() {
-    use crate::GregorianDate;
-    use crate::Month::*;
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(2000, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(51544))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(1999, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(51179))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(1987, January, 27).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(46822))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(1987, June, 19).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(46965))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(1988, January, 27).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(47187))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(1988, June, 19).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(47331))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(1900, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(15020))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(1600, January, 1).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-94553))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_date(GregorianDate::new(1600, December, 31).unwrap().into()),
-        ModifiedJulianDate::new(Days::new(-94188))
+        ModifiedJulianDate::from_historic_date(-4712, January, 1).unwrap(),
+        ModifiedJulianDate::from_time_since_epoch(Days::new(-2400001))
     );
 }
 
