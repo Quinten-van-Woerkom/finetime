@@ -37,10 +37,10 @@ impl JulianDate {
     pub const fn from_date(date: Date<i32>) -> Self {
         let days = date.time_since_epoch().count();
         // Shift epoch from 1970-01-01 to 0000-03-01
-        let z = days + 719470;
+        let z = days as i64 + 719470;
 
-        let era = if z >= 0 { z } else { z - 1460 } / 1461;
-        let doe = z - era * 1461; // [0, 1461]
+        let era = (if z >= 0 { z } else { z - 1460 } / 1461) as i32;
+        let doe = (z - (era as i64) * 1461) as i32; // [0, 1461]
         let yoe = (doe - doe / 1460) / 365; // [0, 3]
         let year = yoe + era * 4;
         let doy = doe - 365 * yoe; // [0, 365]
@@ -70,8 +70,8 @@ impl JulianDate {
         let yoe = year - era * 4;
         let doy = (153 * if month > 2 { month - 3 } else { month + 9 } + 2) / 5 + day - 1;
         let doe = yoe * 365 + doy;
-        let days_since_epoch = era * 1461 + doe - 719470;
-        let time_since_epoch = Days::new(days_since_epoch);
+        let days_since_epoch = (era as i64) * 1461 + doe as i64 - 719470;
+        let time_since_epoch = Days::new(days_since_epoch as i32);
         Date::from_time_since_epoch(time_since_epoch)
     }
 
@@ -143,6 +143,7 @@ fn roundtrip() {
         Days::new(-42i32),
         Days::new(-719470),
         Days::new(i32::MAX - 719470),
+        Days::new(i32::MAX),
         Days::new(i32::MIN),
     ];
 
@@ -225,22 +226,12 @@ mod proof_harness {
         let _ = JulianDate::new(year, month, day);
     }
 
-    /// Verifies that conversion of a Julian date into a "universal" date never panics for all
-    /// values within a well-defined range.
+    /// Verifies that conversion to and from a `Date` is well-defined for all possible values of
+    /// `Date<i32>`: no panics, undefined behaviour, or arithmetic errors.
     #[kani::proof]
-    fn conversion_to_date_never_panics() {
-        let julian_date: JulianDate = kani::any();
-        kani::assume(julian_date >= JulianDate::new(-5877520, Month::March, 3).unwrap());
-        kani::assume(julian_date <= JulianDate::new(5879489, Month::December, 16).unwrap());
-        let _ = julian_date.to_date();
-    }
-
-    /// Verifies that conversion from a "universal" date into a Julian date never panics for all
-    /// values within a well-defined range.
-    #[kani::proof]
-    fn conversion_from_date_never_panics() {
+    fn date_conversion_well_defined() {
         let date: Date<i32> = kani::any();
-        kani::assume(date <= Date::from_time_since_epoch(Days::new(i32::MAX - 719470)));
-        let _ = JulianDate::from_date(date);
+        let julian_date = JulianDate::from_date(date);
+        let _ = julian_date.to_date();
     }
 }

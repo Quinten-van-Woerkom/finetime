@@ -289,4 +289,13 @@ mod proof_harness {
         let reconstructed = HistoricDate::from_year_day(year, day_of_year).unwrap();
         assert_eq!(date, reconstructed);
     }
+
+    /// Verifies that conversion to and from a `Date` is well-defined for all possible values of
+    /// `Date<i32>`: no panics, undefined behaviour, or arithmetic errors.
+    #[kani::proof]
+    fn date_conversion_well_defined() {
+        let date: Date<i32> = kani::any();
+        let historic_date = HistoricDate::from_date(date);
+        let _ = historic_date.to_date();
+    }
 }

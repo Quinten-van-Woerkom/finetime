@@ -37,10 +37,10 @@ impl GregorianDate {
     pub const fn from_date(date: Date<i32>) -> Self {
         let days = date.time_since_epoch().count();
         // Shift epoch from 1970-01-01 to 0000-03-01
-        let z = days + 719468; // 719468 days from 0000-03-01 to 1970-01-01
+        let z = days as i64 + 719468; // 719468 days from 0000-03-01 to 1970-01-01
 
-        let era = if z >= 0 { z } else { z - 146096 } / 146097;
-        let doe = z - era * 146097; // [0, 146096]
+        let era = (if z >= 0 { z } else { z - 146096 } / 146097) as i32;
+        let doe = (z - (era as i64) * 146097) as i32; // [0, 146096]
         let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365; // [0, 399]
         let year = yoe + era * 400;
         let doy = doe - (365 * yoe + yoe / 4 - yoe / 100); // [0, 365]
@@ -70,8 +70,8 @@ impl GregorianDate {
         let yoe = year - era * 400;
         let doy = (153 * if month > 2 { month - 3 } else { month + 9 } + 2) / 5 + day - 1;
         let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
-        let days_since_epoch = era * 146097 + doe - 719468;
-        let time_since_epoch = Days::new(days_since_epoch);
+        let days_since_epoch = (era as i64) * 146097 + doe as i64 - 719468;
+        let time_since_epoch = Days::new(days_since_epoch as i32);
         Date::from_time_since_epoch(time_since_epoch)
     }
 
@@ -143,6 +143,7 @@ fn roundtrip() {
         Days::new(-42i32),
         Days::new(-719469),
         Days::new(i32::MAX - 719468),
+        Days::new(i32::MAX),
         Days::new(i32::MIN),
     ];
 
@@ -225,22 +226,12 @@ mod proof_harness {
         let _ = GregorianDate::new(year, month, day);
     }
 
-    /// Verifies that conversion of a Gregorian date into a "universal" date never panics for all
-    /// values within a well-defined range.
+    /// Verifies that conversion to and from a `Date` is well-defined for all possible values of
+    /// `Date<i32>`: no panics, undefined behaviour, or arithmetic errors.
     #[kani::proof]
-    fn conversion_to_date_never_panics() {
-        let gregorian_date: GregorianDate = kani::any();
-        kani::assume(gregorian_date >= GregorianDate::new(-5877641, Month::June, 23).unwrap());
-        kani::assume(gregorian_date <= GregorianDate::new(5879610, Month::September, 9).unwrap());
-        let _ = gregorian_date.to_date();
-    }
-
-    /// Verifies that conversion from a "universal" date into a Gregorian date never panics for all
-    /// values within a well-defined range.
-    #[kani::proof]
-    fn conversion_from_date_never_panics() {
+    fn date_conversion_well_defined() {
         let date: Date<i32> = kani::any();
-        kani::assume(date <= Date::from_time_since_epoch(Days::new(i32::MAX - 719468)));
-        let _ = GregorianDate::from_date(date);
+        let gregorian_date = GregorianDate::from_date(date);
+        let _ = gregorian_date.to_date();
     }
 }
