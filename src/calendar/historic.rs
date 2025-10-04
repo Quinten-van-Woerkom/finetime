@@ -41,37 +41,15 @@ impl HistoricDate {
     ///
     /// This function will never panic.
     pub const fn from_ordinal_date(year: i32, day_of_year: u16) -> Result<Self, InvalidDayOfYear> {
-        // Validate the input
         let is_leap_year = Self::is_leap_year(year);
-        if day_of_year == 0 || day_of_year > 366 || (day_of_year == 366 && !is_leap_year) {
-            return Err(InvalidDayOfYear::InvalidDayOfYearCount(
-                InvalidDayOfYearCount { year, day_of_year },
-            ));
-        }
-
-        // Compute the month and day-of-month.
-        let k = if is_leap_year { 1 } else { 2 };
-        let month = if day_of_year < 32 {
-            1
-        } else {
-            (9 * (k + day_of_year as i32) + 269) / 275
-        };
-        let day = day_of_year as i32 - (275 * month) / 9 + k * ((month + 9) / 12) + 30;
-
-        // Validate the output range. This should not actually fail, but we need to handle it for
-        // casting to the proper output types.
-        let day = match day {
-            0..=32 => day as u8,
-            _ => unreachable!(),
-        };
-        let month = match Month::try_from(month as u8) {
-            Ok(month) => month,
-            Err(_) => unreachable!(),
+        let (month, day) = match month_day_from_ordinal_date(year, day_of_year, is_leap_year) {
+            Ok((month, day)) => (month, day),
+            Err(error) => return Err(error),
         };
 
-        // This call may actually fail again, because it is still possible for a date to have been
-        // computed that is part of the Gregorian calendar reform period (5 October up to and
-        // including 14 October 1582, which don't exist).
+        // It is still possible for a date to have been computed that is part of the Gregorian
+        // calendar reform period (5 October up to and including 14 October 1582). We must reject
+        // such dates in the historic calendar.
         match Self::new(year, month, day) {
             Ok(date) => Ok(date),
             Err(err) => Err(InvalidDayOfYear::InvalidHistoricDate(err)),
@@ -200,6 +178,42 @@ impl HistoricDate {
     const fn falls_during_gregorian_reform(year: i32, month: Month, day: u8) -> bool {
         year == 1582 && month as u8 == Month::October as u8 && day > 4 && day < 15
     }
+}
+
+/// It turns out that the `from_ordinal_date` implementation can largely be factored into one
+/// function that is valid for both the historic, proleptic Gregorian, and proleptic Julian
+/// calendars. After all, the function depends only on whether or not some year is a leap year.
+pub(crate) const fn month_day_from_ordinal_date(
+    year: i32,
+    day_of_year: u16,
+    is_leap_year: bool,
+) -> Result<(Month, u8), InvalidDayOfYear> {
+    if day_of_year == 0 || day_of_year > 366 || (day_of_year == 366 && !is_leap_year) {
+        return Err(InvalidDayOfYear::InvalidDayOfYearCount(
+            InvalidDayOfYearCount { year, day_of_year },
+        ));
+    }
+
+    // Compute the month and day-of-month.
+    let k = if is_leap_year { 1 } else { 2 };
+    let month = if day_of_year < 32 {
+        1
+    } else {
+        (9 * (k + day_of_year as i32) + 269) / 275
+    };
+    let day = day_of_year as i32 - (275 * month) / 9 + k * ((month + 9) / 12) + 30;
+
+    // Validate the output range. This should not actually fail, but we need to handle it for
+    // casting to the proper output types.
+    let day = match day {
+        0..=32 => day as u8,
+        _ => unreachable!(),
+    };
+    let month = match Month::try_from(month as u8) {
+        Ok(month) => month,
+        Err(_) => unreachable!(),
+    };
+    Ok((month, day))
 }
 
 impl From<HistoricDate> for Date<i32> {

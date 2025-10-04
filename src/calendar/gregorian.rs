@@ -1,7 +1,12 @@
 //! Implementation of all functionality related to computations regarding the proleptic Gregorian
 //! calendar.
 
-use crate::{Date, Month, duration::Days, errors::InvalidGregorianDate};
+use crate::{
+    Date, Month,
+    calendar::historic::month_day_from_ordinal_date,
+    duration::Days,
+    errors::{InvalidDayOfYear, InvalidGregorianDate},
+};
 
 /// Representation of a proleptic Gregorian date. Only represents logic down to single-day
 /// accuracy: i.e., leap days are included, but leap seconds are not. This is useful in keeping
@@ -73,6 +78,22 @@ impl GregorianDate {
         let days_since_epoch = (era as i64) * 146097 + doe as i64 - 719468;
         let time_since_epoch = Days::new(days_since_epoch as i32);
         Date::from_time_since_epoch(time_since_epoch)
+    }
+
+    /// Creates a new date given only the year and the day-of-year. Implementation is based on an
+    /// algorithm found by A. Pouplier and reported by Jean Meeus in Astronomical Algorithms.
+    ///
+    /// This function will never panic.
+    pub const fn from_ordinal_date(year: i32, day_of_year: u16) -> Result<Self, InvalidDayOfYear> {
+        let is_leap_year = Self::is_leap_year(year);
+        let (month, day) = match month_day_from_ordinal_date(year, day_of_year, is_leap_year) {
+            Ok((month, day)) => (month, day),
+            Err(error) => return Err(error),
+        };
+        match Self::new(year, month, day) {
+            Ok(date) => Ok(date),
+            Err(_) => unreachable!(),
+        }
     }
 
     /// Returns the year stored inside this proleptic Gregorian date. Astronomical year
