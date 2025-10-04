@@ -23,7 +23,7 @@ use crate::{
 /// determines the integer (!) ratio of each tick to seconds. This may be used to convert between
 /// `Duration`s of differing time units.
 #[derive(Debug)]
-pub struct Duration<Representation, Period = Second> {
+pub struct Duration<Representation, Period: ?Sized = Second> {
     count: Representation,
     period: core::marker::PhantomData<Period>,
 }

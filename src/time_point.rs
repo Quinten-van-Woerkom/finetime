@@ -16,7 +16,7 @@ use crate::{
 /// `Period`, which the define the characteristics of the `Duration` type used to represent the
 /// time elapsed since the epoch of the underlying time scale `Scale`.
 #[derive(Debug)]
-pub struct TimePoint<Scale, Representation, Period = Second> {
+pub struct TimePoint<Scale: ?Sized, Representation, Period = Second> {
     time_since_epoch: Duration<Representation, Period>,
     time_scale: core::marker::PhantomData<Scale>,
 }
