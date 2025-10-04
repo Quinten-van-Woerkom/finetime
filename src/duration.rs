@@ -10,8 +10,7 @@ use core::{
 use num_traits::{Bounded, ConstZero, Signed, Zero};
 
 use crate::{
-    TryMul,
-    fraction::{Fraction, MulCeil, MulFloor, MulRound},
+    Fraction, MulCeil, MulFloor, MulRound, TryMul,
     units::{
         Atto, Convert, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay, SecondsPerHalfDay,
         SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek, SecondsPerYear,

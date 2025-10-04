@@ -1,21 +1,13 @@
-//! Representation of specific calendrical types, used to represent individual dates according to a
-//! variety of historical calendars.
+//! Implementation of the "generic" date representation, which is largely agnostic of any specific
+//! calendar representation: including phenomena such as months, weeks, years, and leap years.
+//! Rather, it is a simple day count since the Unix epoch.
 
-mod historic;
 use core::ops::Add;
 
-pub use historic::*;
-mod gregorian;
-pub use gregorian::*;
-mod julian;
-pub use julian::*;
-mod julian_day;
-pub use julian_day::*;
-mod modified_julian_date;
-pub use modified_julian_date::*;
-use thiserror::Error;
-
-use crate::Days;
+use crate::{
+    Days, GregorianDate, HistoricDate, JulianDate, Month, WeekDay,
+    errors::{InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate},
+};
 
 /// Generic representation of date. Identifies an exact individual date within the calendar, in
 /// terms of days before (negative) or after (positive) 1970-01-01. This makes it useful as
@@ -108,6 +100,20 @@ impl Date<i32> {
             Err(error) => Err(error),
         }
     }
+
+    /// Returns the day-of-the-week of this date.
+    pub const fn week_day(&self) -> WeekDay {
+        let z = self.time_since_epoch().count();
+        let day = if z >= -4 {
+            (z + 4) % 7
+        } else {
+            (z + 5) % 7 + 6
+        };
+        match WeekDay::try_from(day as u8) {
+            Ok(week_day) => week_day,
+            Err(_) => unreachable!(),
+        }
+    }
 }
 
 impl<Representation> Add<Days<Representation>> for Date<Representation>
@@ -133,80 +139,31 @@ where
     }
 }
 
-/// Representation of a month in a Roman calendar.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Display)]
-pub enum Month {
-    January = 1,
-    February = 2,
-    March = 3,
-    April = 4,
-    May = 5,
-    June = 6,
-    July = 7,
-    August = 8,
-    September = 9,
-    October = 10,
-    November = 11,
-    December = 12,
-}
-
-impl Month {
-    pub const fn from_raw(month: u8) -> Result<Self, InvalidMonthNumber> {
-        let month = match month {
-            1 => Month::January,
-            2 => Month::February,
-            3 => Month::March,
-            4 => Month::April,
-            5 => Month::May,
-            6 => Month::June,
-            7 => Month::July,
-            8 => Month::August,
-            9 => Month::September,
-            10 => Month::October,
-            11 => Month::November,
-            12 => Month::December,
-            _ => return Err(InvalidMonthNumber { month }),
-        };
-        Ok(month)
-    }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
-#[error("invalid month number {month}")]
-pub struct InvalidMonthNumber {
-    month: u8,
-}
-
-#[cfg(kani)]
-impl kani::Arbitrary for Month {
-    fn any() -> Self {
-        use Month::*;
-        let any: u8 = (kani::any::<u8>() % 12u8) + 1u8;
-        match any {
-            1 => January,
-            2 => February,
-            3 => March,
-            4 => April,
-            5 => May,
-            6 => June,
-            7 => July,
-            8 => August,
-            9 => September,
-            10 => October,
-            11 => November,
-            12 => December,
-            _ => unreachable!(),
-        }
-    }
-}
-
 /// Verifies that the epoch of `Date` is found at 1970-01-01 (historic calendar).
 #[test]
 fn epoch_at_1970_01_01() {
     let epoch = Date::from_historic_date(1970, Month::January, 1).unwrap();
-    assert_eq!(epoch.time_since_epoch.count(), 0);
+    assert_eq!(epoch.time_since_epoch(), Days::new(0));
 
     let historic_date = HistoricDate::new(1970, Month::January, 1).unwrap();
     let historic_date2 = HistoricDate::from_date(epoch);
     assert_eq!(historic_date, historic_date2);
+}
+
+/// Tests some known week day values.
+#[test]
+fn week_days() {
+    assert_eq!(
+        Date::from_historic_date(1970, Month::January, 1)
+            .unwrap()
+            .week_day(),
+        WeekDay::Thursday
+    );
+
+    assert_eq!(
+        Date::from_historic_date(1998, Month::December, 17)
+            .unwrap()
+            .week_day(),
+        WeekDay::Thursday
+    );
 }

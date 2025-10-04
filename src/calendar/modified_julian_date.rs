@@ -5,8 +5,9 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    Convert, Date, Duration, InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate, Month,
-    duration::Days, units::SecondsPerDay,
+    Convert, Date, Days, Duration, Month,
+    errors::{InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate},
+    units::SecondsPerDay,
 };
 
 /// The Modified Julian Day (MJD) representation of any given date.

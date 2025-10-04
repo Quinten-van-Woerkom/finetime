@@ -2,7 +2,7 @@
 //! types are little more than labels that are associated with a given ratio to SI seconds, as may
 //! be used to convert between arbitrary time periods.
 
-use crate::fraction::{Fraction, TryMul};
+use crate::{Fraction, TryMul};
 
 /// Trait representing a lossless conversion from one unit to another. Note that the underlying
 /// value representation stays the same. For floating point representations, floating point

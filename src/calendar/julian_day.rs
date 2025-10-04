@@ -4,8 +4,8 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    Convert, Date, Duration, HalfDays, InvalidGregorianDate, InvalidHistoricDate,
-    InvalidJulianDate, Month,
+    Convert, Date, Duration, HalfDays, Month,
+    errors::{InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate},
     units::{SecondsPerDay, SecondsPerHalfDay},
 };
 

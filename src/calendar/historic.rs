@@ -3,9 +3,10 @@
 //! Implementation of the historic calendar, which is Julian before and Gregorian after the
 //! Gregoric calendar reform of 1582. When in doubt, use this calendar.
 
-use thiserror::Error;
-
-use crate::{Date, GregorianDate, JulianDate, Month};
+use crate::{
+    Date, GregorianDate, JulianDate, Month,
+    errors::{InvalidDayOfYear, InvalidDayOfYearCount, InvalidHistoricDate},
+};
 
 /// Implementation of a date in the historic calendar. After 15 October 1582, this coincides with
 /// the Gregorian calendar; until 4 October 1582, this is the Julian calendar. The days inbetween
@@ -63,7 +64,7 @@ impl HistoricDate {
             0..=32 => day as u8,
             _ => unreachable!(),
         };
-        let month = match Month::from_raw(month as u8) {
+        let month = match Month::try_from(month as u8) {
             Ok(month) => month,
             Err(_) => unreachable!(),
         };
@@ -84,7 +85,7 @@ impl HistoricDate {
             Err(_) => unreachable!(),
         };
         let is_gregorian =
-            date.time_since_epoch.count() >= GREGORIAN_REFORM.time_since_epoch.count();
+            date.time_since_epoch().count() >= GREGORIAN_REFORM.time_since_epoch().count();
 
         if is_gregorian {
             let date = GregorianDate::from_date(date);
@@ -211,28 +212,6 @@ impl From<Date<i32>> for HistoricDate {
     fn from(value: Date<i32>) -> Self {
         Self::from_date(value)
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
-#[error("invalid combination of year and day-of-year")]
-pub enum InvalidDayOfYear {
-    InvalidDayOfYearCount(#[from] InvalidDayOfYearCount),
-    InvalidHistoricDate(#[from] InvalidHistoricDate),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
-#[error("{day_of_year} is not a valid day in {year}")]
-pub struct InvalidDayOfYearCount {
-    day_of_year: u16,
-    year: i32,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
-#[error("{day} {month} {year} does not exist in the historic calendar")]
-pub struct InvalidHistoricDate {
-    year: i32,
-    month: Month,
-    day: u8,
 }
 
 /// Tests the day-of-year function using some examples from Meeus.
