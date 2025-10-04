@@ -116,7 +116,7 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
     }
 }
 
-impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
+impl<Scale> TimePoint<Scale, i64, Second>
 where
     Scale: DateTime,
 {
@@ -126,10 +126,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, Scale::Error>
-    where
-        Representation: TryFrom<i64> + Convert<Second, Period>,
-    {
+    ) -> Result<Self, Scale::Error> {
         let time_seconds = Scale::time_point_from_date_time(date, hour, minute, second)?;
         let time = time_seconds
             .try_cast()
@@ -146,10 +143,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidHistoricDateTime<Scale::Error>>
-    where
-        Representation: TryFrom<i64> + Convert<Second, Period>,
-    {
+    ) -> Result<Self, InvalidHistoricDateTime<Scale::Error>> {
         let date = Date::from_historic_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
@@ -165,10 +159,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidGregorianDateTime<Scale::Error>>
-    where
-        Representation: TryFrom<i64> + Convert<Second, Period>,
-    {
+    ) -> Result<Self, InvalidGregorianDateTime<Scale::Error>> {
         let date = Date::from_gregorian_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
@@ -184,10 +175,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidJulianDateTime<Scale::Error>>
-    where
-        Representation: TryFrom<i64> + Convert<Second, Period>,
-    {
+    ) -> Result<Self, InvalidJulianDateTime<Scale::Error>> {
         let date = Date::from_julian_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
