@@ -54,23 +54,16 @@ impl<Representation, Period> Duration<Representation, Period> {
     where
         Representation: Convert<Period, Target>,
     {
-        Duration {
-            count: self.count.convert(),
-            period: core::marker::PhantomData,
-        }
+        Duration::new(self.count.convert())
     }
 
-    /// Tries to convert a `Duration` towards a different time unit. Only applies to integers (as
-    /// all floats may be converted infallibly anyway). Will only return a result if the conversion
-    /// is lossless.
+    /// Tries to convert a `Duration` towards a different time unit. Will only return a result if
+    /// the conversion is lossless.
     pub fn try_into_unit<Target>(self) -> Option<Duration<Representation, Target>>
     where
         Representation: TryConvert<Period, Target>,
     {
-        Some(Duration {
-            count: self.count.try_convert()?,
-            period: core::marker::PhantomData,
-        })
+        Some(Duration::new(self.count.try_convert()?))
     }
 
     /// Converts towards a different time unit, rounding towards the nearest whole unit.
@@ -81,10 +74,7 @@ impl<Representation, Period> Duration<Representation, Period> {
         Target: UnitRatio,
     {
         let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
-        Duration {
-            count: self.count.mul_round(unit_ratio),
-            period: core::marker::PhantomData,
-        }
+        Duration::new(self.count.mul_round(unit_ratio))
     }
 
     /// Converts towards a different time unit, rounding towards positive infinity if the unit is
@@ -96,10 +86,7 @@ impl<Representation, Period> Duration<Representation, Period> {
         Target: UnitRatio,
     {
         let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
-        Duration {
-            count: self.count.mul_ceil(unit_ratio),
-            period: core::marker::PhantomData,
-        }
+        Duration::new(self.count.mul_ceil(unit_ratio))
     }
 
     /// Converts towards a different time unit, rounding towards negative infinity if the unit is
@@ -111,10 +98,7 @@ impl<Representation, Period> Duration<Representation, Period> {
         Target: UnitRatio,
     {
         let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
-        Duration {
-            count: self.count.mul_floor(unit_ratio),
-            period: core::marker::PhantomData,
-        }
+        Duration::new(self.count.mul_floor(unit_ratio))
     }
 
     /// Infallibly converts towards a different representation.
@@ -126,7 +110,7 @@ impl<Representation, Period> Duration<Representation, Period> {
     }
 
     /// Converts towards a different representation. If the underlying representation cannot store
-    /// the result of this cast, returns `None`.
+    /// the result of this cast, returns an appropriate `Error`.
     pub fn try_cast<Target>(
         self,
     ) -> Result<Duration<Target, Period>, <Representation as TryInto<Target>>::Error>
@@ -140,10 +124,7 @@ impl<Representation, Period> Duration<Representation, Period> {
 #[cfg(kani)]
 impl<Representation: kani::Arbitrary, Period> kani::Arbitrary for Duration<Representation, Period> {
     fn any() -> Self {
-        Duration {
-            count: kani::any(),
-            period: core::marker::PhantomData,
-        }
+        Duration::new(kani::any())
     }
 }
 
@@ -154,10 +135,7 @@ where
     Representation: Clone,
 {
     fn clone(&self) -> Self {
-        Self {
-            count: self.count.clone(),
-            period: core::marker::PhantomData,
-        }
+        Self::new(self.count.clone())
     }
 }
 
