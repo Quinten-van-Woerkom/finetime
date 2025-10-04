@@ -101,6 +101,31 @@ impl<Representation, Period> Duration<Representation, Period> {
         Duration::new(self.count.mul_floor(unit_ratio))
     }
 
+    /// Segments this `Duration` by factoring out the largest possible number of whole multiples of
+    /// a given unit. Returns this whole number as well as the remainder.
+    ///
+    /// An example would be factoring out the number of whole days from some elapsed time: then,
+    /// `self.factor_out()` would return a tuple of the number of whole days and the fractional
+    /// day part that remains.
+    pub fn factor_out<Unit>(
+        self,
+    ) -> (
+        Duration<Representation, Unit>,
+        Duration<Representation, Period>,
+    )
+    where
+        Representation: Copy
+            + MulFloor<Fraction, Output = Representation>
+            + Sub<Representation, Output = Representation>
+            + Convert<Unit, Period>,
+        Period: UnitRatio,
+        Unit: UnitRatio,
+    {
+        let factored = self.floor::<Unit>();
+        let remainder = self - factored.into_unit();
+        (factored, remainder)
+    }
+
     /// Infallibly converts towards a different representation.
     pub fn cast<Target>(self) -> Duration<Target, Period>
     where

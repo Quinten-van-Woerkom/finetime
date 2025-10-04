@@ -15,5 +15,7 @@ mod fraction;
 pub use fraction::{Fraction, MulCeil, MulFloor, MulRound, TryMul};
 mod time_point;
 pub use time_point::TimePoint;
+mod time_scale;
+pub use time_scale::{DateTime, Tai, TaiTime};
 mod units;
 pub use units::{Convert, TryConvert, UnitRatio};

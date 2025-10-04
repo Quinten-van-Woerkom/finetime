@@ -9,7 +9,10 @@ use core::{
 use num_traits::Bounded;
 
 use crate::{
-    Convert, Duration, Fraction, MulCeil, MulFloor, MulRound, TryConvert, UnitRatio, units::Second,
+    Convert, Date, DateTime, Duration, Fraction, Month, MulCeil, MulFloor, MulRound, TryConvert,
+    UnitRatio,
+    errors::{InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime},
+    units::Second,
 };
 
 /// A `TimePoint` identifies a specific instant in time. It is templated on a `Representation` and
@@ -110,6 +113,86 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
         Ok(TimePoint::from_time_since_epoch(
             self.time_since_epoch.try_cast()?,
         ))
+    }
+}
+
+impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
+where
+    Scale: DateTime,
+{
+    /// Constructs a `TimePoint` in the given time scale based on the date and time-of-day.
+    pub fn from_datetime(
+        date: Date<i32>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, Scale::Error>
+    where
+        Representation: TryFrom<i64> + Convert<Second, Period>,
+    {
+        let time_seconds = Scale::time_point_from_date_time(date, hour, minute, second)?;
+        let time = time_seconds
+            .try_cast()
+            .unwrap_or_else(|_| panic!())
+            .into_unit();
+        Ok(time)
+    }
+
+    /// Constructs a `TimePoint` in the given time scale based on a Gregorian date-time.
+    pub fn from_historic_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, InvalidHistoricDateTime<Scale::Error>>
+    where
+        Representation: TryFrom<i64> + Convert<Second, Period>,
+    {
+        let date = Date::from_historic_date(year, month, day)?;
+        match Self::from_datetime(date, hour, minute, second) {
+            Ok(time_point) => Ok(time_point),
+            Err(error) => Err(InvalidHistoricDateTime::InvalidDateTime(error)),
+        }
+    }
+
+    /// Constructs a `TimePoint` in the given time scale based on a Gregorian date-time.
+    pub fn from_gregorian_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, InvalidGregorianDateTime<Scale::Error>>
+    where
+        Representation: TryFrom<i64> + Convert<Second, Period>,
+    {
+        let date = Date::from_gregorian_date(year, month, day)?;
+        match Self::from_datetime(date, hour, minute, second) {
+            Ok(time_point) => Ok(time_point),
+            Err(error) => Err(InvalidGregorianDateTime::InvalidDateTime(error)),
+        }
+    }
+
+    /// Constructs a `TimePoint` in the given time scale based on a Julian date-time.
+    pub fn from_julian_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, InvalidJulianDateTime<Scale::Error>>
+    where
+        Representation: TryFrom<i64> + Convert<Second, Period>,
+    {
+        let date = Date::from_julian_date(year, month, day)?;
+        match Self::from_datetime(date, hour, minute, second) {
+            Ok(time_point) => Ok(time_point),
+            Err(error) => Err(InvalidJulianDateTime::InvalidDateTime(error)),
+        }
     }
 }
 

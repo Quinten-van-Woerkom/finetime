@@ -55,3 +55,32 @@ pub struct InvalidMonthNumber {
 pub struct InvalidWeekDayNumber {
     pub week_day: u8,
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
+#[error("invalid time-of-day {hour:02}-{minute:02}-{second:02}")]
+pub struct InvalidTimeOfDay {
+    pub hour: u8,
+    pub minute: u8,
+    pub second: u8,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
+#[error("invalid historic date-time")]
+pub enum InvalidHistoricDateTime<InvalidDateTime: core::error::Error> {
+    InvalidHistoricDate(#[from] InvalidHistoricDate),
+    InvalidDateTime(#[source] InvalidDateTime),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
+#[error("invalid Gregorian date-time")]
+pub enum InvalidGregorianDateTime<InvalidDateTime: core::error::Error> {
+    InvalidGregorianDate(#[from] InvalidGregorianDate),
+    InvalidDateTime(#[source] InvalidDateTime),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
+#[error("invalid Julian date-time")]
+pub enum InvalidJulianDateTime<InvalidDateTime: core::error::Error> {
+    InvalidJulianDate(#[from] InvalidJulianDate),
+    InvalidDateTime(#[source] InvalidDateTime),
+}
