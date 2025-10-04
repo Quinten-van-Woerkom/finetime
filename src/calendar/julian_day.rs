@@ -37,6 +37,14 @@ impl<Representation, Period> JulianDay<Representation, Period> {
         Self { time_since_epoch }
     }
 
+    /// Returns the time elapsed since the epoch of the Julian period.
+    pub const fn time_since_epoch(&self) -> Duration<Representation, Period>
+    where
+        Representation: Copy,
+    {
+        self.time_since_epoch
+    }
+
     /// Constructs a Julian day from some given calendar date.
     pub fn from_date(date: Date<Representation>) -> Self
     where
