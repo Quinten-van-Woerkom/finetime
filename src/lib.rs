@@ -13,5 +13,7 @@ pub use duration::{
 pub mod errors;
 mod fraction;
 pub use fraction::{Fraction, MulCeil, MulFloor, MulRound, TryMul};
+mod time_point;
+pub use time_point::TimePoint;
 mod units;
 pub use units::{Convert, TryConvert, UnitRatio};

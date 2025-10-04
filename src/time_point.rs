@@ -1,0 +1,242 @@
+//! Definition of the `TimePoint` type (and associated types and methods), which implements the
+//! fundamental timekeeping logic of this library.
+
+use core::{
+    hash::Hash,
+    ops::{Add, AddAssign, Sub, SubAssign},
+};
+
+use num_traits::Bounded;
+
+use crate::{
+    Convert, Duration, Fraction, MulCeil, MulFloor, MulRound, TryConvert, UnitRatio, units::Second,
+};
+
+/// A `TimePoint` identifies a specific instant in time. It is templated on a `Representation` and
+/// `Period`, which the define the characteristics of the `Duration` type used to represent the
+/// time elapsed since the epoch of the underlying time scale `Scale`.
+#[derive(Debug)]
+pub struct TimePoint<Scale, Representation, Period = Second> {
+    time_since_epoch: Duration<Representation, Period>,
+    time_scale: core::marker::PhantomData<Scale>,
+}
+
+impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
+    /// Constructs a new `TimePoint` from a known time since epoch.
+    pub const fn from_time_since_epoch(time_since_epoch: Duration<Representation, Period>) -> Self {
+        Self {
+            time_since_epoch,
+            time_scale: core::marker::PhantomData,
+        }
+    }
+
+    /// Returns the time elapsed since the epoch of the time scale associated with this instant.
+    pub const fn time_since_epoch(&self) -> Duration<Representation, Period>
+    where
+        Representation: Copy,
+    {
+        self.time_since_epoch
+    }
+
+    /// Converts this `TimePoint` into a different unit. May only be used if the time unit is
+    /// smaller than the current one (e.g., seconds to milliseconds) or if the representation of
+    /// this `TimePoint` is a float.
+    pub fn into_unit<Target>(self) -> TimePoint<Scale, Representation, Target>
+    where
+        Representation: Convert<Period, Target>,
+    {
+        TimePoint::from_time_since_epoch(self.time_since_epoch.into_unit())
+    }
+
+    /// Tries to convert a `TimePoint` towards a different time unit. Will only return a result if
+    /// the conversion is lossless.
+    pub fn try_into_unit<Target>(self) -> Option<TimePoint<Scale, Representation, Target>>
+    where
+        Representation: TryConvert<Period, Target>,
+    {
+        Some(TimePoint::from_time_since_epoch(
+            self.time_since_epoch.try_into_unit()?,
+        ))
+    }
+
+    /// Converts towards a different time unit, rounding towards the nearest whole unit.
+    pub fn round<Target>(self) -> TimePoint<Scale, Representation, Target>
+    where
+        Representation: MulRound<Fraction, Output = Representation>,
+        Period: UnitRatio,
+        Target: UnitRatio,
+    {
+        TimePoint::from_time_since_epoch(self.time_since_epoch.round())
+    }
+
+    /// Converts towards a different time unit, rounding towards positive infinity if the unit is
+    /// not entirely commensurate with the present unit.
+    pub fn ceil<Target>(self) -> TimePoint<Scale, Representation, Target>
+    where
+        Representation: MulCeil<Fraction, Output = Representation>,
+        Period: UnitRatio,
+        Target: UnitRatio,
+    {
+        TimePoint::from_time_since_epoch(self.time_since_epoch.ceil())
+    }
+
+    /// Converts towards a different time unit, rounding towards negative infinity if the unit is
+    /// not entirely commensurate with the present unit.
+    pub fn floor<Target>(self) -> TimePoint<Scale, Representation, Target>
+    where
+        Representation: MulFloor<Fraction, Output = Representation>,
+        Period: UnitRatio,
+        Target: UnitRatio,
+    {
+        TimePoint::from_time_since_epoch(self.time_since_epoch.floor())
+    }
+
+    /// Infallibly converts towards a different representation.
+    pub fn cast<Target>(self) -> TimePoint<Scale, Target, Period>
+    where
+        Representation: Into<Target>,
+    {
+        TimePoint::from_time_since_epoch(self.time_since_epoch.cast())
+    }
+
+    /// Converts towards a different representation. If the underlying representation cannot store
+    /// the result of this cast, returns an appropriate `Error`.
+    pub fn try_cast<Target>(
+        self,
+    ) -> Result<TimePoint<Scale, Target, Period>, <Representation as TryInto<Target>>::Error>
+    where
+        Representation: TryInto<Target>,
+    {
+        Ok(TimePoint::from_time_since_epoch(
+            self.time_since_epoch.try_cast()?,
+        ))
+    }
+}
+
+#[cfg(kani)]
+impl<Scale, Representation: kani::Arbitrary, Period> kani::Arbitrary
+    for TimePoint<Scale, Representation, Period>
+{
+    fn any() -> Self {
+        TimePoint::from_time_since_epoch(kani::any())
+    }
+}
+
+impl<Scale, Representation, Period> Copy for TimePoint<Scale, Representation, Period> where
+    Representation: Copy
+{
+}
+
+impl<Scale, Representation, Period> Clone for TimePoint<Scale, Representation, Period>
+where
+    Representation: Clone,
+{
+    fn clone(&self) -> Self {
+        Self::from_time_since_epoch(self.time_since_epoch.clone())
+    }
+}
+
+impl<Scale, Representation, Period> PartialEq for TimePoint<Scale, Representation, Period>
+where
+    Representation: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.time_since_epoch == other.time_since_epoch
+    }
+}
+
+impl<Scale, Representation, Period> Eq for TimePoint<Scale, Representation, Period> where
+    Representation: Eq
+{
+}
+
+impl<Scale, Representation, Period> PartialOrd for TimePoint<Scale, Representation, Period>
+where
+    Representation: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.time_since_epoch.partial_cmp(&other.time_since_epoch)
+    }
+}
+
+impl<Scale, Representation, Period> Ord for TimePoint<Scale, Representation, Period>
+where
+    Representation: Ord,
+{
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.time_since_epoch.cmp(&other.time_since_epoch)
+    }
+}
+
+impl<Scale, Representation, Period> Hash for TimePoint<Scale, Representation, Period>
+where
+    Representation: Hash,
+{
+    fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
+        self.time_since_epoch.hash(state);
+    }
+}
+
+impl<Scale, R1, R2, Period> Sub<TimePoint<Scale, R2, Period>> for TimePoint<Scale, R1, Period>
+where
+    R1: Sub<R2>,
+{
+    type Output = Duration<<R1 as Sub<R2>>::Output, Period>;
+
+    fn sub(self, rhs: TimePoint<Scale, R2, Period>) -> Self::Output {
+        self.time_since_epoch - rhs.time_since_epoch
+    }
+}
+
+impl<Scale, R1, R2, Period> Add<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
+where
+    R1: Add<R2>,
+{
+    type Output = TimePoint<Scale, <R1 as Add<R2>>::Output, Period>;
+
+    fn add(self, rhs: Duration<R2, Period>) -> Self::Output {
+        TimePoint::from_time_since_epoch(self.time_since_epoch + rhs)
+    }
+}
+
+impl<Scale, R1, R2, Period> AddAssign<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
+where
+    R1: AddAssign<R2>,
+{
+    fn add_assign(&mut self, rhs: Duration<R2, Period>) {
+        self.time_since_epoch += rhs;
+    }
+}
+
+impl<Scale, R1, R2, Period> Sub<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
+where
+    R1: Sub<R2>,
+{
+    type Output = TimePoint<Scale, <R1 as Sub<R2>>::Output, Period>;
+
+    fn sub(self, rhs: Duration<R2, Period>) -> Self::Output {
+        TimePoint::from_time_since_epoch(self.time_since_epoch - rhs)
+    }
+}
+
+impl<Scale, R1, R2, Period> SubAssign<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
+where
+    R1: SubAssign<R2>,
+{
+    fn sub_assign(&mut self, rhs: Duration<R2, Period>) {
+        self.time_since_epoch -= rhs;
+    }
+}
+
+impl<Scale, Representation, Period> Bounded for TimePoint<Scale, Representation, Period>
+where
+    Representation: Bounded,
+{
+    fn min_value() -> Self {
+        Self::from_time_since_epoch(Duration::<Representation, Period>::min_value())
+    }
+
+    fn max_value() -> Self {
+        Self::from_time_since_epoch(Duration::<Representation, Period>::max_value())
+    }
+}
