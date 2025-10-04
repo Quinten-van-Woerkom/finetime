@@ -135,6 +135,11 @@ where
         Ok(time)
     }
 
+    /// Maps a `TimePoint` towards the corresponding date and time-of-day.
+    pub fn to_datetime(&self) -> (Date<i32>, u8, u8, u8) {
+        Scale::date_time_from_time_point(*self)
+    }
+
     /// Constructs a `TimePoint` in the given time scale based on a Gregorian date-time.
     pub fn from_historic_datetime(
         year: i32,

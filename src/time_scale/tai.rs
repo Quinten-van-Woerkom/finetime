@@ -93,3 +93,41 @@ fn known_timestamps() {
         Seconds::new(-9940143507),
     );
 }
+
+#[cfg(test)]
+fn gregorian_datetime_roundtrip(
+    year: i32,
+    month: Month,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+) {
+    use crate::GregorianDate;
+
+    let time = TaiTime::from_gregorian_datetime(year, month, day, hour, minute, second).unwrap();
+    let (date, hour2, minute2, second2) = time.to_datetime();
+    let gregorian_date = GregorianDate::from_date(date);
+    assert_eq!(gregorian_date.year(), year);
+    assert_eq!(gregorian_date.month(), month);
+    assert_eq!(gregorian_date.day(), day);
+    assert_eq!(hour, hour2);
+    assert_eq!(minute, minute2);
+    assert_eq!(second, second2);
+}
+
+#[test]
+fn date_decomposition() {
+    gregorian_datetime_roundtrip(1999, Month::August, 22, 0, 0, 0);
+    gregorian_datetime_roundtrip(1958, Month::January, 1, 0, 0, 0);
+    gregorian_datetime_roundtrip(1958, Month::January, 2, 0, 0, 0);
+    gregorian_datetime_roundtrip(1960, Month::January, 1, 0, 0, 0);
+    gregorian_datetime_roundtrip(1961, Month::January, 1, 0, 0, 0);
+    gregorian_datetime_roundtrip(1970, Month::January, 1, 0, 0, 0);
+    gregorian_datetime_roundtrip(1976, Month::January, 1, 0, 0, 0);
+    gregorian_datetime_roundtrip(2025, Month::July, 16, 16, 23, 24);
+    gregorian_datetime_roundtrip(2034, Month::December, 26, 8, 2, 37);
+    gregorian_datetime_roundtrip(2760, Month::April, 1, 21, 59, 58);
+    gregorian_datetime_roundtrip(1643, Month::January, 4, 1, 1, 33);
+    gregorian_datetime_roundtrip(1996, Month::January, 1, 3, 0, 0);
+}
