@@ -150,20 +150,36 @@ fn epoch_at_1970_01_01() {
     assert_eq!(historic_date, historic_date2);
 }
 
+/// Testing function that simply verifies whether a given historic date corresponds with a provided
+/// week day. If not, panics.
+#[cfg(test)]
+fn check_week_day(year: i32, month: Month, day: u8, week_day: crate::WeekDay) {
+    assert_eq!(
+        Date::from_historic_date(year, month, day)
+            .unwrap()
+            .week_day(),
+        week_day
+    );
+}
+
 /// Tests some known week day values.
 #[test]
 fn week_days() {
-    assert_eq!(
-        Date::from_historic_date(1970, Month::January, 1)
-            .unwrap()
-            .week_day(),
-        WeekDay::Thursday
-    );
+    check_week_day(1969, Month::December, 25, WeekDay::Thursday);
+    check_week_day(1969, Month::December, 26, WeekDay::Friday);
+    check_week_day(1969, Month::December, 27, WeekDay::Saturday);
+    check_week_day(1969, Month::December, 28, WeekDay::Sunday);
+    check_week_day(1969, Month::December, 29, WeekDay::Monday);
+    check_week_day(1969, Month::December, 30, WeekDay::Tuesday);
+    check_week_day(1969, Month::December, 31, WeekDay::Wednesday);
+    check_week_day(1970, Month::January, 1, WeekDay::Thursday);
+    check_week_day(1970, Month::January, 2, WeekDay::Friday);
+    check_week_day(1970, Month::January, 3, WeekDay::Saturday);
+    check_week_day(1970, Month::January, 4, WeekDay::Sunday);
+    check_week_day(1970, Month::January, 5, WeekDay::Monday);
+    check_week_day(1970, Month::January, 6, WeekDay::Tuesday);
+    check_week_day(1970, Month::January, 7, WeekDay::Wednesday);
+    check_week_day(1970, Month::January, 8, WeekDay::Thursday);
 
-    assert_eq!(
-        Date::from_historic_date(1998, Month::December, 17)
-            .unwrap()
-            .week_day(),
-        WeekDay::Thursday
-    );
+    check_week_day(1998, Month::December, 17, WeekDay::Thursday);
 }
