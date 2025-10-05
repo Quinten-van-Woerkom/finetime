@@ -22,7 +22,7 @@ pub trait DateTime {
     /// Maps a given combination of date and time-of-day to an instant on this time scale. May
     /// return an error if the input does not represent a valid combination of date and
     /// time-of-day.
-    fn time_point_from_date_time(
+    fn time_point_from_datetime(
         date: Date<i32>,
         hour: u8,
         minute: u8,
@@ -32,7 +32,7 @@ pub trait DateTime {
     /// Maps a time point back to the date and time-of-day that it represents. Returns a tuple of
     /// date, hour, minute, and second. This function shall not fail, unless overflow occurs in the
     /// underlying integer arithmetic.
-    fn date_time_from_time_point(
+    fn datetime_from_time_point(
         time_point: TimePoint<Self, i64, Second>,
     ) -> (Date<i32>, u8, u8, u8);
 }
@@ -63,7 +63,7 @@ where
     /// When a continuous date-time mapping exists (without leap seconds), the `TimePoint`
     /// corresponding with a given date-time may be computed by adding the days, hours, minutes,
     /// and seconds since some epoch.
-    fn time_point_from_date_time(
+    fn time_point_from_datetime(
         date: Date<i32>,
         hour: u8,
         minute: u8,
@@ -91,7 +91,7 @@ where
     /// When a continuous date-time mapping exists (without leap seconds), the date-time
     /// corresponding with some `TimePoint` may be computed by factoring out the days, hours,
     /// minutes, and seconds since some epoch.
-    fn date_time_from_time_point(
+    fn datetime_from_time_point(
         time_point: TimePoint<Self, i64, Second>,
     ) -> (Date<i32>, u8, u8, u8) {
         // Step-by-step factoring of the time since epoch into days, hours, minutes, and seconds.

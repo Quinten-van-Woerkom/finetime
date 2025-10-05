@@ -127,7 +127,7 @@ where
         minute: u8,
         second: u8,
     ) -> Result<Self, Scale::Error> {
-        let time_seconds = Scale::time_point_from_date_time(date, hour, minute, second)?;
+        let time_seconds = Scale::time_point_from_datetime(date, hour, minute, second)?;
         let time = time_seconds
             .try_cast()
             .unwrap_or_else(|_| panic!())
@@ -137,7 +137,7 @@ where
 
     /// Maps a `TimePoint` towards the corresponding date and time-of-day.
     pub fn to_datetime(&self) -> (Date<i32>, u8, u8, u8) {
-        Scale::date_time_from_time_point(*self)
+        Scale::datetime_from_time_point(*self)
     }
 
     /// Constructs a `TimePoint` in the given time scale based on a Gregorian date-time.
