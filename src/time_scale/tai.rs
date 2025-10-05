@@ -68,7 +68,7 @@ fn gregorian_datetime_roundtrip(
     use crate::GregorianDate;
 
     let time = TaiTime::from_gregorian_datetime(year, month, day, hour, minute, second).unwrap();
-    let (date, hour2, minute2, second2) = time.to_datetime();
+    let (date, hour2, minute2, second2) = time.to_datetime().unwrap();
     let gregorian_date = GregorianDate::from_date(date);
     assert_eq!(gregorian_date.year(), year);
     assert_eq!(gregorian_date.month(), month);

@@ -126,7 +126,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, Scale::Error> {
+    ) -> Result<Self, Scale::UnrepresentableDateTime> {
         let time_seconds = Scale::time_point_from_datetime(date, hour, minute, second)?;
         let time = time_seconds
             .try_cast()
@@ -136,7 +136,7 @@ where
     }
 
     /// Maps a `TimePoint` towards the corresponding date and time-of-day.
-    pub fn to_datetime(&self) -> (Date<i32>, u8, u8, u8) {
+    pub fn to_datetime(&self) -> Result<(Date<i32>, u8, u8, u8), Scale::UnrepresentableTimePoint> {
         Scale::datetime_from_time_point(*self)
     }
 
@@ -148,7 +148,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidHistoricDateTime<Scale::Error>> {
+    ) -> Result<Self, InvalidHistoricDateTime<Scale::UnrepresentableDateTime>> {
         let date = Date::from_historic_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
@@ -164,7 +164,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidGregorianDateTime<Scale::Error>> {
+    ) -> Result<Self, InvalidGregorianDateTime<Scale::UnrepresentableDateTime>> {
         let date = Date::from_gregorian_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
@@ -180,7 +180,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidJulianDateTime<Scale::Error>> {
+    ) -> Result<Self, InvalidJulianDateTime<Scale::UnrepresentableDateTime>> {
         let date = Date::from_julian_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
@@ -202,7 +202,7 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, Scale::Error> {
+    ) -> Result<Self, Scale::UnrepresentableDateTime> {
         Scale::time_point_from_fine_datetime(date, hour, minute, second, subseconds)
     }
 
@@ -216,7 +216,7 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidHistoricDateTime<Scale::Error>> {
+    ) -> Result<Self, InvalidHistoricDateTime<Scale::UnrepresentableDateTime>> {
         let date = Date::from_historic_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),
@@ -234,7 +234,7 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidGregorianDateTime<Scale::Error>> {
+    ) -> Result<Self, InvalidGregorianDateTime<Scale::UnrepresentableDateTime>> {
         let date = Date::from_gregorian_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),
@@ -252,7 +252,7 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidJulianDateTime<Scale::Error>> {
+    ) -> Result<Self, InvalidJulianDateTime<Scale::UnrepresentableDateTime>> {
         let date = Date::from_julian_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),
