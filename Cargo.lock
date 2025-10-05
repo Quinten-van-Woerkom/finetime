@@ -98,6 +98,7 @@ dependencies = [
  "num-traits",
  "paste",
  "rand",
+ "rand_chacha",
  "thiserror",
  "tinyvec",
  "ureq",

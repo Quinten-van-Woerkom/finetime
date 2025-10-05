@@ -179,7 +179,7 @@ fn roundtrip() {
 
     // Afterwards, we verify 10_000 uniformly distributed random numbers
     use rand::prelude::*;
-    let mut rng = rand::rng();
+    let mut rng = rand_chacha::ChaCha12Rng::seed_from_u64(42);
     for _ in 0..10000 {
         let days_since_epoch = rng.random::<i32>();
         let time_since_epoch = Days::new(days_since_epoch);
