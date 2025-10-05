@@ -181,7 +181,7 @@ fn roundtrip() {
     use rand::prelude::*;
     let mut rng = rand::rng();
     for _ in 0..10000 {
-        let days_since_epoch = rng.random::<i32>() % (i32::MAX - 719468);
+        let days_since_epoch = rng.random::<i32>();
         let time_since_epoch = Days::new(days_since_epoch);
         let date = Date::from_time_since_epoch(time_since_epoch);
         let gregorian_date = GregorianDate::from_date(date);
