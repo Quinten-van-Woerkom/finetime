@@ -12,8 +12,6 @@ use crate::{
 /// accuracy: i.e., leap days are included, but leap seconds are not. This is useful in keeping
 /// this calendar applicable to all different time scales. Can represent years from -2^31 up to
 /// 2^31 - 1.
-///
-/// This is the calendar effectively used by the `hifitime` and `chrono` libraries.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct JulianDate {
     year: i32,
