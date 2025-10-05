@@ -1,9 +1,9 @@
 //! Implementation of the concept of date and time-of-day within a time scale.
 
-use core::ops::Add;
+use core::ops::{Add, Sub};
 
 use crate::{
-    Convert, Date, Duration, Hours, Minutes, Seconds, TimePoint,
+    Convert, Date, Duration, Fraction, Hours, Minutes, MulFloor, Seconds, TimePoint, UnitRatio,
     errors::InvalidTimeOfDay,
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
@@ -31,13 +31,6 @@ pub trait DateTime {
         second: u8,
     ) -> Result<TimePoint<Self, i64, Second>, Self::Error>;
 
-    /// Maps a time point back to the date and time-of-day that it represents. Returns a tuple of
-    /// date, hour, minute, and second. This function shall not fail, unless overflow occurs in the
-    /// underlying integer arithmetic.
-    fn datetime_from_time_point(
-        time_point: TimePoint<Self, i64, Second>,
-    ) -> (Date<i32>, u8, u8, u8);
-
     /// Convenience function that maps from a "fine" (subsecond-accuracy) date-time to an instant on
     /// this time scale. Shall defer to `time_point_from_datetime` for all logic beyond adding the
     /// subsecond time.
@@ -56,6 +49,34 @@ pub trait DateTime {
         let fine_time_point: TimePoint<Self, Representation, Period> =
             coarse_time_point.cast().into_unit();
         Ok(fine_time_point + subseconds)
+    }
+
+    /// Maps a time point back to the date and time-of-day that it represents. Returns a tuple of
+    /// date, hour, minute, and second. This function shall not fail, unless overflow occurs in the
+    /// underlying integer arithmetic.
+    fn datetime_from_time_point(
+        time_point: TimePoint<Self, i64, Second>,
+    ) -> (Date<i32>, u8, u8, u8);
+
+    /// Convenience function that maps from a "fine" (subsecond-accuracy) time point to a date-time
+    /// according to this time scale. Returns a tuple of date, hour, minute, second, and subsecond.
+    /// Shall not fail, unless overflow occurs in the underlying integer arithmetic.
+    fn fine_datetime_from_time_point<Representation, Period>(
+        time_point: TimePoint<Self, Representation, Period>,
+    ) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>)
+    where
+        Representation: Copy
+            + Into<i64>
+            + MulFloor<Fraction, Output = Representation>
+            + Sub<Representation, Output = Representation>
+            + Convert<Second, Period>,
+        Period: UnitRatio,
+    {
+        let coarse_time_point = time_point.floor::<Second>();
+        let subseconds = time_point - coarse_time_point.into_unit::<Period>();
+        let coarse_time_point = coarse_time_point.cast::<i64>();
+        let (date, hour, minute, second) = Self::datetime_from_time_point(coarse_time_point);
+        (date, hour, minute, second, subseconds)
     }
 }
 

@@ -63,13 +63,21 @@ fn check_historic_datetime(
     second: u8,
     subseconds: crate::MicroSeconds<i64>,
 ) {
-    let datetime = crate::TaiTime::from_str(string).unwrap();
-    let expected_datetime =
-        crate::TaiTime::from_historic_datetime(year, month, day, hour, minute, second)
-            .unwrap()
-            .into_unit()
-            + subseconds;
+    use crate::{Date, Tai, TaiTime};
+    let datetime = TaiTime::from_str(string).unwrap();
+    let date = Date::from_historic_date(year, month, day).unwrap();
+    let expected_datetime = TaiTime::from_datetime(date, hour, minute, second)
+        .unwrap()
+        .into_unit()
+        + subseconds;
     assert_eq!(datetime, expected_datetime);
+    let (date2, hour2, minute2, second2, subseconds2) =
+        Tai::fine_datetime_from_time_point(datetime);
+    assert_eq!(date, date2);
+    assert_eq!(hour, hour2);
+    assert_eq!(minute, minute2);
+    assert_eq!(second, second2);
+    assert_eq!(subseconds, subseconds2);
 }
 
 #[test]
