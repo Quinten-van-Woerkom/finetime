@@ -84,6 +84,23 @@ pub enum InvalidJulianDateTime<InvalidDateTime: core::error::Error> {
     InvalidJulianDate(#[from] InvalidJulianDate),
     InvalidDateTime(#[source] InvalidDateTime),
 }
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[error("error parsing `Date`")]
+pub enum HistoricDateParsingError {
+    IntegerParsingError(#[from] lexical_core::Error),
+    InvalidHistoricDate(#[from] InvalidHistoricDate),
+    InvalidMonthNumber(#[from] InvalidMonthNumber),
+    #[error("expected but did not find year-month delimiter '-'")]
+    ExpectedYearMonthDelimiter,
+    #[error("month representation must be exactly two digits")]
+    MonthRepresentationNotTwoDigits,
+    #[error("day representation must be exactly two digits")]
+    DayRepresentationNotTwoDigits,
+    #[error("expected but did not find month-day delimiter '-'")]
+    ExpectedMonthDayDelimiter,
+    #[error("could not parse entire string: data remains after historic date")]
+    UnexpectedRemainder,
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("error parsing `Duration`")]

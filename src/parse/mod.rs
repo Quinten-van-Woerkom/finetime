@@ -3,6 +3,7 @@
 //!
 //! Primarily, a subset of ISO 8601 is supported.
 
+mod historic_date;
 mod duration;
 pub use duration::{DurationComponent, DurationDesignator};
 mod number;
