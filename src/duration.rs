@@ -3,6 +3,7 @@
 //! concept is similar to that applied in the C++ `chrono` library.
 
 use core::{
+    fmt::Debug,
     hash::Hash,
     ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
@@ -22,13 +23,15 @@ use crate::{
 /// `Representation`, which determines how the count of elapsed ticks is stored. The `Period`
 /// determines the integer (!) ratio of each tick to seconds. This may be used to convert between
 /// `Duration`s of differing time units.
-#[derive(Debug)]
 pub struct Duration<Representation, Period: ?Sized = Second> {
     count: Representation,
     period: core::marker::PhantomData<Period>,
 }
 
-impl<Representation, Period> Duration<Representation, Period> {
+impl<Representation, Period> Duration<Representation, Period>
+where
+    Period: ?Sized,
+{
     /// Constructs a new `Duration` from a given number of time units.
     pub const fn new(count: Representation) -> Self {
         Self {
@@ -53,6 +56,7 @@ impl<Representation, Period> Duration<Representation, Period> {
     pub fn into_unit<Target>(self) -> Duration<Representation, Target>
     where
         Representation: Convert<Period, Target>,
+        Target: ?Sized,
     {
         Duration::new(self.count.convert())
     }
@@ -62,6 +66,7 @@ impl<Representation, Period> Duration<Representation, Period> {
     pub fn try_into_unit<Target>(self) -> Option<Duration<Representation, Target>>
     where
         Representation: TryConvert<Period, Target>,
+        Target: ?Sized,
     {
         Some(Duration::new(self.count.try_convert()?))
     }
@@ -70,8 +75,8 @@ impl<Representation, Period> Duration<Representation, Period> {
     pub fn round<Target>(self) -> Duration<Representation, Target>
     where
         Representation: MulRound<Fraction, Output = Representation>,
+        Target: UnitRatio + ?Sized,
         Period: UnitRatio,
-        Target: UnitRatio,
     {
         let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
         Duration::new(self.count.mul_round(unit_ratio))
@@ -82,8 +87,8 @@ impl<Representation, Period> Duration<Representation, Period> {
     pub fn ceil<Target>(self) -> Duration<Representation, Target>
     where
         Representation: MulCeil<Fraction, Output = Representation>,
+        Target: UnitRatio + ?Sized,
         Period: UnitRatio,
-        Target: UnitRatio,
     {
         let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
         Duration::new(self.count.mul_ceil(unit_ratio))
@@ -94,8 +99,8 @@ impl<Representation, Period> Duration<Representation, Period> {
     pub fn floor<Target>(self) -> Duration<Representation, Target>
     where
         Representation: MulFloor<Fraction, Output = Representation>,
+        Target: UnitRatio + ?Sized,
         Period: UnitRatio,
-        Target: UnitRatio,
     {
         let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
         Duration::new(self.count.mul_floor(unit_ratio))
@@ -119,7 +124,7 @@ impl<Representation, Period> Duration<Representation, Period> {
             + Sub<Representation, Output = Representation>
             + Convert<Unit, Period>,
         Period: UnitRatio,
-        Unit: UnitRatio,
+        Unit: UnitRatio + ?Sized,
     {
         let factored = self.floor::<Unit>();
         let remainder = self - factored.into_unit();
@@ -153,11 +158,30 @@ impl<Representation: kani::Arbitrary, Period> kani::Arbitrary for Duration<Repre
     }
 }
 
-impl<Representation, Period> Copy for Duration<Representation, Period> where Representation: Copy {}
+impl<Representation, Period> Debug for Duration<Representation, Period>
+where
+    Representation: Debug,
+    Period: ?Sized,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Duration")
+            .field("count", &self.count)
+            .field("period", &self.period)
+            .finish()
+    }
+}
+
+impl<Representation, Period> Copy for Duration<Representation, Period>
+where
+    Representation: Copy,
+    Period: ?Sized,
+{
+}
 
 impl<Representation, Period> Clone for Duration<Representation, Period>
 where
     Representation: Clone,
+    Period: ?Sized,
 {
     fn clone(&self) -> Self {
         Self::new(self.count.clone())
@@ -167,17 +191,24 @@ where
 impl<Representation, Period> PartialEq for Duration<Representation, Period>
 where
     Representation: PartialEq,
+    Period: ?Sized,
 {
     fn eq(&self, other: &Self) -> bool {
         self.count == other.count
     }
 }
 
-impl<Representation, Period> Eq for Duration<Representation, Period> where Representation: Eq {}
+impl<Representation, Period> Eq for Duration<Representation, Period>
+where
+    Representation: Eq,
+    Period: ?Sized,
+{
+}
 
 impl<Representation, Period> PartialOrd for Duration<Representation, Period>
 where
     Representation: PartialOrd,
+    Period: ?Sized,
 {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.count.partial_cmp(&other.count)
@@ -187,6 +218,7 @@ where
 impl<Representation, Period> Ord for Duration<Representation, Period>
 where
     Representation: Ord,
+    Period: ?Sized,
 {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.count.cmp(&other.count)
@@ -196,6 +228,7 @@ where
 impl<Representation, Period> Hash for Duration<Representation, Period>
 where
     Representation: Hash,
+    Period: ?Sized,
 {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.count.hash(state);
@@ -235,6 +268,7 @@ pub type Years<T> = Duration<T, SecondsPerYear>;
 impl<R1, R2, Period> Add<Duration<R2, Period>> for Duration<R1, Period>
 where
     R1: Add<R2>,
+    Period: ?Sized,
 {
     type Output = Duration<<R1 as Add<R2>>::Output, Period>;
 
@@ -249,6 +283,7 @@ where
 impl<R1, R2, Period> AddAssign<Duration<R2, Period>> for Duration<R1, Period>
 where
     R1: AddAssign<R2>,
+    Period: ?Sized,
 {
     fn add_assign(&mut self, rhs: Duration<R2, Period>) {
         self.count += rhs.count;
@@ -259,6 +294,7 @@ where
 impl<R1, R2, Period> Sub<Duration<R2, Period>> for Duration<R1, Period>
 where
     R1: Sub<R2>,
+    Period: ?Sized,
 {
     type Output = Duration<<R1 as Sub<R2>>::Output, Period>;
 
@@ -273,6 +309,7 @@ where
 impl<R1, R2, Period> SubAssign<Duration<R2, Period>> for Duration<R1, Period>
 where
     R1: SubAssign<R2>,
+    Period: ?Sized,
 {
     fn sub_assign(&mut self, rhs: Duration<R2, Period>) {
         self.count -= rhs.count;
@@ -284,6 +321,7 @@ where
 impl<Representation, Period> Neg for Duration<Representation, Period>
 where
     Representation: Neg<Output = Representation>,
+    Period: ?Sized,
 {
     type Output = Self;
 
@@ -298,6 +336,7 @@ where
 impl<R1, R2, Period> Mul<R2> for Duration<R1, Period>
 where
     R1: Mul<R2>,
+    Period: ?Sized,
 {
     type Output = Duration<<R1 as Mul<R2>>::Output, Period>;
 
@@ -314,6 +353,7 @@ where
 impl<R1, R2, Period> Div<R2> for Duration<R1, Period>
 where
     R1: Div<R2>,
+    Period: ?Sized,
 {
     type Output = Duration<<R1 as Div<R2>>::Output, Period>;
 
@@ -329,6 +369,7 @@ where
 impl<Representation, Period> Bounded for Duration<Representation, Period>
 where
     Representation: Bounded,
+    Period: ?Sized,
 {
     /// Returns the `Duration` value that is nearest to negative infinity.
     fn min_value() -> Self {
@@ -350,6 +391,7 @@ where
 impl<Representation, Period> Zero for Duration<Representation, Period>
 where
     Representation: Zero,
+    Period: ?Sized,
 {
     /// Returns a `Duration` value that represents no time passed.
     fn zero() -> Self {
@@ -368,6 +410,7 @@ where
 impl<Representation, Period> ConstZero for Duration<Representation, Period>
 where
     Representation: ConstZero,
+    Period: ?Sized,
 {
     const ZERO: Self = Self {
         count: Representation::ZERO,
@@ -378,6 +421,7 @@ where
 impl<Representation, Period> Duration<Representation, Period>
 where
     Representation: Signed,
+    Period: ?Sized,
 {
     pub fn abs(&self) -> Self {
         Self {
@@ -412,6 +456,7 @@ where
 impl<Representation, Period> TryMul<Fraction> for Duration<Representation, Period>
 where
     Representation: TryMul<Fraction>,
+    Period: ?Sized,
 {
     type Output = Duration<<Representation as TryMul<Fraction>>::Output, Period>;
 
@@ -426,6 +471,7 @@ where
 impl<Representation, Period> TryMul<Duration<Representation, Period>> for Fraction
 where
     Representation: TryMul<Fraction>,
+    Period: ?Sized,
 {
     type Output = Duration<<Representation as TryMul<Fraction>>::Output, Period>;
 
@@ -440,6 +486,7 @@ where
 impl<Representation, Period> MulRound<Fraction> for Duration<Representation, Period>
 where
     Representation: MulRound<Fraction>,
+    Period: ?Sized,
 {
     type Output = Duration<<Representation as MulRound<Fraction>>::Output, Period>;
 
@@ -454,6 +501,7 @@ where
 impl<Representation, Period> MulRound<Duration<Representation, Period>> for Fraction
 where
     Representation: MulRound<Fraction>,
+    Period: ?Sized,
 {
     type Output = Duration<<Representation as MulRound<Fraction>>::Output, Period>;
 
@@ -468,6 +516,7 @@ where
 impl<Representation, Period> MulCeil<Fraction> for Duration<Representation, Period>
 where
     Representation: MulCeil<Fraction>,
+    Period: ?Sized,
 {
     type Output = Duration<<Representation as MulCeil<Fraction>>::Output, Period>;
 
@@ -482,6 +531,7 @@ where
 impl<Representation, Period> MulCeil<Duration<Representation, Period>> for Fraction
 where
     Representation: MulCeil<Fraction>,
+    Period: ?Sized,
 {
     type Output = Duration<<Representation as MulCeil<Fraction>>::Output, Period>;
 
@@ -496,6 +546,7 @@ where
 impl<Representation, Period> MulFloor<Fraction> for Duration<Representation, Period>
 where
     Representation: MulFloor<Fraction>,
+    Period: ?Sized,
 {
     type Output = Duration<<Representation as MulFloor<Fraction>>::Output, Period>;
 
@@ -510,6 +561,7 @@ where
 impl<Representation, Period> MulFloor<Duration<Representation, Period>> for Fraction
 where
     Representation: MulFloor<Fraction>,
+    Period: ?Sized,
 {
     type Output = Duration<<Representation as MulFloor<Fraction>>::Output, Period>;
 

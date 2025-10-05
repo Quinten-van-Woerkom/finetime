@@ -7,7 +7,11 @@ use crate::{Fraction, TryMul};
 /// Trait representing a lossless conversion from one unit to another. Note that the underlying
 /// value representation stays the same. For floating point representations, floating point
 /// rounding is permitted.
-pub trait Convert<From, Into> {
+pub trait Convert<From, Into>
+where
+    From: ?Sized,
+    Into: ?Sized,
+{
     /// Converts from one unit into another. Shall only be used for exact conversions, without
     /// rounding error. Floating point errors are permitted.
     fn convert(self) -> Self;
@@ -39,8 +43,8 @@ impl_identity_conversion!(i128);
 
 impl<From, Into> Convert<From, Into> for f64
 where
-    From: UnitRatio,
-    Into: UnitRatio,
+    From: UnitRatio + ?Sized,
+    Into: UnitRatio + ?Sized,
 {
     fn convert(self) -> Self {
         let combined_ratio = From::FRACTION.divide_by(&Into::FRACTION);
@@ -50,8 +54,8 @@ where
 
 impl<From, Into> Convert<From, Into> for f32
 where
-    From: UnitRatio,
-    Into: UnitRatio,
+    From: UnitRatio + ?Sized,
+    Into: UnitRatio + ?Sized,
 {
     fn convert(self) -> Self {
         let combined_ratio = From::FRACTION.divide_by(&Into::FRACTION);
@@ -62,7 +66,11 @@ where
 /// Trait representing a fallible conversion from one unit to another, failing if the requested
 /// conversion cannot be computed losslessly. For floating point representations, this conversion
 /// shall always succeed.
-pub trait TryConvert<From, Into>: Sized {
+pub trait TryConvert<From, Into>: Sized
+where
+    From: ?Sized,
+    Into: ?Sized,
+{
     /// Tries to convert from one unit into another. If the conversion would result in significant
     /// (non floating point) rounding error, returns `None`.
     fn try_convert(self) -> Option<Self>;
@@ -71,8 +79,8 @@ pub trait TryConvert<From, Into>: Sized {
 impl<T, From, Into> TryConvert<From, Into> for T
 where
     T: TryMul<Fraction, Output = T>,
-    From: UnitRatio,
-    Into: UnitRatio,
+    From: UnitRatio + ?Sized,
+    Into: UnitRatio + ?Sized,
 {
     fn try_convert(self) -> Option<Self> {
         let combined_ratio = From::FRACTION.divide_by(&Into::FRACTION);

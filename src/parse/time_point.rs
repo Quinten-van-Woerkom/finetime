@@ -13,7 +13,7 @@ where
     Period: UnitRatio,
     i64: Convert<Second, Period>,
 {
-    type Err = TimePointParsingError<<Scale as DateTime>::UnrepresentableDateTime>;
+    type Err = TimePointParsingError<<Scale as DateTime>::Error>;
 
     /// Parses a `TimePoint` based on some ISO 8610 date and time of day string. Note that time
     /// shifts are explicitly not supported: those are already included in the choice of `Scale`
@@ -72,7 +72,7 @@ fn check_historic_datetime(
         + subseconds;
     assert_eq!(datetime, expected_datetime);
     let (date2, hour2, minute2, second2, subseconds2) =
-        Tai::fine_datetime_from_time_point(datetime).unwrap();
+        Tai::fine_datetime_from_time_point(datetime);
     assert_eq!(date, date2);
     assert_eq!(hour, hour2);
     assert_eq!(minute, minute2);

@@ -2,15 +2,16 @@
 //! fundamental timekeeping logic of this library.
 
 use core::{
+    fmt::{Debug, Display},
     hash::Hash,
     ops::{Add, AddAssign, Sub, SubAssign},
 };
 
-use num_traits::Bounded;
+use num_traits::{Bounded, Zero};
 
 use crate::{
-    Convert, Date, DateTime, Duration, Fraction, Month, MulCeil, MulFloor, MulRound, TryConvert,
-    UnitRatio,
+    Convert, Date, DateTime, Duration, Fraction, GregorianDate, HistoricDate, JulianDate, Month,
+    MulCeil, MulFloor, MulRound, TryConvert, UnitRatio,
     errors::{InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime},
     units::Second,
 };
@@ -18,7 +19,6 @@ use crate::{
 /// A `TimePoint` identifies a specific instant in time. It is templated on a `Representation` and
 /// `Period`, which the define the characteristics of the `Duration` type used to represent the
 /// time elapsed since the epoch of the underlying time scale `Scale`.
-#[derive(Debug)]
 pub struct TimePoint<Scale: ?Sized, Representation, Period = Second> {
     time_since_epoch: Duration<Representation, Period>,
     time_scale: core::marker::PhantomData<Scale>,
@@ -126,18 +126,13 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, Scale::UnrepresentableDateTime> {
+    ) -> Result<Self, Scale::Error> {
         let time_seconds = Scale::time_point_from_datetime(date, hour, minute, second)?;
         let time = time_seconds
             .try_cast()
             .unwrap_or_else(|_| panic!())
             .into_unit();
         Ok(time)
-    }
-
-    /// Maps a `TimePoint` towards the corresponding date and time-of-day.
-    pub fn to_datetime(&self) -> Result<(Date<i32>, u8, u8, u8), Scale::UnrepresentableTimePoint> {
-        Scale::datetime_from_time_point(*self)
     }
 
     /// Constructs a `TimePoint` in the given time scale, based on a historic date-time.
@@ -148,7 +143,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidHistoricDateTime<Scale::UnrepresentableDateTime>> {
+    ) -> Result<Self, InvalidHistoricDateTime<Scale::Error>> {
         let date = Date::from_historic_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
@@ -164,7 +159,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidGregorianDateTime<Scale::UnrepresentableDateTime>> {
+    ) -> Result<Self, InvalidGregorianDateTime<Scale::Error>> {
         let date = Date::from_gregorian_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
@@ -180,12 +175,35 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Self, InvalidJulianDateTime<Scale::UnrepresentableDateTime>> {
+    ) -> Result<Self, InvalidJulianDateTime<Scale::Error>> {
         let date = Date::from_julian_date(year, month, day)?;
         match Self::from_datetime(date, hour, minute, second) {
             Ok(time_point) => Ok(time_point),
             Err(error) => Err(InvalidJulianDateTime::InvalidDateTime(error)),
         }
+    }
+
+    /// Maps a `TimePoint` towards the corresponding date and time-of-day.
+    pub fn to_datetime(&self) -> (Date<i32>, u8, u8, u8) {
+        Scale::datetime_from_time_point(*self)
+    }
+
+    /// Maps a `TimePoint` towards the corresponding historic date and time-of-day.
+    pub fn to_historic_datetime(&self) -> (HistoricDate, u8, u8, u8) {
+        let (date, hour, minute, second) = self.to_datetime();
+        (date.into(), hour, minute, second)
+    }
+
+    /// Maps a `TimePoint` towards the corresponding proleptic Gregorian date and time-of-day.
+    pub fn to_gregorian_datetime(&self) -> (GregorianDate, u8, u8, u8) {
+        let (date, hour, minute, second) = self.to_datetime();
+        (date.into(), hour, minute, second)
+    }
+
+    /// Maps a `TimePoint` towards the corresponding Julian date and time-of-day.
+    pub fn to_julian_datetime(&self) -> (JulianDate, u8, u8, u8) {
+        let (date, hour, minute, second) = self.to_datetime();
+        (date.into(), hour, minute, second)
     }
 }
 
@@ -202,7 +220,7 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, Scale::UnrepresentableDateTime> {
+    ) -> Result<Self, Scale::Error> {
         Scale::time_point_from_fine_datetime(date, hour, minute, second, subseconds)
     }
 
@@ -216,7 +234,7 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidHistoricDateTime<Scale::UnrepresentableDateTime>> {
+    ) -> Result<Self, InvalidHistoricDateTime<Scale::Error>> {
         let date = Date::from_historic_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),
@@ -234,7 +252,7 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidGregorianDateTime<Scale::UnrepresentableDateTime>> {
+    ) -> Result<Self, InvalidGregorianDateTime<Scale::Error>> {
         let date = Date::from_gregorian_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),
@@ -252,7 +270,7 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidJulianDateTime<Scale::UnrepresentableDateTime>> {
+    ) -> Result<Self, InvalidJulianDateTime<Scale::Error>> {
         let date = Date::from_julian_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),
@@ -261,12 +279,129 @@ where
     }
 }
 
+impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
+where
+    Scale: ?Sized + DateTime,
+    Representation: Copy
+        + Into<i64>
+        + MulFloor<Fraction, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + Convert<Second, Period>,
+    Period: UnitRatio,
+{
+    pub fn to_fine_datetime(&self) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>) {
+        Scale::fine_datetime_from_time_point(*self)
+    }
+
+    pub fn to_fine_historic_datetime(
+        &self,
+    ) -> (HistoricDate, u8, u8, u8, Duration<Representation, Period>) {
+        let (date, hour, minute, second, subseconds) = self.to_fine_datetime();
+        (date.into(), hour, minute, second, subseconds)
+    }
+
+    pub fn to_fine_gregorian_datetime(
+        &self,
+    ) -> (GregorianDate, u8, u8, u8, Duration<Representation, Period>) {
+        let (date, hour, minute, second, subseconds) = self.to_fine_datetime();
+        (date.into(), hour, minute, second, subseconds)
+    }
+
+    pub fn to_fine_julian_datetime(
+        &self,
+    ) -> (JulianDate, u8, u8, u8, Duration<Representation, Period>) {
+        let (date, hour, minute, second, subseconds) = self.to_fine_datetime();
+        (date.into(), hour, minute, second, subseconds)
+    }
+}
+
+impl<Scale, Representation, Period> Display for TimePoint<Scale, Representation, Period>
+where
+    Scale: ?Sized + DateTime,
+    Representation: Copy
+        + Into<i64>
+        + MulFloor<Fraction, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + Convert<Second, Period>
+        + Zero,
+    Period: UnitRatio,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let (historic_date, hour, minute, second, subseconds) = self.to_fine_historic_datetime();
+        write!(
+            f,
+            "{:04}-{:02}-{:02}T{hour:02}:{minute:02}:{second:02}",
+            historic_date.year(),
+            historic_date.month() as u8,
+            historic_date.day(),
+        )?;
+
+        if !subseconds.is_zero() {
+            write!(f, ".")?;
+
+            // Set maximum number of digits after the decimal point printed based on precision
+            // argument given to the formatter.
+            let max_digits_printed = f.precision().unwrap_or(9);
+            let mut digits_printed = 0;
+
+            // First, we express the subseconds value as a fraction of a second.
+            let subseconds: i64 = subseconds.count().into();
+            let subseconds = subseconds as u64;
+            let numerator = Period::FRACTION.numerator() * subseconds;
+            let denominator = Period::FRACTION.denominator();
+            let mut remainder = numerator % denominator;
+
+            // Then we repeatedly reduce the remainder until none remains, or until we reach the
+            // maximum specified precision.
+            while remainder != 0 && digits_printed < max_digits_printed {
+                remainder *= 10;
+                write!(f, "{}", remainder / denominator)?;
+                digits_printed += 1;
+                remainder %= denominator;
+            }
+            Ok(())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[test]
+fn format() {
+    let time = crate::TaiTime::from_fine_historic_datetime(
+        1998,
+        Month::December,
+        17,
+        23,
+        21,
+        58,
+        crate::NanoSeconds::new(450103789i64),
+    )
+    .unwrap();
+    assert_eq!(time.to_string(), "1998-12-17T23:21:58.450103789");
+}
+
 #[cfg(kani)]
 impl<Scale, Representation: kani::Arbitrary, Period> kani::Arbitrary
     for TimePoint<Scale, Representation, Period>
+where
+    Scale: ?Sized,
 {
     fn any() -> Self {
         TimePoint::from_time_since_epoch(kani::any())
+    }
+}
+
+impl<Scale, Representation, Period> Debug for TimePoint<Scale, Representation, Period>
+where
+    Representation: Debug,
+    Scale: ?Sized,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("TimePoint")
+            .field("time_since_epoch", &self.time_since_epoch)
+            .field("time_scale", &self.time_scale)
+            .finish()
     }
 }
 

@@ -22,14 +22,7 @@ pub trait DateTime {
     /// This error may be returned whenever some input date-time is not valid. This may be the case
     /// when the time-of-day is not valid, but also when some date-time does not occur in a chosen
     /// time scale, for example due to leap seconds deletions or daylight saving time switches.
-    type UnrepresentableDateTime: core::error::Error;
-
-    /// This error may be returned whenever some input `TimePoint` does not map to an existing
-    /// date-time. This almost never happens, so this type will generally be
-    /// `core::convert::Infallible`. A rare exception is Unix time: due to its ignoring of leap
-    /// seconds, some seconds-since-epoch map to multiple date-times (leap second insertions) or to
-    /// no date-time at all (leap second deletions).
-    type UnrepresentableTimePoint: core::error::Error;
+    type Error: core::error::Error;
 
     /// Maps a given combination of date and time-of-day to an instant on this time scale. May
     /// return an error if the input does not represent a valid combination of date and
@@ -39,7 +32,7 @@ pub trait DateTime {
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<TimePoint<Self, i64, Second>, Self::UnrepresentableDateTime>;
+    ) -> Result<TimePoint<Self, i64, Second>, Self::Error>;
 
     /// Convenience function that maps from a "fine" (subsecond-accuracy) date-time to an instant on
     /// this time scale. Shall defer to `time_point_from_datetime` for all logic beyond adding the
@@ -50,7 +43,7 @@ pub trait DateTime {
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<TimePoint<Self, Representation, Period>, Self::UnrepresentableDateTime>
+    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
         Representation:
             From<i64> + Convert<Second, Period> + Add<Representation, Output = Representation>,
@@ -66,7 +59,7 @@ pub trait DateTime {
     /// underlying integer arithmetic.
     fn datetime_from_time_point(
         time_point: TimePoint<Self, i64, Second>,
-    ) -> Result<(Date<i32>, u8, u8, u8), Self::UnrepresentableTimePoint>;
+    ) -> (Date<i32>, u8, u8, u8);
 
     /// Convenience function that maps from a "fine" (subsecond-accuracy) time point to a date-time
     /// according to this time scale. Returns a tuple of date, hour, minute, second, and subsecond.
@@ -74,10 +67,7 @@ pub trait DateTime {
     #[allow(clippy::type_complexity)]
     fn fine_datetime_from_time_point<Representation, Period>(
         time_point: TimePoint<Self, Representation, Period>,
-    ) -> Result<
-        (Date<i32>, u8, u8, u8, Duration<Representation, Period>),
-        Self::UnrepresentableTimePoint,
-    >
+    ) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>)
     where
         Representation: Copy
             + Into<i64>
@@ -89,8 +79,8 @@ pub trait DateTime {
         let coarse_time_point = time_point.floor::<Second>();
         let subseconds = time_point - coarse_time_point.into_unit::<Period>();
         let coarse_time_point = coarse_time_point.cast::<i64>();
-        let (date, hour, minute, second) = Self::datetime_from_time_point(coarse_time_point)?;
-        Ok((date, hour, minute, second, subseconds))
+        let (date, hour, minute, second) = Self::datetime_from_time_point(coarse_time_point);
+        (date, hour, minute, second, subseconds)
     }
 }
 
@@ -115,8 +105,7 @@ impl<Scale> DateTime for Scale
 where
     Scale: ContinuousDateTime,
 {
-    type UnrepresentableDateTime = InvalidTimeOfDay;
-    type UnrepresentableTimePoint = core::convert::Infallible;
+    type Error = InvalidTimeOfDay;
 
     /// When a continuous date-time mapping exists (without leap seconds), the `TimePoint`
     /// corresponding with a given date-time may be computed by adding the days, hours, minutes,
@@ -126,7 +115,7 @@ where
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<TimePoint<Self, i64, Second>, Self::UnrepresentableDateTime> {
+    ) -> Result<TimePoint<Self, i64, Second>, Self::Error> {
         if hour >= 24 || minute >= 60 || second >= 60 {
             return Err(InvalidTimeOfDay {
                 hour,
@@ -151,7 +140,7 @@ where
     /// minutes, and seconds since some epoch.
     fn datetime_from_time_point(
         time_point: TimePoint<Self, i64, Second>,
-    ) -> Result<(Date<i32>, u8, u8, u8), Self::UnrepresentableTimePoint> {
+    ) -> (Date<i32>, u8, u8, u8) {
         // Step-by-step factoring of the time since epoch into days, hours, minutes, and seconds.
         let seconds_since_scale_epoch = time_point.time_since_epoch();
         let (days_since_scale_epoch, seconds_in_day) =
@@ -164,12 +153,12 @@ where
 
         // We must narrow-cast all results, but only the cast of `date` may fail. The rest will
         // always succeed by construction: hour < 24, minute < 60, second < 60, so all fit in `u8`.
-        Ok((
+        (
             date.try_cast()
                 .expect("Call of `date_time_from_time_point` results in date outside of representable range of `i32`"),
             hour.count() as u8,
             minute.count() as u8,
             second.count() as u8,
-        ))
+        )
     }
 }
