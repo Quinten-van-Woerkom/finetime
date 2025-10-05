@@ -344,14 +344,22 @@ where
             let max_digits_printed = f.precision().unwrap_or(9);
             let mut digits_printed = 0;
 
-            // First, we express the subseconds value as a fraction of a second.
+            // First, we express the subseconds value as a fraction of a second. The cast to `i64`
+            // may fail, because the input subseconds may not fit in the supported range. However,
+            // since the subseconds are always positive (by construction), the second cast from
+            // `i64` to `u64` will always succeed.
+            //
+            // It would equivalently be possible to do a direct `TryInto<u64>`, but that would
+            // require an additional bound on the input `Representation`. Hence, we stick to the
+            // `TryInto<i64>` bound, which must already be supported based on the call to
+            // `to_fine_historic_datetime()`.
             let subseconds: i64 = subseconds
                 .count()
                 .try_into()
                 .unwrap_or_else(|_| panic!("result does not fit in `i64"));
-            let subseconds: u64 = subseconds
-                .try_into()
-                .unwrap_or_else(|_| panic!("result does not fit in `u64`"));
+            let subseconds: u64 = subseconds.try_into().unwrap_or_else(|_| {
+                panic!("internal error: result of positive `i64` does not fit in `u64`")
+            });
             let numerator = Period::FRACTION.numerator() * subseconds;
             let denominator = Period::FRACTION.denominator();
             let mut remainder = numerator % denominator;
@@ -427,6 +435,23 @@ fn truncated_format() {
     )
     .unwrap();
     assert_eq!(time.to_string(), "1998-12-17T23:21:58.450103789");
+}
+
+/// Verifies that formatting does not panic for a large randomized range of values.
+#[test]
+fn random_formatting() {
+    use crate::TaiTime;
+    use core::str::FromStr;
+    use rand::prelude::*;
+    let mut rng = rand_chacha::ChaCha12Rng::seed_from_u64(76);
+    for _ in 0..10_000 {
+        let ticks_since_epoch = rng.random::<i64>();
+        let time_since_epoch = crate::NanoSeconds::new(ticks_since_epoch);
+        let time = TaiTime::from_time_since_epoch(time_since_epoch);
+        let string = format!("{time:.9}");
+        let time2 = TaiTime::from_str(string.as_str()).unwrap();
+        assert_eq!(time, time2);
+    }
 }
 
 #[cfg(kani)]
