@@ -46,11 +46,13 @@ pub trait DateTime {
     ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
         Representation:
-            From<i64> + Convert<Second, Period> + Add<Representation, Output = Representation>,
+            TryFrom<i64> + Convert<Second, Period> + Add<Representation, Output = Representation>,
     {
         let coarse_time_point = Self::time_point_from_datetime(date, hour, minute, second)?;
-        let fine_time_point: TimePoint<Self, Representation, Period> =
-            coarse_time_point.cast().into_unit();
+        let fine_time_point: TimePoint<Self, Representation, Period> = coarse_time_point
+            .try_cast()
+            .unwrap_or_else(|_| panic!("result does not fit in `i64"))
+            .into_unit();
         Ok(fine_time_point + subseconds)
     }
 
@@ -70,7 +72,7 @@ pub trait DateTime {
     ) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>)
     where
         Representation: Copy
-            + Into<i64>
+            + TryInto<i64>
             + MulFloor<Fraction, Output = Representation>
             + Sub<Representation, Output = Representation>
             + Convert<Second, Period>,
@@ -78,7 +80,9 @@ pub trait DateTime {
     {
         let coarse_time_point = time_point.floor::<Second>();
         let subseconds = time_point - coarse_time_point.into_unit::<Period>();
-        let coarse_time_point = coarse_time_point.cast::<i64>();
+        let coarse_time_point = coarse_time_point
+            .try_cast::<i64>()
+            .unwrap_or_else(|_| panic!("result does not fit in `i64"));
         let (date, hour, minute, second) = Self::datetime_from_time_point(coarse_time_point);
         (date, hour, minute, second, subseconds)
     }

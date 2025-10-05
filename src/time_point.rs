@@ -211,7 +211,7 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized + DateTime,
     Representation:
-        From<i64> + Convert<Second, Period> + Add<Representation, Output = Representation>,
+        TryFrom<i64> + Convert<Second, Period> + Add<Representation, Output = Representation>,
 {
     /// Constructs a `TimePoint` from a given date and subsecond-accuracy time.
     pub fn from_fine_datetime(
@@ -283,7 +283,7 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized + DateTime,
     Representation: Copy
-        + Into<i64>
+        + TryInto<i64>
         + MulFloor<Fraction, Output = Representation>
         + Sub<Representation, Output = Representation>
         + Convert<Second, Period>,
@@ -319,7 +319,7 @@ impl<Scale, Representation, Period> Display for TimePoint<Scale, Representation,
 where
     Scale: ?Sized + DateTime,
     Representation: Copy
-        + Into<i64>
+        + TryInto<i64>
         + MulFloor<Fraction, Output = Representation>
         + Sub<Representation, Output = Representation>
         + Convert<Second, Period>
@@ -345,8 +345,13 @@ where
             let mut digits_printed = 0;
 
             // First, we express the subseconds value as a fraction of a second.
-            let subseconds: i64 = subseconds.count().into();
-            let subseconds = subseconds as u64;
+            let subseconds: i64 = subseconds
+                .count()
+                .try_into()
+                .unwrap_or_else(|_| panic!("result does not fit in `i64"));
+            let subseconds: u64 = subseconds
+                .try_into()
+                .unwrap_or_else(|_| panic!("result does not fit in `u64`"));
             let numerator = Period::FRACTION.numerator() * subseconds;
             let denominator = Period::FRACTION.denominator();
             let mut remainder = numerator % denominator;
@@ -366,8 +371,51 @@ where
     }
 }
 
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn check_formatting(
+    string: &str,
+    year: i32,
+    month: Month,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    milliseconds: i64,
+) {
+    let time = crate::TaiTime::from_fine_historic_datetime(
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        crate::MilliSeconds::new(milliseconds),
+    )
+    .unwrap();
+    assert_eq!(time.to_string(), string);
+}
+
+/// Verifies formatting for some known values.
 #[test]
-fn format() {
+fn formatting() {
+    use crate::Month::*;
+    check_formatting("1958-01-01T00:00:00.001", 1958, January, 1, 0, 0, 0, 1);
+    check_formatting("1958-01-02T00:00:00", 1958, January, 2, 0, 0, 0, 0);
+    check_formatting("1960-01-01T12:34:56.789", 1960, January, 1, 12, 34, 56, 789);
+    check_formatting("1961-01-01T00:00:00", 1961, January, 1, 0, 0, 0, 0);
+    check_formatting("1970-01-01T00:00:00", 1970, January, 1, 0, 0, 0, 0);
+    check_formatting("1976-01-01T23:59:59.999", 1976, January, 1, 23, 59, 59, 999);
+    check_formatting("2025-07-16T16:23:24", 2025, July, 16, 16, 23, 24, 0);
+    check_formatting("2034-12-26T08:02:37.123", 2034, December, 26, 8, 2, 37, 123);
+    check_formatting("2760-04-01T21:59:58", 2760, April, 1, 21, 59, 58, 0);
+    check_formatting("1643-01-04T01:01:33", 1643, January, 4, 1, 1, 33, 0);
+}
+
+/// Verifies that truncation is properly applied when the underlying fraction exceeds the number of
+/// digits specified in the formatting precision (or 9 by default, if none is specified).
+#[test]
+fn truncated_format() {
     let time = crate::TaiTime::from_fine_historic_datetime(
         1998,
         Month::December,
@@ -375,7 +423,7 @@ fn format() {
         23,
         21,
         58,
-        crate::NanoSeconds::new(450103789i64),
+        crate::PicoSeconds::new(450103789401i128),
     )
     .unwrap();
     assert_eq!(time.to_string(), "1998-12-17T23:21:58.450103789");
