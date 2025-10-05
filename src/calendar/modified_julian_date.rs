@@ -142,76 +142,46 @@ where
     }
 }
 
+/// Verifies this implementation by computing the `ModifiedJulianDate` for some known (computed
+/// manually or obtained elsewhere) time stamp. If it doesn't match the given `time_since_epoch`,
+/// panics.
+#[cfg(test)]
+fn check_historic_modified_julian_date(
+    year: i32,
+    month: Month,
+    day: u8,
+    time_since_epoch: Days<i32>,
+) {
+    assert_eq!(
+        ModifiedJulianDate::from_historic_date(year, month, day)
+            .unwrap()
+            .time_since_epoch(),
+        time_since_epoch,
+    );
+}
+
 /// Compares some computed MJD values with known values from Meeus' Astronomical Algorithms.
 /// Includes all historic dates, including those from before the Gregorian reform: indeed, the
 /// historic date structure should be able to capture that.
 #[test]
 fn historic_dates_from_meeus() {
     use crate::Month::*;
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(2000, January, 1).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(51544))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(1999, January, 1).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(51179))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(1987, January, 27).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(46822))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(1987, June, 19).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(46965))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(1988, January, 27).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(47187))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(1988, June, 19).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(47331))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(1900, January, 1).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(15020))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(1600, January, 1).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-94553))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(1600, December, 31).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-94188))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(837, April, 10).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-373129))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(-123, December, 31).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-723504))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(-122, January, 1).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-723503))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(-1000, July, 12).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-1044000))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(-1000, February, 29).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-1044134))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(-1001, August, 17).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-1044330))
-    );
-    assert_eq!(
-        ModifiedJulianDate::from_historic_date(-4712, January, 1).unwrap(),
-        ModifiedJulianDate::from_time_since_epoch(Days::new(-2400001))
-    );
+    check_historic_modified_julian_date(2000, January, 1, Days::new(51544));
+    check_historic_modified_julian_date(1999, January, 1, Days::new(51179));
+    check_historic_modified_julian_date(1987, January, 27, Days::new(46822));
+    check_historic_modified_julian_date(1987, June, 19, Days::new(46965));
+    check_historic_modified_julian_date(1988, January, 27, Days::new(47187));
+    check_historic_modified_julian_date(1988, June, 19, Days::new(47331));
+    check_historic_modified_julian_date(1900, January, 1, Days::new(15020));
+    check_historic_modified_julian_date(1600, January, 1, Days::new(-94553));
+    check_historic_modified_julian_date(1600, December, 31, Days::new(-94188));
+    check_historic_modified_julian_date(837, April, 10, Days::new(-373129));
+    check_historic_modified_julian_date(-123, December, 31, Days::new(-723504));
+    check_historic_modified_julian_date(-122, January, 1, Days::new(-723503));
+    check_historic_modified_julian_date(-1000, July, 12, Days::new(-1044000));
+    check_historic_modified_julian_date(-1000, February, 29, Days::new(-1044134));
+    check_historic_modified_julian_date(-1001, August, 17, Days::new(-1044330));
+    check_historic_modified_julian_date(-4712, January, 1, Days::new(-2400001));
 }
 
 /// In practical astrodynamical calculations, it is often useful to be able to create a modified

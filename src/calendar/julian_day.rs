@@ -159,77 +159,40 @@ where
     }
 }
 
+/// Verifies this implementation by computing the `JulianDay` for some known (computed manually or
+/// obtained elsewhere) time stamp. If it doesn't match the given `time_since_epoch`, panics.
+#[cfg(test)]
+fn check_historic_julian_day(year: i32, month: Month, day: u8, time_since_epoch: HalfDays<i32>) {
+    assert_eq!(
+        JulianDay::from_historic_date(year, month, day)
+            .unwrap()
+            .time_since_epoch(),
+        time_since_epoch,
+    );
+}
+
 /// Compares some computed JD values with known values from Meeus' Astronomical Algorithms.
 /// Includes all historic dates, including those from before the Gregorian reform: indeed, the
 /// historic date structure should be able to capture that.
 #[test]
 fn historic_dates_from_meeus() {
-    use crate::Days;
     use crate::Month::*;
-    assert_eq!(
-        JulianDay::from_historic_date(2000, January, 1).unwrap(),
-        JulianDay::new(Days::new(2451544).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(1999, January, 1).unwrap(),
-        JulianDay::new(Days::new(2451179).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(1987, January, 27).unwrap(),
-        JulianDay::new(Days::new(2446822).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(1987, June, 19).unwrap(),
-        JulianDay::new(Days::new(2446965).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(1988, January, 27).unwrap(),
-        JulianDay::new(Days::new(2447187).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(1988, June, 19).unwrap(),
-        JulianDay::new(Days::new(2447331).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(1900, January, 1).unwrap(),
-        JulianDay::new(Days::new(2415020).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(1600, January, 1).unwrap(),
-        JulianDay::new(Days::new(2305447).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(1600, December, 31).unwrap(),
-        JulianDay::new(Days::new(2305812).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(837, April, 10).unwrap(),
-        JulianDay::new(Days::new(2026871).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(-123, December, 31).unwrap(),
-        JulianDay::new(Days::new(1676496).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(-122, January, 1).unwrap(),
-        JulianDay::new(Days::new(1676497).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(-1000, July, 12).unwrap(),
-        JulianDay::new(Days::new(1356000).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(-1000, February, 29).unwrap(),
-        JulianDay::new(Days::new(1355866).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(-1001, August, 17).unwrap(),
-        JulianDay::new(Days::new(1355670).into_unit() + HalfDays::new(1))
-    );
-    assert_eq!(
-        JulianDay::from_historic_date(-4712, January, 1).unwrap(),
-        JulianDay::new(-HalfDays::new(1))
-    );
+    check_historic_julian_day(2000, January, 1, HalfDays::new(4903089));
+    check_historic_julian_day(1999, January, 1, HalfDays::new(4902359));
+    check_historic_julian_day(1987, January, 27, HalfDays::new(4893645));
+    check_historic_julian_day(1987, June, 19, HalfDays::new(4893931));
+    check_historic_julian_day(1988, January, 27, HalfDays::new(4894375));
+    check_historic_julian_day(1988, June, 19, HalfDays::new(4894663));
+    check_historic_julian_day(1900, January, 1, HalfDays::new(4830041));
+    check_historic_julian_day(1600, January, 1, HalfDays::new(4610895));
+    check_historic_julian_day(1600, December, 31, HalfDays::new(4611625));
+    check_historic_julian_day(837, April, 10, HalfDays::new(4053743));
+    check_historic_julian_day(-123, December, 31, HalfDays::new(3352993));
+    check_historic_julian_day(-122, January, 1, HalfDays::new(3352995));
+    check_historic_julian_day(-1000, July, 12, HalfDays::new(2712001));
+    check_historic_julian_day(-1000, February, 29, HalfDays::new(2711733));
+    check_historic_julian_day(-1001, August, 17, HalfDays::new(2711341));
+    check_historic_julian_day(-4712, January, 1, -HalfDays::new(1));
 }
 
 #[cfg(kani)]

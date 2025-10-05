@@ -17,81 +17,43 @@ impl ContinuousDateTime for Tai {
     };
 }
 
+/// Test function that verifies whether a given Gregorian date-time maps to the provided time since
+/// epoch (in seconds). If not, panics.
+#[cfg(test)]
+fn check_gregorian_datetime(
+    year: i32,
+    month: Month,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    time_since_epoch: crate::duration::Seconds<i64>,
+) {
+    assert_eq!(
+        TaiTime::from_gregorian_datetime(year, month, day, hour, minute, second)
+            .unwrap()
+            .time_since_epoch(),
+        time_since_epoch
+    );
+}
+
 /// Verifies this implementation by computing the `TaiTime` for some known (computed manually or
 /// obtained elsewhere) time stamps.
 #[test]
 fn known_timestamps() {
+    use crate::Month::*;
     use crate::duration::Seconds;
 
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(1958, Month::January, 1, 0, 0, 0)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(0)
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(1958, Month::January, 2, 0, 0, 0)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(86400),
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(1960, Month::January, 1, 0, 0, 0)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(63072000),
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(1961, Month::January, 1, 0, 0, 0)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(94694400),
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(1970, Month::January, 1, 0, 0, 0)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(378691200),
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(1976, Month::January, 1, 0, 0, 0)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(567993600),
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(2025, Month::July, 16, 16, 23, 24)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(2131374204),
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(2034, Month::December, 26, 8, 2, 37)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(2429424157),
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(2760, Month::April, 1, 21, 59, 58)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(25316575198),
-    );
-
-    assert_eq!(
-        TaiTime::from_gregorian_datetime(1643, Month::January, 4, 1, 1, 33)
-            .unwrap()
-            .time_since_epoch(),
-        Seconds::new(-9940143507),
-    );
+    check_gregorian_datetime(1958, January, 1, 0, 0, 0, Seconds::new(0));
+    check_gregorian_datetime(1958, January, 2, 0, 0, 0, Seconds::new(86400));
+    check_gregorian_datetime(1960, January, 1, 0, 0, 0, Seconds::new(63072000));
+    check_gregorian_datetime(1961, January, 1, 0, 0, 0, Seconds::new(94694400));
+    check_gregorian_datetime(1970, January, 1, 0, 0, 0, Seconds::new(378691200));
+    check_gregorian_datetime(1976, January, 1, 0, 0, 0, Seconds::new(567993600));
+    check_gregorian_datetime(2025, July, 16, 16, 23, 24, Seconds::new(2131374204));
+    check_gregorian_datetime(2034, December, 26, 8, 2, 37, Seconds::new(2429424157));
+    check_gregorian_datetime(2760, April, 1, 21, 59, 58, Seconds::new(25316575198));
+    check_gregorian_datetime(1643, January, 4, 1, 1, 33, Seconds::new(-9940143507));
 }
 
 #[cfg(test)]
