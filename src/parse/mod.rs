@@ -3,8 +3,11 @@
 //!
 //! Primarily, a subset of ISO 8601 is supported.
 
-mod historic_date;
 mod duration;
+mod historic_date;
 pub use duration::{DurationComponent, DurationDesignator};
-mod number;
-pub(crate) use number::Number;
+mod decimal;
+pub(crate) use decimal::DecimalNumber;
+mod time_of_day;
+pub(crate) use time_of_day::TimeOfDay;
+mod time_point;

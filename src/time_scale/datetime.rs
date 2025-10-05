@@ -1,7 +1,9 @@
 //! Implementation of the concept of date and time-of-day within a time scale.
 
+use core::ops::Add;
+
 use crate::{
-    Date, Hours, Minutes, Seconds, TimePoint,
+    Convert, Date, Duration, Hours, Minutes, Seconds, TimePoint,
     errors::InvalidTimeOfDay,
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
@@ -35,6 +37,26 @@ pub trait DateTime {
     fn datetime_from_time_point(
         time_point: TimePoint<Self, i64, Second>,
     ) -> (Date<i32>, u8, u8, u8);
+
+    /// Convenience function that maps from a "fine" (subsecond-accuracy) date-time to an instant on
+    /// this time scale. Shall defer to `time_point_from_datetime` for all logic beyond adding the
+    /// subsecond time.
+    fn time_point_from_fine_datetime<Representation, Period>(
+        date: Date<i32>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
+    where
+        Representation:
+            From<i64> + Convert<Second, Period> + Add<Representation, Output = Representation>,
+    {
+        let coarse_time_point = Self::time_point_from_datetime(date, hour, minute, second)?;
+        let fine_time_point: TimePoint<Self, Representation, Period> =
+            coarse_time_point.cast().into_unit();
+        Ok(fine_time_point + subseconds)
+    }
 }
 
 /// Some date-time scales are continuous: they do not apply leap seconds. In such cases, their

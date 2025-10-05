@@ -24,7 +24,7 @@ pub struct TimePoint<Scale: ?Sized, Representation, Period = Second> {
     time_scale: core::marker::PhantomData<Scale>,
 }
 
-impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
+impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Period> {
     /// Constructs a new `TimePoint` from a known time since epoch.
     pub const fn from_time_since_epoch(time_since_epoch: Duration<Representation, Period>) -> Self {
         Self {
@@ -118,7 +118,7 @@ impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period> {
 
 impl<Scale> TimePoint<Scale, i64, Second>
 where
-    Scale: DateTime,
+    Scale: ?Sized + DateTime,
 {
     /// Constructs a `TimePoint` in the given time scale based on the date and time-of-day.
     pub fn from_datetime(
@@ -140,7 +140,7 @@ where
         Scale::datetime_from_time_point(*self)
     }
 
-    /// Constructs a `TimePoint` in the given time scale based on a Gregorian date-time.
+    /// Constructs a `TimePoint` in the given time scale, based on a historic date-time.
     pub fn from_historic_datetime(
         year: i32,
         month: Month,
@@ -156,7 +156,7 @@ where
         }
     }
 
-    /// Constructs a `TimePoint` in the given time scale based on a Gregorian date-time.
+    /// Constructs a `TimePoint` in the given time scale, based on a Gregorian date-time.
     pub fn from_gregorian_datetime(
         year: i32,
         month: Month,
@@ -172,7 +172,7 @@ where
         }
     }
 
-    /// Constructs a `TimePoint` in the given time scale based on a Julian date-time.
+    /// Constructs a `TimePoint` in the given time scale, based on a Julian date-time.
     pub fn from_julian_datetime(
         year: i32,
         month: Month,
@@ -189,6 +189,78 @@ where
     }
 }
 
+impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
+where
+    Scale: ?Sized + DateTime,
+    Representation:
+        From<i64> + Convert<Second, Period> + Add<Representation, Output = Representation>,
+{
+    /// Constructs a `TimePoint` from a given date and subsecond-accuracy time.
+    pub fn from_fine_datetime(
+        date: Date<i32>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<Self, Scale::Error> {
+        Scale::time_point_from_fine_datetime(date, hour, minute, second, subseconds)
+    }
+
+    /// Constructs a `TimePoint` in the given time scale, based on a subsecond-accuracy historic
+    /// date-time.
+    pub fn from_fine_historic_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<Self, InvalidHistoricDateTime<Scale::Error>> {
+        let date = Date::from_historic_date(year, month, day)?;
+        match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
+            Ok(time_point) => Ok(time_point),
+            Err(error) => Err(InvalidHistoricDateTime::InvalidDateTime(error)),
+        }
+    }
+
+    /// Constructs a `TimePoint` in the given time scale, based on a subsecond-accuracy Gregorian
+    /// date-time.
+    pub fn from_fine_gregorian_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<Self, InvalidGregorianDateTime<Scale::Error>> {
+        let date = Date::from_gregorian_date(year, month, day)?;
+        match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
+            Ok(time_point) => Ok(time_point),
+            Err(error) => Err(InvalidGregorianDateTime::InvalidDateTime(error)),
+        }
+    }
+
+    /// Constructs a `TimePoint` in the given time scale, based on a subsecond-accuracy Julian
+    /// date-time.
+    pub fn from_fine_julian_datetime(
+        year: i32,
+        month: Month,
+        day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<Self, InvalidJulianDateTime<Scale::Error>> {
+        let date = Date::from_julian_date(year, month, day)?;
+        match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
+            Ok(time_point) => Ok(time_point),
+            Err(error) => Err(InvalidJulianDateTime::InvalidDateTime(error)),
+        }
+    }
+}
+
 #[cfg(kani)]
 impl<Scale, Representation: kani::Arbitrary, Period> kani::Arbitrary
     for TimePoint<Scale, Representation, Period>
@@ -198,14 +270,17 @@ impl<Scale, Representation: kani::Arbitrary, Period> kani::Arbitrary
     }
 }
 
-impl<Scale, Representation, Period> Copy for TimePoint<Scale, Representation, Period> where
-    Representation: Copy
+impl<Scale, Representation, Period> Copy for TimePoint<Scale, Representation, Period>
+where
+    Representation: Copy,
+    Scale: ?Sized,
 {
 }
 
 impl<Scale, Representation, Period> Clone for TimePoint<Scale, Representation, Period>
 where
     Representation: Clone,
+    Scale: ?Sized,
 {
     fn clone(&self) -> Self {
         Self::from_time_since_epoch(self.time_since_epoch.clone())
@@ -215,20 +290,24 @@ where
 impl<Scale, Representation, Period> PartialEq for TimePoint<Scale, Representation, Period>
 where
     Representation: PartialEq,
+    Scale: ?Sized,
 {
     fn eq(&self, other: &Self) -> bool {
         self.time_since_epoch == other.time_since_epoch
     }
 }
 
-impl<Scale, Representation, Period> Eq for TimePoint<Scale, Representation, Period> where
-    Representation: Eq
+impl<Scale, Representation, Period> Eq for TimePoint<Scale, Representation, Period>
+where
+    Representation: Eq,
+    Scale: ?Sized,
 {
 }
 
 impl<Scale, Representation, Period> PartialOrd for TimePoint<Scale, Representation, Period>
 where
     Representation: PartialOrd,
+    Scale: ?Sized,
 {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.time_since_epoch.partial_cmp(&other.time_since_epoch)
@@ -238,6 +317,7 @@ where
 impl<Scale, Representation, Period> Ord for TimePoint<Scale, Representation, Period>
 where
     Representation: Ord,
+    Scale: ?Sized,
 {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.time_since_epoch.cmp(&other.time_since_epoch)
@@ -247,6 +327,7 @@ where
 impl<Scale, Representation, Period> Hash for TimePoint<Scale, Representation, Period>
 where
     Representation: Hash,
+    Scale: ?Sized,
 {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.time_since_epoch.hash(state);
@@ -256,6 +337,7 @@ where
 impl<Scale, R1, R2, Period> Sub<TimePoint<Scale, R2, Period>> for TimePoint<Scale, R1, Period>
 where
     R1: Sub<R2>,
+    Scale: ?Sized,
 {
     type Output = Duration<<R1 as Sub<R2>>::Output, Period>;
 
@@ -267,6 +349,7 @@ where
 impl<Scale, R1, R2, Period> Add<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
 where
     R1: Add<R2>,
+    Scale: ?Sized,
 {
     type Output = TimePoint<Scale, <R1 as Add<R2>>::Output, Period>;
 
@@ -278,6 +361,7 @@ where
 impl<Scale, R1, R2, Period> AddAssign<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
 where
     R1: AddAssign<R2>,
+    Scale: ?Sized,
 {
     fn add_assign(&mut self, rhs: Duration<R2, Period>) {
         self.time_since_epoch += rhs;
@@ -287,6 +371,7 @@ where
 impl<Scale, R1, R2, Period> Sub<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
 where
     R1: Sub<R2>,
+    Scale: ?Sized,
 {
     type Output = TimePoint<Scale, <R1 as Sub<R2>>::Output, Period>;
 
@@ -298,6 +383,7 @@ where
 impl<Scale, R1, R2, Period> SubAssign<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
 where
     R1: SubAssign<R2>,
+    Scale: ?Sized,
 {
     fn sub_assign(&mut self, rhs: Duration<R2, Period>) {
         self.time_since_epoch -= rhs;
@@ -307,6 +393,7 @@ where
 impl<Scale, Representation, Period> Bounded for TimePoint<Scale, Representation, Period>
 where
     Representation: Bounded,
+    Scale: ?Sized,
 {
     fn min_value() -> Self {
         Self::from_time_since_epoch(Duration::<Representation, Period>::min_value())

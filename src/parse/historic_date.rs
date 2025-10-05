@@ -23,7 +23,8 @@ impl FromStr for HistoricDate {
 impl HistoricDate {
     /// Parses a `HistoricDate` based on some string. Accepts only the extended complete calendar
     /// date format specified in ISO 8601 (see section 5.2.2.1), though in addition any number of
-    /// digits is accepted for each term.
+    /// digits is accepted for the years term - to extend applicability of the format to a larger
+    /// time range.
     ///
     /// On success, returns the resulting `HistoricDate` and any remaining input that was not yet
     /// parsed. On failure, returns a reason indicating why.
@@ -53,6 +54,7 @@ impl HistoricDate {
             return Err(HistoricDateParsingError::ExpectedMonthDayDelimiter);
         }
 
+        // Parse day component
         let (day, consumed_bytes) = lexical_core::parse_partial(string.as_bytes())?;
         if consumed_bytes != 2 {
             return Err(HistoricDateParsingError::DayRepresentationNotTwoDigits);

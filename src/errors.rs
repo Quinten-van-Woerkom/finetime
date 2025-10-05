@@ -4,7 +4,7 @@
 
 use thiserror::Error;
 
-use crate::{DurationComponent, DurationDesignator, Month};
+use crate::{DurationDesignator, Month, parse::DecimalNumber};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
 #[error("{day} {month} {year} does not exist in the historic calendar")]
@@ -84,6 +84,20 @@ pub enum InvalidJulianDateTime<InvalidDateTime: core::error::Error> {
     InvalidJulianDate(#[from] InvalidJulianDate),
     InvalidDateTime(#[source] InvalidDateTime),
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[error("error parsing `TimePoint`")]
+pub enum TimePointParsingError<DateTimeError> {
+    DateParsingError(#[from] HistoricDateParsingError),
+    TimeOfDayParsingError(#[from] TimeOfDayParsingError),
+    #[error("expected but did not find time designator 'T'")]
+    ExpectedTimeDesignator,
+    #[error("could not parse entire string: data remains after time point")]
+    UnexpectedRemainder,
+    CannotRepresentDecimalNumber(#[from] CannotRepresentDecimalNumber),
+    DateTimeError(#[source] DateTimeError),
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("error parsing `Date`")]
 pub enum HistoricDateParsingError {
@@ -94,11 +108,31 @@ pub enum HistoricDateParsingError {
     ExpectedYearMonthDelimiter,
     #[error("month representation must be exactly two digits")]
     MonthRepresentationNotTwoDigits,
-    #[error("day representation must be exactly two digits")]
-    DayRepresentationNotTwoDigits,
     #[error("expected but did not find month-day delimiter '-'")]
     ExpectedMonthDayDelimiter,
+    #[error("day representation must be exactly two digits")]
+    DayRepresentationNotTwoDigits,
     #[error("could not parse entire string: data remains after historic date")]
+    UnexpectedRemainder,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[error("error parsing `TimeOfDay`")]
+pub enum TimeOfDayParsingError {
+    IntegerParsingError(#[from] lexical_core::Error),
+    #[error("hour representation must be exactly two digits")]
+    HourRepresentationNotTwoDigits,
+    #[error("expected but did not find hour-minute delimiter ':'")]
+    ExpectedHourMinuteDelimiter,
+    #[error("minute representation must be exactly two digits")]
+    MinuteRepresentationNotTwoDigits,
+    #[error("expected but did not find minute-second delimiter ':'")]
+    ExpectedMinuteSecondDelimiter,
+    #[error("integer part of the second representation must be exactly two digits")]
+    IntegerSecondRepresentationNotTwoDigits,
+    #[error("could not parse seconds component")]
+    NumberParsingError(#[from] NumberParsingError),
+    #[error("could not parse entire string: data remains after time-of-day")]
     UnexpectedRemainder,
 }
 
@@ -118,13 +152,13 @@ pub enum DurationParsingError {
     },
     #[error("only lowest order component may be expressed as decimal fraction")]
     OnlyLowestOrderComponentMayHaveDecimalFraction,
-    DurationComponentConversionError(#[from] DurationComponentConversionError),
+    CannotRepresentDecimalNumber(#[from] CannotRepresentDecimalNumber),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
-#[error("unable to express duration component {component:?} in underlying representation")]
-pub struct DurationComponentConversionError {
-    pub component: DurationComponent,
+#[error("unable to express decimal number {number:?} in underlying representation")]
+pub struct CannotRepresentDecimalNumber {
+    pub(crate) number: DecimalNumber,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]

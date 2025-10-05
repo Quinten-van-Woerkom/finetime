@@ -5,12 +5,13 @@ use core::str::FromStr;
 use num_traits::ConstZero;
 
 use crate::{
-    Days, Duration, Fraction, Hours, Minutes, Seconds, TryMul, UnitRatio, Years,
+    Duration, UnitRatio,
     errors::{
-        DurationComponentConversionError, DurationComponentParsingError,
+        CannotRepresentDecimalNumber, DurationComponentParsingError,
         DurationDesignatorParsingError, DurationParsingError,
     },
-    parse::Number,
+    parse::DecimalNumber,
+    units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerYear},
 };
 
 impl<Period> FromStr for Duration<i64, Period>
@@ -55,7 +56,7 @@ where
 
             duration += component.into_period()?;
 
-            if component.is_decimal_fraction() && !string.is_empty() {
+            if component.has_decimal_fraction() && !string.is_empty() {
                 return Err(DurationParsingError::OnlyLowestOrderComponentMayHaveDecimalFraction);
             }
 
@@ -70,91 +71,36 @@ where
 /// duration designator.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct DurationComponent {
-    number: Number,
+    number: DecimalNumber,
     designator: DurationDesignator,
 }
 
 impl DurationComponent {
     /// Tries to parse a duration component from a string.
     pub fn parse_partial(string: &str) -> Result<(Self, &str), DurationComponentParsingError> {
-        let (number, remainder) = Number::parse_partial(string)?;
+        let (number, remainder) = DecimalNumber::parse_partial(string)?;
         let (designator, remainder) = DurationDesignator::parse_partial(remainder)?;
         Ok((Self { number, designator }, remainder))
     }
 
     /// If a duration component contains a decimal fraction instead of a integer, it must per ISO
     /// 8601 be the last duration component in a duration string.
-    fn is_decimal_fraction(&self) -> bool {
-        match self.number {
-            Number::Integer(_) => false,
-            Number::Decimal { .. } => true,
-        }
+    fn has_decimal_fraction(&self) -> bool {
+        !self.number.is_integer()
     }
 
     /// Tries to convert a parsed duration component into the equivalent underlying representation
     /// for some given unit.
-    fn into_period<Period>(self) -> Result<Duration<i64, Period>, DurationComponentConversionError>
+    fn into_period<Period>(self) -> Result<Duration<i64, Period>, CannotRepresentDecimalNumber>
     where
         Period: UnitRatio,
     {
-        let error = DurationComponentConversionError { component: self };
-        match self.number {
-            Number::Integer(integer) => match self.designator {
-                DurationDesignator::Seconds => {
-                    let seconds = Seconds::new(integer);
-                    seconds.try_into_unit().ok_or(error)
-                }
-                DurationDesignator::Minutes => {
-                    let minutes = Minutes::new(integer);
-                    minutes.try_into_unit().ok_or(error)
-                }
-                DurationDesignator::Hours => {
-                    let hours = Hours::new(integer);
-                    hours.try_into_unit().ok_or(error)
-                }
-                DurationDesignator::Days => {
-                    let days = Days::new(integer);
-                    days.try_into_unit().ok_or(error)
-                }
-                DurationDesignator::Years => {
-                    let years = Years::new(integer);
-                    years.try_into_unit().ok_or(error)
-                }
-            },
-            Number::Decimal {
-                decimal,
-                fractional_digits,
-            } => {
-                let decimal_power = 10u64.pow(fractional_digits);
-                let fraction = Fraction::new(1, decimal_power);
-                match self.designator {
-                    DurationDesignator::Seconds => {
-                        let seconds = Seconds::new(decimal);
-                        let duration = seconds.try_into_unit().ok_or(error)?;
-                        duration.try_mul(fraction).ok_or(error)
-                    }
-                    DurationDesignator::Minutes => {
-                        let minutes = Minutes::new(decimal);
-                        let duration = minutes.try_into_unit().ok_or(error)?;
-                        duration.try_mul(fraction).ok_or(error)
-                    }
-                    DurationDesignator::Hours => {
-                        let hours = Hours::new(decimal);
-                        let duration = hours.try_into_unit().ok_or(error)?;
-                        duration.try_mul(fraction).ok_or(error)
-                    }
-                    DurationDesignator::Days => {
-                        let days = Days::new(decimal);
-                        let duration = days.try_into_unit().ok_or(error)?;
-                        duration.try_mul(fraction).ok_or(error)
-                    }
-                    DurationDesignator::Years => {
-                        let years = Years::new(decimal);
-                        let duration = years.try_into_unit().ok_or(error)?;
-                        duration.try_mul(fraction).ok_or(error)
-                    }
-                }
-            }
+        match self.designator {
+            DurationDesignator::Seconds => self.number.convert_period::<Second, Period>(),
+            DurationDesignator::Minutes => self.number.convert_period::<SecondsPerMinute, Period>(),
+            DurationDesignator::Hours => self.number.convert_period::<SecondsPerHour, Period>(),
+            DurationDesignator::Days => self.number.convert_period::<SecondsPerDay, Period>(),
+            DurationDesignator::Years => self.number.convert_period::<SecondsPerYear, Period>(),
         }
     }
 }
@@ -199,6 +145,8 @@ impl DurationDesignator {
 /// Tests that "simple" durations, made up of only one unit, can correctly be constructed.
 #[test]
 fn simple_durations() {
+    use crate::{Days, Hours, Minutes, Seconds, Years};
+
     let second = Seconds::from_str("P1S").unwrap();
     assert_eq!(second, Seconds::new(1));
     let seconds = Seconds::from_str("P42S").unwrap();
@@ -228,6 +176,7 @@ fn simple_durations() {
 /// Verifies that composite durations can be constructed.
 #[test]
 fn composite_durations() {
+    use crate::Seconds;
     let duration = Seconds::from_str("P1Y2D3H4M5S").unwrap();
     assert_eq!(
         duration,
@@ -240,6 +189,7 @@ fn composite_durations() {
 /// be converted into an hour, so "P60M" is a valid representation for hours).
 #[test]
 fn sub_unit_durations() {
+    use crate::Hours;
     let hour = Hours::from_str("P60M").unwrap();
     assert_eq!(hour, Hours::new(1));
 }
@@ -247,7 +197,7 @@ fn sub_unit_durations() {
 /// Checks whether fractional duration representations can be constructed.
 #[test]
 fn fractional_durations() {
-    use crate::MilliSeconds;
+    use crate::{MilliSeconds, Seconds};
     let milliseconds = MilliSeconds::from_str("P5.123S").unwrap();
     assert_eq!(milliseconds, MilliSeconds::new(5123));
 
