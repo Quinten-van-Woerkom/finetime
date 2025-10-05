@@ -256,4 +256,7 @@ fn fractional_durations() {
         milliseconds,
         MilliSeconds::new(58123 + 59 * 60_000 + 23 * 3_600_000)
     );
+
+    let seconds = Seconds::from_str("P23H59.5M").unwrap();
+    assert_eq!(seconds, Seconds::new(23 * 3600 + 59 * 60 + 30));
 }
