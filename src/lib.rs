@@ -13,6 +13,8 @@ pub use duration::{
 pub mod errors;
 mod fraction;
 pub use fraction::{Fraction, MulCeil, MulFloor, MulRound, TryMul};
+mod parse;
+pub use parse::{DurationComponent, DurationDesignator};
 mod time_point;
 pub use time_point::TimePoint;
 mod time_scale;
