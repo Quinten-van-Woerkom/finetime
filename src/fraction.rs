@@ -155,9 +155,9 @@ macro_rules! try_mul_integer {
 
             fn try_mul(self, rhs: $repr) -> Option<Self::Output> {
                 use num_integer::Integer;
-                let numerator: $repr = self.numerator().try_into().ok()?;
-                let denominator: $repr = self.denominator().try_into().ok()?;
-                let (div, rem) = rhs.checked_mul(numerator)?.div_rem(&denominator);
+                let numerator: $repr = self.numerator().try_into().unwrap();
+                let denominator: $repr = self.denominator().try_into().unwrap();
+                let (div, rem) = (rhs * numerator).div_rem(&denominator);
                 if rem == 0 { Some(div) } else { None }
             }
         }
