@@ -22,7 +22,8 @@ where
     /// Parses a `Duration` type based on some ISO 8601 duration string. However, we additionally
     /// impose that months may not be used as duration, to prevent confusion with minutes (and
     /// because their precise duration cannot be unambiguously defined). Furthermore, we do not
-    /// support use of the time designator ('T') inside duration expressions.
+    /// support use of the time designator ('T') inside duration expressions. Finally, we support
+    /// years, days, hours, minutes, and seconds with any number of digits.
     ///
     /// For years, following the rest of `finetime`, a duration of 31556952 seconds is used, which
     /// corresponds with the exact average duration of a Gregorian year.
