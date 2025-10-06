@@ -11,6 +11,9 @@ repository = "https://github.com/Quinten-van-Woerkom/finetime"
 default = ["std"]
 std = []
 
+[profile.dev]
+opt-level=3
+
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
 
@@ -19,13 +22,10 @@ paste = "1.0.15"
 
 [dependencies]
 derive_more = { version = "2.0.1", features = ["full"] }
-i256 = { version = "0.2.2", features = ["num-traits"] }
-lazy_static = "1.5.0"
 lexical-core = "1.0.6"
 num-integer = "0.1.46"
 num-traits = "0.2.19"
 thiserror = "2.0.17"
-tinyvec = "1.9.0"
 
 [build-dependencies]
 ureq = "2"

@@ -91,8 +91,6 @@ name = "finetime"
 version = "0.4.4"
 dependencies = [
  "derive_more",
- "i256",
- "lazy_static",
  "lexical-core",
  "num-integer",
  "num-traits",
@@ -100,7 +98,6 @@ dependencies = [
  "rand",
  "rand_chacha",
  "thiserror",
- "tinyvec",
  "ureq",
 ]
 
@@ -144,15 +141,6 @@ dependencies = [
  "libc",
  "r-efi",
  "wasi 0.14.7+wasi-0.2.4",
-]
-
-[[package]]
-name = "i256"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d33e2469f814f46f104fc4641cba20f3ba3b2b902e7d3c12db5bab37b33f6ac9"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]
@@ -261,12 +249,6 @@ dependencies = [
  "icu_normalizer",
  "icu_properties",
 ]
-
-[[package]]
-name = "lazy_static"
-version = "1.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "lexical-core"
@@ -603,12 +585,6 @@ dependencies = [
  "displaydoc",
  "zerovec",
 ]
-
-[[package]]
-name = "tinyvec"
-version = "1.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09b3661f17e86524eccd4371ab0429194e0d7c008abb45f7a7495b1719463c71"
 
 [[package]]
 name = "unicode-ident"
