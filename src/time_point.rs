@@ -327,8 +327,7 @@ where
 
             // Set maximum number of digits after the decimal point printed based on precision
             // argument given to the formatter.
-            let max_digits_printed = f.precision().unwrap_or(9);
-
+            let max_digits_printed = f.precision();
             for digit in subseconds.fractional_digits(max_digits_printed) {
                 write!(f, "{digit}")?;
             }
@@ -394,7 +393,7 @@ fn truncated_format() {
         crate::PicoSeconds::new(450103789401i128),
     )
     .unwrap();
-    assert_eq!(time.to_string(), "1998-12-17T23:21:58.450103789");
+    assert_eq!(format!("{time:.9}"), "1998-12-17T23:21:58.450103789");
 }
 
 /// Verifies that formatting does not panic for a large randomized range of values.

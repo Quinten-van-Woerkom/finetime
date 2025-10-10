@@ -12,7 +12,7 @@ pub trait FractionalDigits {
     type Iterator: Iterator<Item = u8>;
 
     /// Returns an iterator into the fractional digits that make up a given number.
-    fn fractional_digits(self, unit_ratio: Fraction, precision: usize) -> Self::Iterator;
+    fn fractional_digits(self, unit_ratio: Fraction, precision: Option<usize>) -> Self::Iterator;
 }
 
 impl<T> FractionalDigits for T
@@ -32,7 +32,7 @@ where
 {
     type Iterator = IntegerFractionalDigits<T>;
 
-    fn fractional_digits(self, unit_ratio: Fraction, precision: usize) -> Self::Iterator {
+    fn fractional_digits(self, unit_ratio: Fraction, precision: Option<usize>) -> Self::Iterator {
         IntegerFractionalDigits::new(self, unit_ratio, precision)
     }
 }
@@ -52,7 +52,7 @@ where
 pub struct IntegerFractionalDigits<T> {
     remainder: T,
     denominator: T,
-    precision: usize,
+    precision: Option<usize>,
     current_digits: usize,
 }
 
@@ -60,7 +60,7 @@ impl<T> IntegerFractionalDigits<T>
 where
     T: Copy + TryFrom<u64> + Mul<T, Output = T> + Rem<T, Output = T>,
 {
-    pub fn new(count: T, fraction: Fraction, precision: usize) -> Self {
+    pub fn new(count: T, fraction: Fraction, precision: Option<usize>) -> Self {
         let fraction_numerator: T = fraction.numerator().try_into().unwrap_or_else(|_| panic!());
         let numerator = fraction_numerator * count;
         let denominator = fraction
@@ -93,7 +93,14 @@ where
 
     fn next(&mut self) -> Option<Self::Item> {
         let ten = (T::ONE + T::ONE + T::ONE + T::ONE + T::ONE) * (T::ONE + T::ONE);
-        if !self.remainder.is_zero() && self.current_digits < self.precision {
+        let keep_going = if let Some(precision) = self.precision {
+            self.current_digits < precision
+        } else {
+            !self.remainder.is_zero()
+        };
+        // Back-up limit that is used to prevent infinite loops.
+        const ABSOLUTE_MAX_DIGITS: usize = 64;
+        if keep_going && self.current_digits < ABSOLUTE_MAX_DIGITS {
             self.current_digits += 1;
             self.remainder *= ten;
             let digit: u8 = (self.remainder / self.denominator)
@@ -109,11 +116,13 @@ where
 
 #[test]
 fn integer_fractions() {
-    let fraction: Vec<_> = 7854.fractional_digits(Fraction::new(1, 1_000), 8).collect();
-    assert_eq!(fraction, vec![8, 5, 4]);
+    let fraction: Vec<_> = 7854
+        .fractional_digits(Fraction::new(1, 1_000), Some(8))
+        .collect();
+    assert_eq!(fraction, vec![8, 5, 4, 0, 0, 0, 0, 0]);
 
     let fraction: Vec<_> = 1_234_567_890_123i64
-        .fractional_digits(Fraction::new(1, 1_000_000_000_000), 9)
+        .fractional_digits(Fraction::new(1, 1_000_000_000_000), Some(9))
         .collect();
     assert_eq!(fraction, vec![2, 3, 4, 5, 6, 7, 8, 9, 0]);
 }

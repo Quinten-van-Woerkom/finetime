@@ -53,7 +53,7 @@ where
 
     /// Returns an iterator over the fractional (sub-unit) digits of this duration. Useful as
     /// helper function when printing durations.
-    pub fn fractional_digits(&self, precision: usize) -> impl Iterator<Item = u8>
+    pub fn fractional_digits(&self, precision: Option<usize>) -> impl Iterator<Item = u8>
     where
         Representation: Copy + FractionalDigits,
         Period: UnitRatio,
