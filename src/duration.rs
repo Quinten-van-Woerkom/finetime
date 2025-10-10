@@ -12,6 +12,7 @@ use num_traits::{Bounded, ConstZero, Signed, Zero};
 
 use crate::{
     Fraction, MulCeil, MulFloor, MulRound, TryMul,
+    fractional_digits::FractionalDigits,
     units::{
         Atto, Convert, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay, SecondsPerHalfDay,
         SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek, SecondsPerYear,
@@ -48,6 +49,16 @@ where
         Representation: Copy,
     {
         self.count
+    }
+
+    /// Returns an iterator over the fractional (sub-unit) digits of this duration. Useful as
+    /// helper function when printing durations.
+    pub fn fractional_digits(&self, precision: usize) -> impl Iterator<Item = u8>
+    where
+        Representation: Copy + FractionalDigits,
+        Period: UnitRatio,
+    {
+        self.count.fractional_digits(Period::FRACTION, precision)
     }
 
     /// Converts a `Duration` towards a different time unit. May only be used if the time unit is

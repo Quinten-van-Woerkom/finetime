@@ -10,9 +10,10 @@ use core::{
 use num_traits::{Bounded, Zero};
 
 use crate::{
-    Convert, Date, DateTime, Duration, Fraction, GregorianDate, HistoricDate, JulianDate, Month,
-    MulCeil, MulFloor, MulRound, TryConvert, UnitRatio,
+    Convert, Date, DateTime, DateTimeRepresentation, Duration, Fraction, GregorianDate,
+    HistoricDate, JulianDate, Month, MulCeil, MulFloor, MulRound, TryConvert, UnitRatio,
     errors::{InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime},
+    fractional_digits::FractionalDigits,
     units::Second,
 };
 
@@ -127,12 +128,7 @@ where
         minute: u8,
         second: u8,
     ) -> Result<Self, Scale::Error> {
-        let time_seconds = Scale::time_point_from_datetime(date, hour, minute, second)?;
-        let time = time_seconds
-            .try_cast()
-            .unwrap_or_else(|_| panic!())
-            .into_unit();
-        Ok(time)
+        Scale::time_point_from_datetime(date, hour, minute, second)
     }
 
     /// Constructs a `TimePoint` in the given time scale, based on a historic date-time.
@@ -210,8 +206,7 @@ where
 impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized + DateTime,
-    Representation:
-        TryFrom<i64> + Convert<Second, Period> + Add<Representation, Output = Representation>,
+    Representation: DateTimeRepresentation + Convert<Second, Period>,
 {
     /// Constructs a `TimePoint` from a given date and subsecond-accuracy time.
     pub fn from_fine_datetime(
@@ -282,11 +277,7 @@ where
 impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized + DateTime,
-    Representation: Copy
-        + TryInto<i64>
-        + MulFloor<Fraction, Output = Representation>
-        + Sub<Representation, Output = Representation>
-        + Convert<Second, Period>,
+    Representation: DateTimeRepresentation + Convert<Second, Period>,
     Period: UnitRatio,
 {
     pub fn to_fine_datetime(&self) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>) {
@@ -318,12 +309,7 @@ where
 impl<Scale, Representation, Period> Display for TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized + DateTime,
-    Representation: Copy
-        + TryInto<i64>
-        + MulFloor<Fraction, Output = Representation>
-        + Sub<Representation, Output = Representation>
-        + Convert<Second, Period>
-        + Zero,
+    Representation: DateTimeRepresentation + Convert<Second, Period> + Zero + FractionalDigits,
     Period: UnitRatio,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -342,35 +328,9 @@ where
             // Set maximum number of digits after the decimal point printed based on precision
             // argument given to the formatter.
             let max_digits_printed = f.precision().unwrap_or(9);
-            let mut digits_printed = 0;
 
-            // First, we express the subseconds value as a fraction of a second. The cast to `i64`
-            // may fail, because the input subseconds may not fit in the supported range. However,
-            // since the subseconds are always positive (by construction), the second cast from
-            // `i64` to `u64` will always succeed.
-            //
-            // It would equivalently be possible to do a direct `TryInto<u64>`, but that would
-            // require an additional bound on the input `Representation`. Hence, we stick to the
-            // `TryInto<i64>` bound, which must already be supported based on the call to
-            // `to_fine_historic_datetime()`.
-            let subseconds: i64 = subseconds
-                .count()
-                .try_into()
-                .unwrap_or_else(|_| panic!("result does not fit in `i64"));
-            let subseconds: u64 = subseconds.try_into().unwrap_or_else(|_| {
-                panic!("internal error: result of positive `i64` does not fit in `u64`")
-            });
-            let numerator = Period::FRACTION.numerator() * subseconds;
-            let denominator = Period::FRACTION.denominator();
-            let mut remainder = numerator % denominator;
-
-            // Then we repeatedly reduce the remainder until none remains, or until we reach the
-            // maximum specified precision.
-            while remainder != 0 && digits_printed < max_digits_printed {
-                remainder *= 10;
-                write!(f, "{}", remainder / denominator)?;
-                digits_printed += 1;
-                remainder %= denominator;
+            for digit in subseconds.fractional_digits(max_digits_printed) {
+                write!(f, "{digit}")?;
             }
             Ok(())
         } else {
@@ -381,7 +341,7 @@ where
 
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
-fn check_formatting(
+fn check_formatting_i64(
     string: &str,
     year: i32,
     month: Month,
@@ -406,18 +366,18 @@ fn check_formatting(
 
 /// Verifies formatting for some known values.
 #[test]
-fn formatting() {
+fn formatting_i64() {
     use crate::Month::*;
-    check_formatting("1958-01-01T00:00:00.001", 1958, January, 1, 0, 0, 0, 1);
-    check_formatting("1958-01-02T00:00:00", 1958, January, 2, 0, 0, 0, 0);
-    check_formatting("1960-01-01T12:34:56.789", 1960, January, 1, 12, 34, 56, 789);
-    check_formatting("1961-01-01T00:00:00", 1961, January, 1, 0, 0, 0, 0);
-    check_formatting("1970-01-01T00:00:00", 1970, January, 1, 0, 0, 0, 0);
-    check_formatting("1976-01-01T23:59:59.999", 1976, January, 1, 23, 59, 59, 999);
-    check_formatting("2025-07-16T16:23:24", 2025, July, 16, 16, 23, 24, 0);
-    check_formatting("2034-12-26T08:02:37.123", 2034, December, 26, 8, 2, 37, 123);
-    check_formatting("2760-04-01T21:59:58", 2760, April, 1, 21, 59, 58, 0);
-    check_formatting("1643-01-04T01:01:33", 1643, January, 4, 1, 1, 33, 0);
+    check_formatting_i64("1958-01-01T00:00:00.001", 1958, January, 1, 0, 0, 0, 1);
+    check_formatting_i64("1958-01-02T00:00:00", 1958, January, 2, 0, 0, 0, 0);
+    check_formatting_i64("1960-01-01T12:34:56.789", 1960, January, 1, 12, 34, 56, 789);
+    check_formatting_i64("1961-01-01T00:00:00", 1961, January, 1, 0, 0, 0, 0);
+    check_formatting_i64("1970-01-01T00:00:00", 1970, January, 1, 0, 0, 0, 0);
+    check_formatting_i64("1976-01-01T23:59:59.999", 1976, January, 1, 23, 59, 59, 999);
+    check_formatting_i64("2025-07-16T16:23:24", 2025, July, 16, 16, 23, 24, 0);
+    check_formatting_i64("2034-12-26T08:02:37.123", 2034, December, 26, 8, 2, 37, 123);
+    check_formatting_i64("2760-04-01T21:59:58", 2760, April, 1, 21, 59, 58, 0);
+    check_formatting_i64("1643-01-04T01:01:33", 1643, January, 4, 1, 1, 33, 0);
 }
 
 /// Verifies that truncation is properly applied when the underlying fraction exceeds the number of
