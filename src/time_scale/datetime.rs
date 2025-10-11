@@ -23,7 +23,6 @@ pub trait DateTimeRepresentation:
     + From<u8>
     + TryIntoExact<i32>
     + TryIntoExact<u8>
-    + core::fmt::Debug
 {
 }
 
@@ -39,7 +38,6 @@ impl<T> DateTimeRepresentation for T where
         + From<u8>
         + TryIntoExact<i32>
         + TryIntoExact<u8>
-        + core::fmt::Debug
 {
 }
 
