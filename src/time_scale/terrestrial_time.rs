@@ -1,7 +1,10 @@
 //! This file implements the concept of a "terrestrial time", referring to any time scale which
 //! represents the Platonic ideal of a time scale representing the elapsed time on the Earth geoid.
 
-use core::ops::Sub;
+use core::{
+    convert::From,
+    ops::{Add, Sub},
+};
 
 use crate::{ConvertUnit, Duration, FromScale, TimePoint};
 
@@ -10,30 +13,47 @@ use crate::{ConvertUnit, Duration, FromScale, TimePoint};
 /// on terrestrial time (or, equivalently, TAI). All these time scales may easily be converted into
 /// one another through a simple epoch offset: their internal clock rates are identical.
 pub trait TerrestrialTime {
+    /// The underlying representation used to represent the offset with respect to TAI. For
+    /// compatibility with as wide a range of `TimePoint` types, it's best to make this as small a
+    /// type as possible (e.g., u8, u32, etc.).
     type Representation;
 
+    /// The "native" period used to represent the offset with respect to TAI. For wide support, it
+    /// is best to choose the largest possible unit.
     type Period;
 
     const TAI_OFFSET: Duration<Self::Representation, Self::Period>;
 }
 
-impl<From, Into, Representation, Period> FromScale<From, Representation, Period>
-    for TimePoint<Into, Representation, Period>
+impl<ScaleFrom, ScaleInto, Representation, Period> FromScale<ScaleFrom, Representation, Period>
+    for TimePoint<ScaleInto, Representation, Period>
 where
-    From: TerrestrialTime,
-    Into: TerrestrialTime,
+    ScaleFrom: TerrestrialTime,
+    ScaleInto: TerrestrialTime,
     Representation: Copy
+        + Add<Representation, Output = Representation>
         + Sub<Representation, Output = Representation>
-        + core::convert::From<From::Representation>
-        + core::convert::From<Into::Representation>
-        + ConvertUnit<From::Period, Period>
-        + ConvertUnit<Into::Period, Period>,
+        + From<ScaleFrom::Representation>
+        + From<ScaleInto::Representation>
+        + ConvertUnit<ScaleFrom::Period, Period>
+        + ConvertUnit<ScaleInto::Period, Period>
+        + PartialOrd,
 {
-    fn from_scale(time_point: TimePoint<From, Representation, Period>) -> Self {
-        let from_offset: Duration<Representation, Period> = From::TAI_OFFSET.cast().into_unit();
-        let into_offset: Duration<Representation, Period> = Into::TAI_OFFSET.cast().into_unit();
-        let offset = from_offset - into_offset;
-        let time_since_epoch = time_point.time_since_epoch() - offset;
+    fn from_scale(time_point: TimePoint<ScaleFrom, Representation, Period>) -> Self {
+        let from_offset: Duration<Representation, Period> =
+            ScaleFrom::TAI_OFFSET.cast().into_unit();
+        let into_offset: Duration<Representation, Period> =
+            ScaleInto::TAI_OFFSET.cast().into_unit();
+        // Depending on the sign, we flip the subtraction order. This is useful to ensure that we
+        // do not overflow past zero for unsigned integers, and to keep the integer range needed as
+        // small as possible in general.
+        let time_since_epoch = if from_offset >= into_offset {
+            let offset = from_offset - into_offset;
+            time_point.time_since_epoch() - offset
+        } else {
+            let offset = into_offset - from_offset;
+            time_point.time_since_epoch() + offset
+        };
         Self::from_time_since_epoch(time_since_epoch)
     }
 }
