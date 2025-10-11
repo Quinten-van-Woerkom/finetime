@@ -3,17 +3,16 @@
 use core::str::FromStr;
 
 use crate::{
-    ConvertUnit, DateTime, HistoricDate, TimePoint, UnitRatio, errors::TimePointParsingError,
-    parse::TimeOfDay, units::Second,
+    FromDateTime, FromFineDateTime, HistoricDate, TimePoint, UnitRatio,
+    errors::TimePointParsingError, parse::TimeOfDay, units::Second,
 };
 
 impl<Scale, Period> FromStr for TimePoint<Scale, i64, Period>
 where
-    Scale: DateTime,
+    Self: FromFineDateTime<i64, Period>,
     Period: UnitRatio,
-    i64: ConvertUnit<Second, Period>,
 {
-    type Err = TimePointParsingError<<Scale as DateTime>::Error>;
+    type Err = TimePointParsingError<<Self as FromDateTime>::Error>;
 
     /// Parses a `TimePoint` based on some ISO 8610 date and time of day string. Note that time
     /// shifts are explicitly not supported: those are already included in the choice of `Scale`
@@ -37,7 +36,7 @@ where
             return Err(TimePointParsingError::UnexpectedRemainder);
         }
 
-        let time_point = Scale::time_point_from_fine_datetime(
+        let time_point = Self::from_fine_datetime(
             historic_date.to_date(),
             time_of_day.hour,
             time_of_day.minute,
@@ -63,16 +62,15 @@ fn check_historic_datetime(
     second: u8,
     subseconds: crate::MicroSeconds<i64>,
 ) {
-    use crate::{Date, Tai, TaiTime};
+    use crate::{Date, FromDateTime, IntoFineDateTime, TaiTime};
     let datetime = TaiTime::from_str(string).unwrap();
     let date = Date::from_historic_date(year, month, day).unwrap();
-    let expected_datetime = TaiTime::<i64, _>::from_datetime(date, hour, minute, second)
+    let expected_datetime = TaiTime::<i64, Second>::from_datetime(date, hour, minute, second)
         .unwrap()
         .into_unit()
         + subseconds;
     assert_eq!(datetime, expected_datetime);
-    let (date2, hour2, minute2, second2, subseconds2) =
-        Tai::fine_datetime_from_time_point(datetime);
+    let (date2, hour2, minute2, second2, subseconds2) = datetime.into_fine_datetime();
     assert_eq!(date, date2);
     assert_eq!(hour, hour2);
     assert_eq!(minute, minute2);

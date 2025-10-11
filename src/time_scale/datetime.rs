@@ -4,124 +4,16 @@ use core::ops::{Add, Sub};
 
 use crate::{
     ConvertUnit, Date, Days, Duration, Fraction, Hours, Minutes, MulFloor, Seconds, TimePoint,
-    TryIntoExact, UnitRatio,
+    TryIntoExact,
     errors::InvalidTimeOfDay,
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
 
-/// Trait representing the properties that are needed for a type to be used as time representation
-/// when working with date-times. In practice, just a wrapper around existing Rust traits.
-pub trait DateTimeRepresentation:
-    Copy
-    + ConvertUnit<SecondsPerMinute, Second>
-    + ConvertUnit<SecondsPerHour, Second>
-    + ConvertUnit<SecondsPerDay, Second>
-    + MulFloor<Fraction, Output = Self>
-    + Add<Self, Output = Self>
-    + Sub<Self, Output = Self>
-    + From<i32>
-    + From<u8>
-    + TryIntoExact<i32>
-    + TryIntoExact<u8>
-{
-}
-
-/// Since `DateTimeRepresentation` is just a wrapper trait, we directly implement it for all types
-/// that fulfil the required traits.
-impl<T> DateTimeRepresentation for T where
-    T: Copy
-        + ConvertUnit<SecondsPerMinute, Second>
-        + ConvertUnit<SecondsPerHour, Second>
-        + ConvertUnit<SecondsPerDay, Second>
-        + MulFloor<Fraction, Output = Self>
-        + Add<Self, Output = Self>
-        + Sub<Self, Output = Self>
-        + From<i32>
-        + From<u8>
-        + TryIntoExact<i32>
-        + TryIntoExact<u8>
-{
-}
-
-/// This trait may be implemented for time scales that are able to handle the concept of a
-/// date-time pair: they can connect a date and time-of-day to a specific time instant within their
-/// internal scale and back.
-///
-/// Note that this mapping is explicitly only performed at the precision of seconds and with only
-/// `i64` as underlying representation. These base implementations are "easy" to implement once,
-/// and can then be mapped to other representations and/or smaller units via simple casts. A time
-/// span of 292 billion years before and after some epoch may be represented with this combination
-/// of unit and representation: this should be fine for all time scales on which calendrical math
-/// may be applied - it is about twenty times the age of the universe.
-pub trait DateTime {
-    /// This error may be returned whenever some input date-time is not valid. This may be the case
-    /// when the time-of-day is not valid, but also when some date-time does not occur in a chosen
-    /// time scale, for example due to leap seconds deletions or daylight saving time switches.
-    type Error: core::error::Error;
-
-    /// Maps a given combination of date and time-of-day to an instant on this time scale. May
-    /// return an error if the input does not represent a valid combination of date and
-    /// time-of-day.
-    fn time_point_from_datetime<Representation>(
-        date: Date<i32>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-    ) -> Result<TimePoint<Self, Representation, Second>, Self::Error>
-    where
-        Representation: DateTimeRepresentation;
-
-    /// Convenience function that maps from a "fine" (subsecond-accuracy) date-time to an instant on
-    /// this time scale. Shall defer to `time_point_from_datetime` for all logic beyond adding the
-    /// subsecond time.
-    fn time_point_from_fine_datetime<Representation, Period>(
-        date: Date<i32>,
-        hour: u8,
-        minute: u8,
-        second: u8,
-        subseconds: Duration<Representation, Period>,
-    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
-    where
-        Representation: DateTimeRepresentation + ConvertUnit<Second, Period>,
-    {
-        let coarse_time_point = Self::time_point_from_datetime(date, hour, minute, second)?;
-        let fine_time_point: TimePoint<Self, Representation, Period> =
-            coarse_time_point.into_unit();
-        Ok(fine_time_point + subseconds)
-    }
-
-    /// Maps a time point back to the date and time-of-day that it represents. Returns a tuple of
-    /// date, hour, minute, and second. This function shall not fail, unless overflow occurs in the
-    /// underlying integer arithmetic.
-    fn datetime_from_time_point<Representation>(
-        time_point: TimePoint<Self, Representation, Second>,
-    ) -> (Date<i32>, u8, u8, u8)
-    where
-        Representation: DateTimeRepresentation;
-
-    /// Convenience function that maps from a "fine" (subsecond-accuracy) time point to a date-time
-    /// according to this time scale. Returns a tuple of date, hour, minute, second, and subsecond.
-    /// Shall not fail, unless overflow occurs in the underlying integer arithmetic.
-    #[allow(clippy::type_complexity)]
-    fn fine_datetime_from_time_point<Representation, Period>(
-        time_point: TimePoint<Self, Representation, Period>,
-    ) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>)
-    where
-        Representation: DateTimeRepresentation + ConvertUnit<Second, Period>,
-        Period: UnitRatio,
-    {
-        let coarse_time_point = time_point.floor::<Second>();
-        let subseconds = time_point - coarse_time_point.into_unit::<Period>();
-        let (date, hour, minute, second) = Self::datetime_from_time_point(coarse_time_point);
-        (date, hour, minute, second, subseconds)
-    }
-}
-
-/// Some date-time scales are continuous: they do not apply leap seconds. In such cases, their
-/// implementation of the `DateTime` mapping reduces to a simple add-and-multiply of days, hours,
-/// minutes, and seconds with respect to the "arbitrary" measurement epoch in which their resulting
-/// time points are measured.
-pub trait ContinuousDateTime {
+/// Some time scales are continuous with respect to date-times: they do not apply leap seconds. In
+/// such cases, their implementation of the `DateTime` mapping reduces to a simple add-and-multiply
+/// of days, hours, minutes, and seconds with respect to the "arbitrary" measurement epoch in which
+/// their resulting time points are measured.
+pub trait ContinuousDateTimeScale {
     /// Determines the epoch used to convert date-time of this time scale into the equivalent
     /// time-since-epoch `TimePoint` representation. For simplicity, epochs must fall on date
     /// boundaries.
@@ -134,24 +26,47 @@ pub trait ContinuousDateTime {
     const EPOCH: Date<i32>;
 }
 
-impl<Scale> DateTime for Scale
-where
-    Scale: ContinuousDateTime,
-{
-    type Error = InvalidTimeOfDay;
+/// This trait may be implemented for time points that can be constructed based on a date-time
+/// pair: they can connect a date and time-of-day to a specific time instant within their internal
+/// scale and vice versa.
+pub trait FromDateTime: Sized {
+    /// This error may be returned whenever some input date-time is not valid. This may be the case
+    /// when the time-of-day is not valid, but also when some date-time does not occur in a chosen
+    /// time scale, for example due to leap seconds deletions or daylight saving time switches.
+    type Error: core::error::Error;
 
-    /// When a continuous date-time mapping exists (without leap seconds), the `TimePoint`
-    /// corresponding with a given date-time may be computed by adding the days, hours, minutes,
-    /// and seconds since some epoch.
-    fn time_point_from_datetime<Representation>(
+    /// Maps a given combination of date and time-of-day to an instant on this time scale. May
+    /// return an error if the input does not represent a valid combination of date and
+    /// time-of-day.
+    fn from_datetime(
         date: Date<i32>,
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<TimePoint<Self, Representation, Second>, Self::Error>
-    where
-        Representation: DateTimeRepresentation,
-    {
+    ) -> Result<Self, Self::Error>;
+}
+
+impl<Scale, Representation, Period> FromDateTime for TimePoint<Scale, Representation, Period>
+where
+    Scale: ?Sized + ContinuousDateTimeScale,
+    Representation: Copy
+        + ConvertUnit<SecondsPerMinute, Period>
+        + ConvertUnit<SecondsPerHour, Period>
+        + ConvertUnit<SecondsPerDay, Period>
+        + ConvertUnit<Second, Period>
+        + Add<Representation, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + From<i32>
+        + From<u8>,
+{
+    type Error = InvalidTimeOfDay;
+
+    fn from_datetime(
+        date: Date<i32>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, Self::Error> {
         if hour >= 24 || minute >= 60 || second >= 60 {
             return Err(InvalidTimeOfDay {
                 hour,
@@ -161,26 +76,57 @@ where
         }
 
         let days_since_scale_epoch = date.time_since_epoch().cast::<Representation>()
-            - Self::EPOCH.time_since_epoch().cast::<Representation>();
+            - Scale::EPOCH.time_since_epoch().cast::<Representation>();
         let hours = Hours::new(hour).cast::<Representation>();
         let minutes = Minutes::new(minute).cast::<Representation>();
         let seconds = Seconds::new(second).cast::<Representation>();
-        let time_since_epoch =
-            days_since_scale_epoch.into_unit() + hours.into_unit() + minutes.into_unit() + seconds;
+        let time_since_epoch = days_since_scale_epoch.into_unit()
+            + hours.into_unit()
+            + minutes.into_unit()
+            + seconds.into_unit();
         Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
+}
 
-    /// When a continuous date-time mapping exists (without leap seconds), the date-time
-    /// corresponding with some `TimePoint` may be computed by factoring out the days, hours,
-    /// minutes, and seconds since some epoch.
-    fn datetime_from_time_point<Representation>(
-        time_point: TimePoint<Self, Representation, Second>,
-    ) -> (Date<i32>, u8, u8, u8)
-    where
-        Representation: DateTimeRepresentation,
-    {
+/// This trait may be implemented for time points that can be created based on "fine" date-time
+/// pairs, which have subsecond accuracy.
+pub trait FromFineDateTime<Representation, Period>: FromDateTime {
+    /// Maps a given combination of date and fine time-of-day to an instant on this time scale. May
+    /// return an error if the input does not represent a valid combination of date and
+    /// time-of-day.
+    fn from_fine_datetime(
+        date: Date<i32>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        subseconds: Duration<Representation, Period>,
+    ) -> Result<Self, Self::Error>;
+}
+
+/// This trait represents the fact that some time instant may be mapped back to the date-time pair
+/// that it corresponds with, at an accuracy of seconds.
+pub trait IntoDateTime: Sized {
+    /// Maps a time point back to the date and time-of-day that it represents. Returns a tuple of
+    /// date, hour, minute, and second. This function shall not fail, unless overflow occurs in the
+    /// underlying integer arithmetic.
+    fn into_datetime(self) -> (Date<i32>, u8, u8, u8);
+}
+
+impl<Scale, Representation> IntoDateTime for TimePoint<Scale, Representation, Second>
+where
+    Scale: ?Sized + ContinuousDateTimeScale,
+    Representation: Copy
+        + ConvertUnit<SecondsPerMinute, Second>
+        + ConvertUnit<SecondsPerHour, Second>
+        + ConvertUnit<SecondsPerDay, Second>
+        + MulFloor<Fraction, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + TryIntoExact<i32>
+        + TryIntoExact<u8>,
+{
+    fn into_datetime(self) -> (Date<i32>, u8, u8, u8) {
         // Step-by-step factoring of the time since epoch into days, hours, minutes, and seconds.
-        let seconds_since_scale_epoch = time_point.time_since_epoch();
+        let seconds_since_scale_epoch = self.time_since_epoch();
         let (days_since_scale_epoch, seconds_in_day) =
             seconds_since_scale_epoch.factor_out::<SecondsPerDay>();
         let days_since_scale_epoch: Days<i32> = days_since_scale_epoch
@@ -191,7 +137,8 @@ where
         // This last step will be a no-op for integer representations, but is necessary for float
         // representations.
         let second = second.floor::<Second>();
-        let days_since_universal_epoch = Self::EPOCH.time_since_epoch() + days_since_scale_epoch;
+        let days_since_universal_epoch =
+            <Scale as ContinuousDateTimeScale>::EPOCH.time_since_epoch() + days_since_scale_epoch;
         let date = Date::from_time_since_epoch(days_since_universal_epoch);
 
         // We must narrow-cast all results, but only the cast of `date` may fail. The rest will
@@ -204,4 +151,11 @@ where
             second.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in second value that cannot be expressed as `u8`")),
         )
     }
+}
+
+pub trait IntoFineDateTime<Representation, Period> {
+    /// Convenience function that maps from a "fine" (subsecond-accuracy) time point to a date-time
+    /// according to this time scale. Returns a tuple of date, hour, minute, second, and subsecond.
+    /// Shall not fail, unless overflow occurs in the underlying integer arithmetic.
+    fn into_fine_datetime(self) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>);
 }

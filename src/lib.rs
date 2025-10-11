@@ -20,6 +20,9 @@ pub use parse::{DurationComponent, DurationDesignator};
 mod time_point;
 pub use time_point::TimePoint;
 mod time_scale;
-pub use time_scale::{DateTime, DateTimeRepresentation, Tai, TaiTime};
+pub use time_scale::{
+    ContinuousDateTimeScale, FromDateTime, FromFineDateTime, FromScale, IntoDateTime,
+    IntoFineDateTime, IntoScale, Tai, TaiTime,
+};
 mod units;
 pub use units::{ConvertUnit, TryConvertUnit, UnitRatio};
