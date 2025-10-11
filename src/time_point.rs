@@ -118,7 +118,7 @@ impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Per
     }
 }
 
-impl<Scale, Representation> TimePoint<Scale, Representation, Second>
+impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Self: FromDateTime,
 {

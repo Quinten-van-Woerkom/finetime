@@ -1,6 +1,10 @@
 //! Implementation of International Atomic Time (TAI).
 
-use crate::{Date, Month, TimePoint, time_scale::datetime::ContinuousDateTimeScale, units::Second};
+use crate::{
+    Date, Duration, Month, TimePoint, Years,
+    time_scale::{TerrestrialTime, datetime::ContinuousDateTimeScale},
+    units::{Second, SecondsPerYear},
+};
 
 pub type TaiTime<Representation = i64, Period = Second> = TimePoint<Tai, Representation, Period>;
 
@@ -15,6 +19,12 @@ impl ContinuousDateTimeScale for Tai {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };
+}
+
+impl TerrestrialTime for Tai {
+    type Representation = u8;
+    type Period = SecondsPerYear;
+    const TAI_OFFSET: Duration<Self::Representation, Self::Period> = Years::new(0);
 }
 
 /// Test function that verifies whether a given Gregorian date-time maps to the provided time since

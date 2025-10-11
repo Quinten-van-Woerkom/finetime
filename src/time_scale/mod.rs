@@ -6,5 +6,10 @@ mod datetime;
 pub use datetime::{
     ContinuousDateTimeScale, FromDateTime, FromFineDateTime, IntoDateTime, IntoFineDateTime,
 };
+
 mod tai;
 pub use tai::{Tai, TaiTime};
+mod tt;
+pub use tt::{Tt, TtTime};
+mod terrestrial_time;
+pub use terrestrial_time::TerrestrialTime;
