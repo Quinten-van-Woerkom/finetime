@@ -10,8 +10,8 @@ use core::{
 use num_traits::{Bounded, Zero};
 
 use crate::{
-    Convert, Date, DateTime, DateTimeRepresentation, Duration, Fraction, FractionalDigits,
-    GregorianDate, HistoricDate, JulianDate, Month, MulCeil, MulFloor, MulRound, TryConvert,
+    ConvertUnit, Date, DateTime, DateTimeRepresentation, Duration, Fraction, FractionalDigits,
+    GregorianDate, HistoricDate, JulianDate, Month, MulCeil, MulFloor, MulRound, TryConvertUnit,
     TryIntoExact, UnitRatio,
     errors::{InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime},
     units::Second,
@@ -20,7 +20,7 @@ use crate::{
 /// A `TimePoint` identifies a specific instant in time. It is templated on a `Representation` and
 /// `Period`, which the define the characteristics of the `Duration` type used to represent the
 /// time elapsed since the epoch of the underlying time scale `Scale`.
-pub struct TimePoint<Scale: ?Sized, Representation, Period = Second> {
+pub struct TimePoint<Scale: ?Sized, Representation = i64, Period = Second> {
     time_since_epoch: Duration<Representation, Period>,
     time_scale: core::marker::PhantomData<Scale>,
 }
@@ -47,7 +47,7 @@ impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Per
     /// this `TimePoint` is a float.
     pub fn into_unit<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
-        Representation: Convert<Period, Target>,
+        Representation: ConvertUnit<Period, Target>,
     {
         TimePoint::from_time_since_epoch(self.time_since_epoch.into_unit())
     }
@@ -56,7 +56,7 @@ impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Per
     /// the conversion is lossless.
     pub fn try_into_unit<Target>(self) -> Option<TimePoint<Scale, Representation, Target>>
     where
-        Representation: TryConvert<Period, Target>,
+        Representation: TryConvertUnit<Period, Target>,
     {
         Some(TimePoint::from_time_since_epoch(
             self.time_since_epoch.try_into_unit()?,
@@ -117,9 +117,10 @@ impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Per
     }
 }
 
-impl<Scale> TimePoint<Scale, i64, Second>
+impl<Scale, Representation> TimePoint<Scale, Representation, Second>
 where
     Scale: ?Sized + DateTime,
+    Representation: DateTimeRepresentation,
 {
     /// Constructs a `TimePoint` in the given time scale based on the date and time-of-day.
     pub fn from_datetime(
@@ -206,7 +207,7 @@ where
 impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized + DateTime,
-    Representation: DateTimeRepresentation + Convert<Second, Period>,
+    Representation: DateTimeRepresentation + ConvertUnit<Second, Period>,
 {
     /// Constructs a `TimePoint` from a given date and subsecond-accuracy time.
     pub fn from_fine_datetime(
@@ -277,7 +278,7 @@ where
 impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized + DateTime,
-    Representation: DateTimeRepresentation + Convert<Second, Period>,
+    Representation: DateTimeRepresentation + ConvertUnit<Second, Period>,
     Period: UnitRatio,
 {
     pub fn to_fine_datetime(&self) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>) {
@@ -309,7 +310,7 @@ where
 impl<Scale, Representation, Period> Display for TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized + DateTime,
-    Representation: DateTimeRepresentation + Convert<Second, Period> + Zero + FractionalDigits,
+    Representation: DateTimeRepresentation + ConvertUnit<Second, Period> + Zero + FractionalDigits,
     Period: UnitRatio,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

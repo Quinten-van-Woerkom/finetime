@@ -22,4 +22,4 @@ pub use time_point::TimePoint;
 mod time_scale;
 pub use time_scale::{DateTime, DateTimeRepresentation, Tai, TaiTime};
 mod units;
-pub use units::{Convert, TryConvert, UnitRatio};
+pub use units::{ConvertUnit, TryConvertUnit, UnitRatio};

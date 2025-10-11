@@ -3,7 +3,7 @@
 use core::str::FromStr;
 
 use crate::{
-    Convert, DateTime, HistoricDate, TimePoint, UnitRatio, errors::TimePointParsingError,
+    ConvertUnit, DateTime, HistoricDate, TimePoint, UnitRatio, errors::TimePointParsingError,
     parse::TimeOfDay, units::Second,
 };
 
@@ -11,7 +11,7 @@ impl<Scale, Period> FromStr for TimePoint<Scale, i64, Period>
 where
     Scale: DateTime,
     Period: UnitRatio,
-    i64: Convert<Second, Period>,
+    i64: ConvertUnit<Second, Period>,
 {
     type Err = TimePointParsingError<<Scale as DateTime>::Error>;
 
@@ -66,7 +66,7 @@ fn check_historic_datetime(
     use crate::{Date, Tai, TaiTime};
     let datetime = TaiTime::from_str(string).unwrap();
     let date = Date::from_historic_date(year, month, day).unwrap();
-    let expected_datetime = TaiTime::from_datetime(date, hour, minute, second)
+    let expected_datetime = TaiTime::<i64, _>::from_datetime(date, hour, minute, second)
         .unwrap()
         .into_unit()
         + subseconds;

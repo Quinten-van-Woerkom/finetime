@@ -13,9 +13,9 @@ use num_traits::{Bounded, ConstZero, Signed, Zero};
 use crate::{
     Fraction, FractionalDigits, MulCeil, MulFloor, MulRound, TryIntoExact, TryMul,
     units::{
-        Atto, Convert, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay, SecondsPerHalfDay,
-        SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek, SecondsPerYear,
-        TryConvert, UnitRatio,
+        Atto, ConvertUnit, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay,
+        SecondsPerHalfDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
+        SecondsPerYear, TryConvertUnit, UnitRatio,
     },
 };
 
@@ -76,7 +76,7 @@ where
     /// this `Duration` is a float.
     pub fn into_unit<Target>(self) -> Duration<Representation, Target>
     where
-        Representation: Convert<Period, Target>,
+        Representation: ConvertUnit<Period, Target>,
         Target: ?Sized,
     {
         Duration::new(self.count.convert())
@@ -86,7 +86,7 @@ where
     /// the conversion is lossless.
     pub fn try_into_unit<Target>(self) -> Option<Duration<Representation, Target>>
     where
-        Representation: TryConvert<Period, Target>,
+        Representation: TryConvertUnit<Period, Target>,
         Target: ?Sized,
     {
         Some(Duration::new(self.count.try_convert()?))
@@ -143,7 +143,7 @@ where
         Representation: Copy
             + MulFloor<Fraction, Output = Representation>
             + Sub<Representation, Output = Representation>
-            + Convert<Unit, Period>,
+            + ConvertUnit<Unit, Period>,
         Period: UnitRatio,
         Unit: UnitRatio + ?Sized,
     {

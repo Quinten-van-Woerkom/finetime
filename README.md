@@ -20,17 +20,16 @@ let epoch = UtcTime::from_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
 Note that constructing time points from datetimes may fail, because the given arguments do not form a valid time-of-day, or because the given date did not occur in the historic calendar: `finetime` makes this explicit. Users must acknowledge this possibility by unwrapping the returned `Result` before being able to use the created `UtcTime`.
 
 A wide variety of time scales may be encountered in the context of precise timekeeping.
-`finetime` provides implementations for the most prevalent time scales: UTC, TAI, Unix time, terrestrial time (TT), GPS time (GPST), and most other GNSS time scales.
+`finetime` provides implementations for the most prevalent time scales: UTC, TAI, terrestrial time (TT), GPS time (GPST), and most other GNSS time scales.
+Unix time is explicitly not included, as it is not a continuous time scale: the difference between two Unix times does not reflect the physically elapsed time, because leap seconds are not accounted for.
 Where possible, times can be converted between time scales using the `into_time_scale()` function.
 ```rust
-use finetime::{GalileoTime, GpsTime, TaiTime, UnixTime, UtcTime, Month};
+use finetime::{GalileoTime, GpsTime, TaiTime, UtcTime, Month};
 let epoch_utc = UtcTime::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
 let epoch_tai = TaiTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 19).unwrap();
-let epoch_unix = UnixTime::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
 let epoch_gps = GpsTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 0).unwrap();
 let epoch_galileo = GalileoTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 0).unwrap();
 assert_eq!(epoch_utc.into_time_scale(), epoch_tai);
-assert_eq!(epoch_utc.into_time_scale(), epoch_unix);
 assert_eq!(epoch_utc.into_time_scale(), epoch_gps);
 assert_eq!(epoch_utc.into_time_scale(), epoch_galileo);
 ```

@@ -21,6 +21,7 @@ use crate::{
 /// purely calendrical type. Rather, a date must be mapped towards a proper time scale first,
 /// before such arithmetic is possible. It is possible to add full days to a `Date`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
+#[cfg_attr(kani, derive(kani::Arbitrary))]
 pub struct Date<Representation> {
     time_since_epoch: Days<Representation>,
 }
@@ -126,16 +127,6 @@ where
         Date {
             time_since_epoch: self.time_since_epoch + rhs,
         }
-    }
-}
-
-#[cfg(kani)]
-impl<Representation> kani::Arbitrary for Date<Representation>
-where
-    Representation: kani::Arbitrary,
-{
-    fn any() -> Self {
-        Self::from_time_since_epoch(Days::any())
     }
 }
 

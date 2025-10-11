@@ -4,7 +4,7 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    Convert, Date, Duration, HalfDays, Month,
+    ConvertUnit, Date, Duration, HalfDays, Month,
     errors::{InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate},
     units::{SecondsPerDay, SecondsPerHalfDay},
 };
@@ -51,8 +51,8 @@ impl<Representation, Period> JulianDay<Representation, Period> {
         Representation: Copy
             + From<i32>
             + Add<Representation, Output = Representation>
-            + Convert<SecondsPerDay, Period>
-            + Convert<SecondsPerHalfDay, Period>,
+            + ConvertUnit<SecondsPerDay, Period>
+            + ConvertUnit<SecondsPerHalfDay, Period>,
     {
         Self {
             time_since_epoch: date.time_since_epoch().into_unit()
@@ -65,8 +65,8 @@ impl<Representation, Period> JulianDay<Representation, Period> {
         Representation: Copy
             + From<i32>
             + Sub<Representation, Output = Representation>
-            + Convert<Period, SecondsPerDay>
-            + Convert<SecondsPerHalfDay, SecondsPerDay>,
+            + ConvertUnit<Period, SecondsPerDay>
+            + ConvertUnit<SecondsPerHalfDay, SecondsPerDay>,
     {
         Date::from_time_since_epoch(
             self.time_since_epoch.into_unit() - JULIAN_DAY_UNIX_EPOCH.cast().into_unit(),
@@ -138,8 +138,8 @@ where
     Representation: Copy
         + From<i32>
         + Sub<Representation, Output = Representation>
-        + Convert<Period, SecondsPerDay>
-        + Convert<SecondsPerHalfDay, SecondsPerDay>,
+        + ConvertUnit<Period, SecondsPerDay>
+        + ConvertUnit<SecondsPerHalfDay, SecondsPerDay>,
 {
     fn from(value: JulianDay<Representation, Period>) -> Self {
         value.to_date()
@@ -151,8 +151,8 @@ where
     Representation: Copy
         + From<i32>
         + Add<Representation, Output = Representation>
-        + Convert<SecondsPerDay, Period>
-        + Convert<SecondsPerHalfDay, Period>,
+        + ConvertUnit<SecondsPerDay, Period>
+        + ConvertUnit<SecondsPerHalfDay, Period>,
 {
     fn from(value: Date<Representation>) -> Self {
         Self::from_date(value)

@@ -7,7 +7,7 @@ use crate::{Fraction, TryMul};
 /// Trait representing a lossless conversion from one unit to another. Note that the underlying
 /// value representation stays the same. For floating point representations, floating point
 /// rounding is permitted.
-pub trait Convert<From, Into>
+pub trait ConvertUnit<From, Into>
 where
     From: ?Sized,
     Into: ?Sized,
@@ -19,7 +19,7 @@ where
 
 macro_rules! impl_identity_conversion {
     ($repr:ty) => {
-        impl<T> Convert<T, T> for $repr
+        impl<T> ConvertUnit<T, T> for $repr
         where
             T: UnitRatio,
         {
@@ -41,7 +41,7 @@ impl_identity_conversion!(i32);
 impl_identity_conversion!(i64);
 impl_identity_conversion!(i128);
 
-impl<From, Into> Convert<From, Into> for f64
+impl<From, Into> ConvertUnit<From, Into> for f64
 where
     From: UnitRatio + ?Sized,
     Into: UnitRatio + ?Sized,
@@ -52,7 +52,7 @@ where
     }
 }
 
-impl<From, Into> Convert<From, Into> for f32
+impl<From, Into> ConvertUnit<From, Into> for f32
 where
     From: UnitRatio + ?Sized,
     Into: UnitRatio + ?Sized,
@@ -66,7 +66,7 @@ where
 /// Trait representing a fallible conversion from one unit to another, failing if the requested
 /// conversion cannot be computed losslessly. For floating point representations, this conversion
 /// shall always succeed.
-pub trait TryConvert<From, Into>: Sized
+pub trait TryConvertUnit<From, Into>: Sized
 where
     From: ?Sized,
     Into: ?Sized,
@@ -76,7 +76,7 @@ where
     fn try_convert(self) -> Option<Self>;
 }
 
-impl<T, From, Into> TryConvert<From, Into> for T
+impl<T, From, Into> TryConvertUnit<From, Into> for T
 where
     T: TryMul<Fraction, Output = T>,
     From: UnitRatio + ?Sized,
@@ -124,7 +124,7 @@ macro_rules! valid_integer_conversions {
 
 macro_rules! valid_integer_conversion {
     ($repr:ty, $from:ty, $into:ty) => {
-        impl Convert<$from, $into> for $repr {
+        impl ConvertUnit<$from, $into> for $repr {
             fn convert(self) -> Self {
                 let combined_ratio = <$from>::FRACTION.divide_by(&<$into>::FRACTION);
                 // For any conversion ratio that is lossless, this division will not truncate.

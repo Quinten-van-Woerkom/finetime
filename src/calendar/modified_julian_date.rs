@@ -5,7 +5,7 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    Convert, Date, Days, Duration, Month, TryIntoExact,
+    ConvertUnit, Date, Days, Duration, Month, TryIntoExact,
     errors::{InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate},
     units::SecondsPerDay,
 };
@@ -39,7 +39,7 @@ impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
         Representation: Copy
             + From<i32>
             + Add<Representation, Output = Representation>
-            + Convert<SecondsPerDay, Period>,
+            + ConvertUnit<SecondsPerDay, Period>,
     {
         Self {
             time_since_epoch: date.time_since_epoch().into_unit()
@@ -53,7 +53,7 @@ impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
         Representation: Copy
             + From<i32>
             + Sub<Representation, Output = Representation>
-            + Convert<Period, SecondsPerDay>,
+            + ConvertUnit<Period, SecondsPerDay>,
     {
         Date::from_time_since_epoch(
             self.time_since_epoch.into_unit() - MODIFIED_JULIAN_DATE_UNIX_EPOCH.cast(),
@@ -122,7 +122,7 @@ where
     Representation: Copy
         + From<i32>
         + Add<Representation, Output = Representation>
-        + Convert<SecondsPerDay, Period>,
+        + ConvertUnit<SecondsPerDay, Period>,
 {
     fn from(value: Date<Representation>) -> Self {
         Self::from_date(value)
@@ -135,7 +135,7 @@ where
     Representation: Copy
         + From<i32>
         + Sub<Representation, Output = Representation>
-        + Convert<Period, SecondsPerDay>,
+        + ConvertUnit<Period, SecondsPerDay>,
 {
     fn from(value: ModifiedJulianDate<Representation, Period>) -> Self {
         value.to_date()

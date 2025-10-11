@@ -15,6 +15,7 @@ use crate::errors::InvalidMonthNumber;
     derive_more::Display,
     derive_more::TryFrom,
 )]
+#[cfg_attr(kani, derive(kani::Arbitrary))]
 #[try_from(repr)]
 #[repr(u8)]
 pub enum Month {
@@ -50,28 +51,5 @@ impl Month {
             _ => return Err(InvalidMonthNumber { month }),
         };
         Ok(month)
-    }
-}
-
-#[cfg(kani)]
-impl kani::Arbitrary for Month {
-    fn any() -> Self {
-        use Month::*;
-        let any: u8 = (kani::any::<u8>() % 12u8) + 1u8;
-        match any {
-            1 => January,
-            2 => February,
-            3 => March,
-            4 => April,
-            5 => May,
-            6 => June,
-            7 => July,
-            8 => August,
-            9 => September,
-            10 => October,
-            11 => November,
-            12 => December,
-            _ => unreachable!(),
-        }
     }
 }

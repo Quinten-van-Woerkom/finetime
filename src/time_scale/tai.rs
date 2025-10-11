@@ -1,8 +1,12 @@
 //! Implementation of International Atomic Time (TAI).
 
-use crate::{Date, Month, TimePoint, time_scale::datetime::ContinuousDateTime, units::Second};
+use crate::{
+    Date, Month, TimePoint, Years,
+    time_scale::{TerrestrialTime, datetime::ContinuousDateTime},
+    units::{Second, SecondsPerYear},
+};
 
-pub type TaiTime<Representation, Period = Second> = TimePoint<Tai, Representation, Period>;
+pub type TaiTime<Representation = i64, Period = Second> = TimePoint<Tai, Representation, Period>;
 
 /// Time scale representing the International Atomic Time standard (TAI). TAI has no leap seconds
 /// and increases monotonically at a constant rate. This makes it highly suitable for scientific
@@ -15,6 +19,14 @@ impl ContinuousDateTime for Tai {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };
+}
+
+impl TerrestrialTime for Tai {
+    type Representation = u8;
+
+    type Period = SecondsPerYear;
+
+    const TAI_OFFSET: crate::Duration<Self::Representation, Self::Period> = Years::new(0);
 }
 
 /// Test function that verifies whether a given Gregorian date-time maps to the provided time since
@@ -67,7 +79,8 @@ fn gregorian_datetime_roundtrip(
 ) {
     use crate::GregorianDate;
 
-    let time = TaiTime::from_gregorian_datetime(year, month, day, hour, minute, second).unwrap();
+    let time =
+        TaiTime::<i64, _>::from_gregorian_datetime(year, month, day, hour, minute, second).unwrap();
     let (date, hour2, minute2, second2) = time.to_datetime();
     let gregorian_date = GregorianDate::from_date(date);
     assert_eq!(gregorian_date.year(), year);

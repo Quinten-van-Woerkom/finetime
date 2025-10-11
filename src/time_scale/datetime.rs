@@ -3,7 +3,7 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    Convert, Date, Days, Duration, Fraction, Hours, Minutes, MulFloor, Seconds, TimePoint,
+    ConvertUnit, Date, Days, Duration, Fraction, Hours, Minutes, MulFloor, Seconds, TimePoint,
     TryIntoExact, UnitRatio,
     errors::InvalidTimeOfDay,
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
@@ -13,9 +13,9 @@ use crate::{
 /// when working with date-times. In practice, just a wrapper around existing Rust traits.
 pub trait DateTimeRepresentation:
     Copy
-    + Convert<SecondsPerMinute, Second>
-    + Convert<SecondsPerHour, Second>
-    + Convert<SecondsPerDay, Second>
+    + ConvertUnit<SecondsPerMinute, Second>
+    + ConvertUnit<SecondsPerHour, Second>
+    + ConvertUnit<SecondsPerDay, Second>
     + MulFloor<Fraction, Output = Self>
     + Add<Self, Output = Self>
     + Sub<Self, Output = Self>
@@ -30,9 +30,9 @@ pub trait DateTimeRepresentation:
 /// that fulfil the required traits.
 impl<T> DateTimeRepresentation for T where
     T: Copy
-        + Convert<SecondsPerMinute, Second>
-        + Convert<SecondsPerHour, Second>
-        + Convert<SecondsPerDay, Second>
+        + ConvertUnit<SecondsPerMinute, Second>
+        + ConvertUnit<SecondsPerHour, Second>
+        + ConvertUnit<SecondsPerDay, Second>
         + MulFloor<Fraction, Output = Self>
         + Add<Self, Output = Self>
         + Sub<Self, Output = Self>
@@ -82,7 +82,7 @@ pub trait DateTime {
         subseconds: Duration<Representation, Period>,
     ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
     where
-        Representation: DateTimeRepresentation + Convert<Second, Period>,
+        Representation: DateTimeRepresentation + ConvertUnit<Second, Period>,
     {
         let coarse_time_point = Self::time_point_from_datetime(date, hour, minute, second)?;
         let fine_time_point: TimePoint<Self, Representation, Period> =
@@ -107,7 +107,7 @@ pub trait DateTime {
         time_point: TimePoint<Self, Representation, Period>,
     ) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>)
     where
-        Representation: DateTimeRepresentation + Convert<Second, Period>,
+        Representation: DateTimeRepresentation + ConvertUnit<Second, Period>,
         Period: UnitRatio,
     {
         let coarse_time_point = time_point.floor::<Second>();

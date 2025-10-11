@@ -14,6 +14,7 @@ pub struct Fraction {
 impl Fraction {
     /// Creates a new `Ratio` with the given values for `numerator` and `denominator`. Is
     /// normalized to the smallest possible representation.
+    #[cfg_attr(kani, kani::requires(denominator != 0))]
     pub const fn new(numerator: u64, denominator: u64) -> Self {
         if denominator == 0 {
             panic!("Created invalid ratio with denominator 0.");
@@ -66,7 +67,25 @@ impl Fraction {
     }
 }
 
+#[cfg(kani)]
+impl kani::Arbitrary for Fraction {
+    fn any() -> Self {
+        use num_traits::Zero;
+        let numerator = kani::any();
+        let denominator: u64 = kani::any();
+        Self {
+            numerator,
+            denominator: if !denominator.is_zero() {
+                denominator
+            } else {
+                1
+            },
+        }
+    }
+}
+
 /// Returns the greatest common denominator of `a` and `b`, computed using Stein's algorithm.
+#[cfg_attr(kani, kani::requires(a != 0 && b != 0))]
 const fn binary_gcd(a: u64, b: u64) -> u64 {
     if a == 0 || b == 0 {
         panic!("GCD is undefined when one of the arguments is zero");

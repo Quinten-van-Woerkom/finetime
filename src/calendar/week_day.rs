@@ -5,6 +5,7 @@ use crate::errors::InvalidWeekDayNumber;
 /// Indication of a specific day-of-the-week. While explicit values are assigned to each day (to
 /// make implementation easier), no ordering is implied.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, derive_more::TryFrom)]
+#[cfg_attr(kani, derive(kani::Arbitrary))]
 #[try_from(repr)]
 #[repr(u8)]
 pub enum WeekDay {
