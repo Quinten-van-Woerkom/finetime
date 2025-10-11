@@ -6,9 +6,17 @@ use core::fmt::Debug;
 use num_traits::{ConstZero, Float, Zero};
 use thiserror::Error;
 
+/// Extension of `TryFrom` that behaves exactly the same, but may also define exact float
+/// conversions.
 pub trait TryFromExact<T>: Sized {
     type Error;
 
+    /// Tries to convert `value` into type `Self`. If this conversion may succeed without loss of
+    /// information, returns `Ok(_)` with the converted value. If any information may be lost (even
+    /// if it is only floating point rounding), returns `None`.
+    ///
+    /// The primarily reason to use this trait is when conversions from floats to integers are
+    /// needed: these are not supported by the standard `TryFrom` implementations.
     fn try_from_exact(value: T) -> Result<Self, Self::Error>;
 }
 
@@ -50,9 +58,15 @@ derive_from_try_from_all_integers!(i32);
 derive_from_try_from_all_integers!(i64);
 derive_from_try_from_all_integers!(i128);
 
+/// Trait representing the converse of `TryFromExact`. Similar to the standard `TryFrom` and
+/// `TryInto` traits, it is advised not to implement this trait directly but rather to implement
+/// `TryFromExact` and let `TryIntoExact` be derived.
 pub trait TryIntoExact<T>: Sized {
     type Error;
 
+    /// Tries to convert `self` into type `T`. If this conversion may succeed without loss of
+    /// information, returns `Ok(_)` with the converted value. If any information may be lost (even
+    /// if it is only floating point rounding), returns `None`.
     fn try_into_exact(self) -> Result<T, Self::Error>;
 }
 

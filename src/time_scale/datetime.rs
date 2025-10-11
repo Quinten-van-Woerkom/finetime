@@ -26,6 +26,8 @@ pub trait DateTimeRepresentation:
 {
 }
 
+/// Since `DateTimeRepresentation` is just a wrapper trait, we directly implement it for all types
+/// that fulfil the required traits.
 impl<T> DateTimeRepresentation for T where
     T: Copy
         + Convert<SecondsPerMinute, Second>
