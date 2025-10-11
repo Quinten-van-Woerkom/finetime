@@ -4,7 +4,7 @@ use core::ops::{Add, Sub};
 
 use crate::{
     Convert, Date, Days, Duration, Fraction, Hours, Minutes, MulFloor, Seconds, TimePoint,
-    UnitRatio,
+    TryIntoExact, UnitRatio,
     errors::InvalidTimeOfDay,
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
@@ -21,8 +21,9 @@ pub trait DateTimeRepresentation:
     + Sub<Self, Output = Self>
     + From<i32>
     + From<u8>
-    + TryInto<i32>
-    + TryInto<u8>
+    + TryIntoExact<i32>
+    + TryIntoExact<u8>
+    + core::fmt::Debug
 {
 }
 
@@ -36,8 +37,9 @@ impl<T> DateTimeRepresentation for T where
         + Sub<Self, Output = Self>
         + From<i32>
         + From<u8>
-        + TryInto<i32>
-        + TryInto<u8>
+        + TryIntoExact<i32>
+        + TryIntoExact<u8>
+        + core::fmt::Debug
 {
 }
 
@@ -197,9 +199,9 @@ where
         (
             date.try_cast()
                 .expect("Call of `datetime_from_time_point` results in date outside of representable range of `i32`"),
-            hour.count().try_into().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in hour value that cannot be expressed as `u8`")),
-            minute.count().try_into().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in minute value that cannot be expressed as `u8`")),
-            second.count().try_into().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in second value that cannot be expressed as `u8`")),
+            hour.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in hour value that cannot be expressed as `u8`")),
+            minute.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in minute value that cannot be expressed as `u8`")),
+            second.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in second value that cannot be expressed as `u8`")),
         )
     }
 }

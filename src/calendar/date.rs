@@ -5,7 +5,7 @@
 use core::ops::Add;
 
 use crate::{
-    Days, GregorianDate, HistoricDate, JulianDate, Month, WeekDay,
+    Days, GregorianDate, HistoricDate, JulianDate, Month, TryIntoExact, WeekDay,
     errors::{InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate},
 };
 
@@ -54,9 +54,9 @@ impl<Representation> Date<Representation> {
     /// supports lossless conversions: if the result would lose information, returns `None`.
     pub fn try_cast<Target>(
         self,
-    ) -> Result<Date<Target>, <Representation as TryInto<Target>>::Error>
+    ) -> Result<Date<Target>, <Representation as TryIntoExact<Target>>::Error>
     where
-        Representation: TryInto<Target>,
+        Representation: TryIntoExact<Target>,
     {
         Ok(Date {
             time_since_epoch: self.time_since_epoch.try_cast()?,

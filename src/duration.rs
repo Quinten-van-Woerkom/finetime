@@ -11,8 +11,7 @@ use core::{
 use num_traits::{Bounded, ConstZero, Signed, Zero};
 
 use crate::{
-    Fraction, MulCeil, MulFloor, MulRound, TryMul,
-    fractional_digits::FractionalDigits,
+    Fraction, FractionalDigits, MulCeil, MulFloor, MulRound, TryIntoExact, TryMul,
     units::{
         Atto, Convert, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay, SecondsPerHalfDay,
         SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek, SecondsPerYear,
@@ -53,12 +52,23 @@ where
 
     /// Returns an iterator over the fractional (sub-unit) digits of this duration. Useful as
     /// helper function when printing durations.
-    pub fn fractional_digits(&self, precision: Option<usize>) -> impl Iterator<Item = u8>
+    pub fn fractional_digits(&self, precision: Option<usize>, base: u8) -> impl Iterator<Item = u8>
     where
         Representation: Copy + FractionalDigits,
         Period: UnitRatio,
     {
-        self.count.fractional_digits(Period::FRACTION, precision)
+        self.count
+            .fractional_digits(Period::FRACTION, precision, base)
+    }
+
+    /// Returns an iterator over the fractional (sub-unit) digits of this duration, expressed in
+    /// decimal. Useful as helper function when printing durations.
+    pub fn decimal_digits(&self, precision: Option<usize>) -> impl Iterator<Item = u8>
+    where
+        Representation: Copy + FractionalDigits,
+        Period: UnitRatio,
+    {
+        self.fractional_digits(precision, 10)
     }
 
     /// Converts a `Duration` towards a different time unit. May only be used if the time unit is
@@ -154,11 +164,11 @@ where
     /// the result of this cast, returns an appropriate `Error`.
     pub fn try_cast<Target>(
         self,
-    ) -> Result<Duration<Target, Period>, <Representation as TryInto<Target>>::Error>
+    ) -> Result<Duration<Target, Period>, <Representation as TryIntoExact<Target>>::Error>
     where
-        Representation: TryInto<Target>,
+        Representation: TryIntoExact<Target>,
     {
-        Ok(Duration::new(self.count.try_into()?))
+        Ok(Duration::new(self.count.try_into_exact()?))
     }
 }
 

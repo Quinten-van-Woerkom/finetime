@@ -10,10 +10,10 @@ use core::{
 use num_traits::{Bounded, Zero};
 
 use crate::{
-    Convert, Date, DateTime, DateTimeRepresentation, Duration, Fraction, GregorianDate,
-    HistoricDate, JulianDate, Month, MulCeil, MulFloor, MulRound, TryConvert, UnitRatio,
+    Convert, Date, DateTime, DateTimeRepresentation, Duration, Fraction, FractionalDigits,
+    GregorianDate, HistoricDate, JulianDate, Month, MulCeil, MulFloor, MulRound, TryConvert,
+    TryIntoExact, UnitRatio,
     errors::{InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime},
-    fractional_digits::FractionalDigits,
     units::Second,
 };
 
@@ -107,9 +107,9 @@ impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Per
     /// the result of this cast, returns an appropriate `Error`.
     pub fn try_cast<Target>(
         self,
-    ) -> Result<TimePoint<Scale, Target, Period>, <Representation as TryInto<Target>>::Error>
+    ) -> Result<TimePoint<Scale, Target, Period>, <Representation as TryIntoExact<Target>>::Error>
     where
-        Representation: TryInto<Target>,
+        Representation: TryIntoExact<Target>,
     {
         Ok(TimePoint::from_time_since_epoch(
             self.time_since_epoch.try_cast()?,
@@ -328,7 +328,7 @@ where
             // Set maximum number of digits after the decimal point printed based on precision
             // argument given to the formatter.
             let max_digits_printed = f.precision();
-            for digit in subseconds.fractional_digits(max_digits_printed) {
+            for digit in subseconds.decimal_digits(max_digits_printed) {
                 write!(f, "{digit}")?;
             }
             Ok(())
@@ -377,6 +377,74 @@ fn formatting_i64() {
     check_formatting_i64("2034-12-26T08:02:37.123", 2034, December, 26, 8, 2, 37, 123);
     check_formatting_i64("2760-04-01T21:59:58", 2760, April, 1, 21, 59, 58, 0);
     check_formatting_i64("1643-01-04T01:01:33", 1643, January, 4, 1, 1, 33, 0);
+}
+
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn check_formatting_f64(
+    string: &str,
+    year: i32,
+    month: Month,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    milliseconds: f64,
+) {
+    let time = crate::TaiTime::from_fine_historic_datetime(
+        year,
+        month,
+        day,
+        hour,
+        minute,
+        second,
+        crate::MilliSeconds::new(milliseconds),
+    )
+    .unwrap();
+    assert_eq!(time.to_string(), string);
+}
+
+/// Verifies formatting for some known values.
+#[test]
+fn formatting_f64() {
+    use crate::Month::*;
+    check_formatting_f64("1958-01-01T00:00:00.001", 1958, January, 1, 0, 0, 0, 1.);
+    check_formatting_f64("1958-01-02T00:00:00", 1958, January, 2, 0, 0, 0, 0.);
+    check_formatting_f64(
+        "1960-01-01T12:34:56.789",
+        1960,
+        January,
+        1,
+        12,
+        34,
+        56,
+        789.,
+    );
+    check_formatting_f64("1961-01-01T00:00:00", 1961, January, 1, 0, 0, 0, 0.);
+    check_formatting_f64("1970-01-01T00:00:00", 1970, January, 1, 0, 0, 0, 0.);
+    check_formatting_f64(
+        "1976-01-01T23:59:59.999",
+        1976,
+        January,
+        1,
+        23,
+        59,
+        59,
+        999.,
+    );
+    check_formatting_f64("2025-07-16T16:23:24", 2025, July, 16, 16, 23, 24, 0.);
+    check_formatting_f64(
+        "2034-12-26T08:02:37.123",
+        2034,
+        December,
+        26,
+        8,
+        2,
+        37,
+        123.,
+    );
+    check_formatting_f64("2760-04-01T21:59:58", 2760, April, 1, 21, 59, 58, 0.);
+    check_formatting_f64("1643-01-04T01:01:33", 1643, January, 4, 1, 1, 33, 0.);
 }
 
 /// Verifies that truncation is properly applied when the underlying fraction exceeds the number of

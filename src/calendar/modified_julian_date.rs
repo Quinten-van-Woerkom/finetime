@@ -5,7 +5,7 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    Convert, Date, Days, Duration, Month,
+    Convert, Date, Days, Duration, Month, TryIntoExact,
     errors::{InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate},
     units::SecondsPerDay,
 };
@@ -72,9 +72,9 @@ impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
     /// the result of this cast, returns `None`.
     pub fn try_cast<Target>(
         self,
-    ) -> Result<ModifiedJulianDate<Target, Period>, <Representation as TryInto<Target>>::Error>
+    ) -> Result<ModifiedJulianDate<Target, Period>, <Representation as TryIntoExact<Target>>::Error>
     where
-        Representation: TryInto<Target>,
+        Representation: TryIntoExact<Target>,
     {
         Ok(ModifiedJulianDate::from_time_since_epoch(
             self.time_since_epoch.try_cast()?,
