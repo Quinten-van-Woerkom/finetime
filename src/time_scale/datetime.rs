@@ -4,8 +4,9 @@ use core::ops::{Add, Sub};
 
 use crate::{
     ConvertUnit, Date, Days, Duration, Fraction, Hours, Minutes, MulFloor, Seconds, TimePoint,
-    TryIntoExact,
+    TryFromExact, TryIntoExact,
     errors::InvalidTimeOfDay,
+    time_scale::TimeScale,
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
 
@@ -13,18 +14,9 @@ use crate::{
 /// such cases, their implementation of the `DateTime` mapping reduces to a simple add-and-multiply
 /// of days, hours, minutes, and seconds with respect to the "arbitrary" measurement epoch in which
 /// their resulting time points are measured.
-pub trait ContinuousDateTimeScale {
-    /// Determines the epoch used to convert date-time of this time scale into the equivalent
-    /// time-since-epoch `TimePoint` representation. For simplicity, epochs must fall on date
-    /// boundaries.
-    ///
-    /// Note that this epoch does not bear any "real" significance: it is merely a representational
-    /// choice. In principle, it may even be distinct from the "actual" epoch, if any is defined,
-    /// for a time scale. For GPS, for example, the epoch is well-defined as 1980-01-06T00:00:00
-    /// UTC, but it would not necessarily be wrong to use a different date here. In practice, of
-    /// course, it is more convenient to choose the actual epoch where one is defined.
-    const EPOCH: Date<i32>;
-}
+///
+/// This trait is only a marker trait.
+pub trait ContinuousDateTimeScale: TimeScale {}
 
 /// This trait may be implemented for time points that can be constructed based on a date-time
 /// pair: they can connect a date and time-of-day to a specific time instant within their internal
@@ -56,8 +48,8 @@ where
         + ConvertUnit<Second, Period>
         + Add<Representation, Output = Representation>
         + Sub<Representation, Output = Representation>
-        + From<i32>
-        + From<u8>,
+        + TryFromExact<i32>
+        + TryFromExact<u8>,
 {
     type Error = InvalidTimeOfDay;
 
@@ -75,11 +67,36 @@ where
             });
         }
 
-        let days_since_scale_epoch = date.time_since_epoch().cast::<Representation>()
-            - Scale::EPOCH.time_since_epoch().cast::<Representation>();
-        let hours = Hours::new(hour).cast::<Representation>();
-        let minutes = Minutes::new(minute).cast::<Representation>();
-        let seconds = Seconds::new(second).cast::<Representation>();
+        let days_since_scale_epoch = {
+            let days_since_1970 = date.time_since_epoch();
+            let epoch_days_since_1970 = Scale::EPOCH.time_since_epoch();
+
+            // First we try to compute the difference by subtracting first and then converting into
+            // the target representation.
+            let difference = (days_since_1970 - epoch_days_since_1970).try_cast::<Representation>();
+            if let Ok(difference) = difference {
+                difference
+            } else {
+                // If that fails, we try first casting into the target representation and then
+                // subtracting. If that also fails, we just error.
+                days_since_1970
+                    .try_cast::<Representation>()
+                    .unwrap_or_else(|_| panic!())
+                    - epoch_days_since_1970
+                        .try_cast::<Representation>()
+                        .unwrap_or_else(|_| panic!())
+            }
+        };
+
+        let hours = Hours::new(hour)
+            .try_cast::<Representation>()
+            .unwrap_or_else(|_| panic!());
+        let minutes = Minutes::new(minute)
+            .try_cast::<Representation>()
+            .unwrap_or_else(|_| panic!());
+        let seconds = Seconds::new(second)
+            .try_cast::<Representation>()
+            .unwrap_or_else(|_| panic!());
         let time_since_epoch = days_since_scale_epoch.into_unit()
             + hours.into_unit()
             + minutes.into_unit()
@@ -138,7 +155,7 @@ where
         // representations.
         let second = second.floor::<Second>();
         let days_since_universal_epoch =
-            <Scale as ContinuousDateTimeScale>::EPOCH.time_since_epoch() + days_since_scale_epoch;
+            <Scale as TimeScale>::EPOCH.time_since_epoch() + days_since_scale_epoch;
         let date = Date::from_time_since_epoch(days_since_universal_epoch);
 
         // We must narrow-cast all results, but only the cast of `date` may fail. The rest will

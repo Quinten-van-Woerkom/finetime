@@ -2,7 +2,7 @@
 //! calendar representation: including phenomena such as months, weeks, years, and leap years.
 //! Rather, it is a simple day count since the Unix epoch.
 
-use core::ops::Add;
+use core::ops::{Add, Sub};
 
 use crate::{
     Days, GregorianDate, HistoricDate, JulianDate, Month, TryIntoExact, WeekDay,
@@ -62,6 +62,17 @@ impl<Representation> Date<Representation> {
         Ok(Date {
             time_since_epoch: self.time_since_epoch.try_cast()?,
         })
+    }
+
+    /// Returns the number of elapsed calendar days since the passed date. Beware: the returned
+    /// value represents strictly the number of elapsed calendar (!) days. While it is expressed as
+    /// a duration, the possibility of leap seconds is ignored. Only interpret the returned value
+    /// as an exact duration if no leap seconds occurred between both days.
+    pub fn elapsed_calendar_days_since(self, other: Self) -> Days<Representation>
+    where
+        Representation: Sub<Representation, Output = Representation> + Copy,
+    {
+        self.time_since_epoch - other.time_since_epoch
     }
 }
 

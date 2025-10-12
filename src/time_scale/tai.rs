@@ -2,7 +2,7 @@
 
 use crate::{
     Date, Duration, Month, TimePoint, Years,
-    time_scale::{TerrestrialTime, datetime::ContinuousDateTimeScale},
+    time_scale::{TerrestrialTime, TimeScale, datetime::ContinuousDateTimeScale},
     units::{Second, SecondsPerYear},
 };
 
@@ -14,12 +14,18 @@ pub type TaiTime<Representation = i64, Period = Second> = TimePoint<Tai, Represe
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tai;
 
-impl ContinuousDateTimeScale for Tai {
+impl TimeScale for Tai {
+    const NAME: &'static str = "International Atomic Time";
+
+    const ABBREVIATION: &'static str = "TAI";
+
     const EPOCH: Date<i32> = match Date::from_gregorian_date(1958, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };
 }
+
+impl ContinuousDateTimeScale for Tai {}
 
 impl TerrestrialTime for Tai {
     type Representation = u8;

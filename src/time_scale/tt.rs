@@ -2,7 +2,7 @@
 
 use crate::{
     Date, Duration, MilliSeconds, Month, TimePoint,
-    time_scale::{TerrestrialTime, datetime::ContinuousDateTimeScale},
+    time_scale::{TerrestrialTime, TimeScale, datetime::ContinuousDateTimeScale},
     units::{Milli, Second},
 };
 
@@ -14,12 +14,18 @@ pub type TtTime<Representation = i64, Period = Second> = TimePoint<Tt, Represent
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tt;
 
-impl ContinuousDateTimeScale for Tt {
-    const EPOCH: Date<i32> = match Date::from_gregorian_date(1958, Month::January, 1) {
+impl TimeScale for Tt {
+    const NAME: &'static str = "Terrestrial Time";
+
+    const ABBREVIATION: &'static str = "TT";
+
+    const EPOCH: Date<i32> = match Date::from_gregorian_date(1977, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };
 }
+
+impl ContinuousDateTimeScale for Tt {}
 
 impl TerrestrialTime for Tt {
     type Representation = u16;

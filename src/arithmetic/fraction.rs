@@ -251,12 +251,13 @@ macro_rules! mul_round_unsigned_integer {
             type Output = $repr;
 
             fn mul_round(self, rhs: $repr) -> Self::Output {
-                let numerator = rhs * self.numerator() as $repr;
-                let denominator = self.denominator() as $repr;
+                let numerator = rhs as u128 * self.numerator() as u128;
+                let denominator = self.denominator() as u128;
                 let div = numerator / denominator;
                 let rem = numerator % denominator;
                 let half = denominator >> 1;
-                if rem > half { div + 1 } else { div }
+                let result = if rem > half { div + 1 } else { div };
+                result.try_into().unwrap()
             }
         }
 
@@ -277,16 +278,17 @@ macro_rules! mul_round_signed_integer {
 
             fn mul_round(self, rhs: $repr) -> Self::Output {
                 use num_traits::ConstZero;
-                let numerator = rhs * self.numerator() as $repr;
-                let denominator = self.denominator() as $repr;
+                let numerator = rhs as i128 * self.numerator() as i128;
+                let denominator = self.denominator() as i128;
                 let div = numerator / denominator;
                 let rem = numerator % denominator;
                 let half = denominator >> 1;
-                if rhs >= <$repr>::ZERO {
+                let result = if rhs >= <$repr>::ZERO {
                     if rem > half { div + 1 } else { div }
                 } else {
                     if rem < (-half) { div - 1 } else { div }
-                }
+                };
+                result.try_into().unwrap()
             }
         }
 
@@ -341,6 +343,11 @@ impl MulRound<Fraction> for f32 {
     fn mul_round(self, rhs: Fraction) -> Self::Output {
         rhs.mul_round(self)
     }
+}
+
+#[test]
+fn rounding_multiplication() {
+    assert_eq!(2.mul_round(Fraction::new(1, 3)), 1);
 }
 
 /// Trait representing multiplication that always succeeds, but that will round towards negative

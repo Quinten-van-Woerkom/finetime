@@ -22,7 +22,7 @@ pub use time_point::TimePoint;
 mod time_scale;
 pub use time_scale::{
     ContinuousDateTimeScale, FromDateTime, FromFineDateTime, FromScale, IntoDateTime,
-    IntoFineDateTime, IntoScale, Tai, TaiTime, TerrestrialTime, Tt, TtTime,
+    IntoFineDateTime, IntoScale, Tai, TaiTime, Tcg, TcgTime, TerrestrialTime, Tt, TtTime,
 };
 mod units;
 pub use units::{ConvertUnit, TryConvertUnit, UnitRatio};
