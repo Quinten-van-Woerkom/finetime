@@ -38,9 +38,9 @@ impl TerrestrialTime for Gst {
 /// aligned with GPS.
 #[test]
 fn known_timestamps() {
-    use crate::{IntoScale, TaiTime};
+    use crate::{IntoTimeScale, TaiTime};
     let tai =
         TaiTime::<i64, Second>::from_historic_datetime(2004, Month::May, 14, 16, 43, 32).unwrap();
     let gst = GalileoTime::from_historic_datetime(2004, Month::May, 14, 16, 43, 13).unwrap();
-    assert_eq!(tai, gst.into_scale());
+    assert_eq!(tai, gst.into_time_scale());
 }

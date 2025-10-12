@@ -2,7 +2,7 @@
 //! calendar representation: including phenomena such as months, weeks, years, and leap years.
 //! Rather, it is a simple day count since the Unix epoch.
 
-use core::ops::{Add, Sub};
+use core::ops::{Add, AddAssign, Sub, SubAssign};
 
 use crate::{
     Days, GregorianDate, HistoricDate, JulianDate, Month, TryIntoExact, WeekDay,
@@ -132,12 +132,43 @@ impl<Representation> Add<Days<Representation>> for Date<Representation>
 where
     Representation: Add<Output = Representation>,
 {
-    type Output = Date<Representation>;
+    type Output = Self;
 
-    fn add(self, rhs: Days<Representation>) -> Self::Output {
-        Date {
+    fn add(self, rhs: Days<Representation>) -> Self {
+        Self {
             time_since_epoch: self.time_since_epoch + rhs,
         }
+    }
+}
+
+impl<Representation> AddAssign<Days<Representation>> for Date<Representation>
+where
+    Days<Representation>: AddAssign,
+{
+    fn add_assign(&mut self, rhs: Days<Representation>) {
+        self.time_since_epoch += rhs;
+    }
+}
+
+impl<Representation> Sub<Days<Representation>> for Date<Representation>
+where
+    Representation: Sub<Output = Representation>,
+{
+    type Output = Self;
+
+    fn sub(self, rhs: Days<Representation>) -> Self {
+        Self {
+            time_since_epoch: self.time_since_epoch - rhs,
+        }
+    }
+}
+
+impl<Representation> SubAssign<Days<Representation>> for Date<Representation>
+where
+    Days<Representation>: SubAssign,
+{
+    fn sub_assign(&mut self, rhs: Days<Representation>) {
+        self.time_since_epoch -= rhs;
     }
 }
 

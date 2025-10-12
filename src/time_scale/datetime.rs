@@ -38,14 +38,13 @@ pub trait FromDateTime: Sized {
     ) -> Result<Self, Self::Error>;
 }
 
-impl<Scale, Representation, Period> FromDateTime for TimePoint<Scale, Representation, Period>
+impl<Scale, Representation> FromDateTime for TimePoint<Scale, Representation, Second>
 where
     Scale: ?Sized + ContinuousDateTimeScale,
     Representation: Copy
-        + ConvertUnit<SecondsPerMinute, Period>
-        + ConvertUnit<SecondsPerHour, Period>
-        + ConvertUnit<SecondsPerDay, Period>
-        + ConvertUnit<Second, Period>
+        + ConvertUnit<SecondsPerMinute, Second>
+        + ConvertUnit<SecondsPerHour, Second>
+        + ConvertUnit<SecondsPerDay, Second>
         + Add<Representation, Output = Representation>
         + Sub<Representation, Output = Representation>
         + TryFromExact<i32>
@@ -97,17 +96,17 @@ where
         let seconds = Seconds::new(second)
             .try_cast::<Representation>()
             .unwrap_or_else(|_| panic!());
-        let time_since_epoch = days_since_scale_epoch.into_unit()
-            + hours.into_unit()
-            + minutes.into_unit()
-            + seconds.into_unit();
+        let time_since_epoch =
+            days_since_scale_epoch.into_unit() + hours.into_unit() + minutes.into_unit() + seconds;
         Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
 }
 
 /// This trait may be implemented for time points that can be created based on "fine" date-time
 /// pairs, which have subsecond accuracy.
-pub trait FromFineDateTime<Representation, Period>: FromDateTime {
+pub trait FromFineDateTime<Representation, Period>: Sized {
+    type Error: core::error::Error;
+
     /// Maps a given combination of date and fine time-of-day to an instant on this time scale. May
     /// return an error if the input does not represent a valid combination of date and
     /// time-of-day.

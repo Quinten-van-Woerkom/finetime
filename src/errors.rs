@@ -4,7 +4,7 @@
 
 use thiserror::Error;
 
-use crate::{DurationDesignator, Month, parse::DecimalNumber};
+use crate::{Date, DurationDesignator, HistoricDate, Month, parse::DecimalNumber};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
 #[error("{day} {month} {year} does not exist in the historic calendar")]
@@ -184,5 +184,18 @@ pub enum NumberParsingError {
     #[error("too many fractional digits: {fractional_digits}, only `i32::MAX` are supported")]
     TooManyFractionalDigits {
         fractional_digits: usize,
+    },
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
+pub enum InvalidUtcDateTime {
+    #[error("invalid time-of-day")]
+    InvalidTimeOfDay(#[from] InvalidTimeOfDay),
+    #[error("not a valid UTC leap second date-time: {}T{hour:02}-{minute:02}-{second:02}", <Date<i32> as Into<HistoricDate>>::into(*date))]
+    NonLeapSecondDateTime {
+        date: Date<i32>,
+        hour: u8,
+        minute: u8,
+        second: u8,
     },
 }

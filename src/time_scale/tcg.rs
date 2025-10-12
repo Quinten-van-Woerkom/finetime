@@ -4,7 +4,7 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    ConvertUnit, Date, Fraction, FromScale, IntoScale, MilliSeconds, Month, MulRound,
+    ConvertUnit, Date, Fraction, FromTimeScale, IntoTimeScale, MilliSeconds, Month, MulRound,
     TerrestrialTime, TimePoint, TryFromExact, Tt, TtTime,
     time_scale::{TimeScale, datetime::ContinuousDateTimeScale},
     units::{Milli, Second, SecondsPerDay},
@@ -66,7 +66,7 @@ where
     }
 }
 
-impl<Scale, Representation, Period> FromScale<Scale, Representation, Period>
+impl<Scale, Representation, Period> FromTimeScale<Scale, Representation, Period>
     for TcgTime<Representation, Period>
 where
     Scale: TerrestrialTime,
@@ -88,7 +88,7 @@ where
     }
 }
 
-impl<Scale, Representation, Period> FromScale<Tcg, Representation, Period>
+impl<Scale, Representation, Period> FromTimeScale<Tcg, Representation, Period>
     for TimePoint<Scale, Representation, Period>
 where
     Scale: TerrestrialTime,
@@ -106,14 +106,14 @@ where
 {
     fn from_scale(tcg_time: TcgTime<Representation, Period>) -> Self {
         let tt_time = tcg_time.into_tt();
-        tt_time.into_scale()
+        tt_time.into_time_scale()
     }
 }
 
 /// Compares with a known timestamp as obtained from the definition of TCG.
 #[test]
 fn known_timestamps() {
-    use crate::{IntoScale, Month, TaiTime};
+    use crate::{IntoTimeScale, Month, TaiTime};
     let tai = TaiTime::from_historic_datetime(1977, Month::January, 1, 0, 0, 0).unwrap();
     let tcg = TcgTime::from_fine_historic_datetime(
         1977,
@@ -125,8 +125,8 @@ fn known_timestamps() {
         MilliSeconds::new(184i64),
     )
     .unwrap();
-    let tai_tt: TtTime<_, _> = tai.into_unit().into_scale();
-    let tcg_tt: TtTime<_, _> = tcg.into_scale();
+    let tai_tt: TtTime<_, _> = tai.into_unit().into_time_scale();
+    let tcg_tt: TtTime<_, _> = tcg.into_time_scale();
     assert_eq!(tai_tt, tcg_tt);
 
     let tt = TtTime::from_fine_historic_datetime(
@@ -149,13 +149,13 @@ fn known_timestamps() {
         MilliSeconds::new(184i64),
     )
     .unwrap();
-    assert_eq!(tt, tcg.into_scale());
+    assert_eq!(tt, tcg.into_time_scale());
 }
 
 /// Verifies that conversion to and from TCG/TAI preserves identity.
 #[test]
 fn check_roundtrip() {
-    use crate::IntoScale;
+    use crate::IntoTimeScale;
     use rand::prelude::*;
     let mut rng = rand_chacha::ChaCha12Rng::seed_from_u64(44);
     for _ in 0..10_000 {
@@ -163,7 +163,7 @@ fn check_roundtrip() {
         let time_since_epoch = MilliSeconds::new(milliseconds_since_epoch);
         let tt = TtTime::from_time_since_epoch(time_since_epoch);
         let tcg: TcgTime<_, _> = TcgTime::from_scale(tt);
-        let tt2 = tcg.into_scale();
+        let tt2 = tcg.into_time_scale();
         assert_eq!(tt, tt2);
     }
 }
@@ -189,7 +189,7 @@ mod proof_harness {
     #[kani::proof]
     fn datetime_tai_roundtrip() {
         use crate::units::Milli;
-        use crate::{FromDateTime, IntoScale};
+        use crate::{FromDateTime, IntoTimeScale};
         let date: Date<i32> = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();

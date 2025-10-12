@@ -37,7 +37,7 @@ impl TerrestrialTime for Tt {
 /// Astrodynamics".
 #[test]
 fn known_timestamps() {
-    use crate::{IntoScale, Month, TaiTime};
+    use crate::{IntoTimeScale, Month, TaiTime};
     let tai = TaiTime::from_historic_datetime(2004, Month::May, 14, 16, 43, 32).unwrap();
     let tt = TtTime::from_fine_historic_datetime(
         2004,
@@ -49,7 +49,7 @@ fn known_timestamps() {
         crate::MilliSeconds::new(184i64),
     )
     .unwrap();
-    assert_eq!(tai.into_unit(), tt.into_scale());
+    assert_eq!(tai.into_unit(), tt.into_time_scale());
 }
 
 #[test]
@@ -87,7 +87,7 @@ mod proof_harness {
     #[kani::proof]
     fn datetime_tai_roundtrip() {
         use crate::units::Milli;
-        use crate::{FromDateTime, IntoScale};
+        use crate::{FromDateTime, IntoTimeScale};
         let date: Date<i32> = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();

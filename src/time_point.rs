@@ -13,7 +13,9 @@ use crate::{
     ConvertUnit, Date, Duration, Fraction, FractionalDigits, FromDateTime, FromFineDateTime,
     GregorianDate, HistoricDate, IntoDateTime, IntoFineDateTime, JulianDate, Month, MulCeil,
     MulFloor, MulRound, TryConvertUnit, TryIntoExact, UnitRatio,
-    errors::{InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime},
+    errors::{
+        InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime, InvalidTimeOfDay,
+    },
     time_scale::ContinuousDateTimeScale,
     units::Second,
 };
@@ -198,9 +200,11 @@ impl<Scale, Representation, Period> FromFineDateTime<Representation, Period>
     for TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized,
-    Representation: Add<Representation, Output = Representation>,
-    Self: FromDateTime,
+    Representation: Add<Representation, Output = Representation> + ConvertUnit<Second, Period>,
+    TimePoint<Scale, Representation, Second>: FromDateTime<Error = InvalidTimeOfDay>,
 {
+    type Error = InvalidTimeOfDay;
+
     fn from_fine_datetime(
         date: Date<i32>,
         hour: u8,
@@ -208,14 +212,15 @@ where
         second: u8,
         subseconds: Duration<Representation, Period>,
     ) -> Result<Self, Self::Error> {
-        let coarse_time_point = Self::from_datetime(date, hour, minute, second)?;
-        Ok(coarse_time_point + subseconds)
+        let coarse_time_point = TimePoint::from_datetime(date, hour, minute, second)?;
+        Ok(coarse_time_point.into_unit() + subseconds)
     }
 }
 
 impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Self: FromFineDateTime<Representation, Period>,
+    TimePoint<Scale, Representation, Second>: FromDateTime,
 {
     /// Constructs a `TimePoint` in the given time scale, based on a subsecond-accuracy historic
     /// date-time.
@@ -227,7 +232,10 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidHistoricDateTime<<Self as FromDateTime>::Error>> {
+    ) -> Result<
+        Self,
+        InvalidHistoricDateTime<<Self as FromFineDateTime<Representation, Period>>::Error>,
+    > {
         let date = Date::from_historic_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),
@@ -245,7 +253,10 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidGregorianDateTime<<Self as FromDateTime>::Error>> {
+    ) -> Result<
+        Self,
+        InvalidGregorianDateTime<<Self as FromFineDateTime<Representation, Period>>::Error>,
+    > {
         let date = Date::from_gregorian_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),
@@ -263,7 +274,10 @@ where
         minute: u8,
         second: u8,
         subseconds: Duration<Representation, Period>,
-    ) -> Result<Self, InvalidJulianDateTime<<Self as FromDateTime>::Error>> {
+    ) -> Result<
+        Self,
+        InvalidJulianDateTime<<Self as FromFineDateTime<Representation, Period>>::Error>,
+    > {
         let date = Date::from_julian_date(year, month, day)?;
         match Self::from_fine_datetime(date, hour, minute, second, subseconds) {
             Ok(time_point) => Ok(time_point),

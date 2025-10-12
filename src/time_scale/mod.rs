@@ -1,7 +1,7 @@
 //! Implementation of timekeeping according to different time scales.
 
 mod convert;
-pub use convert::{FromScale, IntoScale};
+pub use convert::{FromTimeScale, IntoTimeScale};
 mod datetime;
 pub use datetime::{
     ContinuousDateTimeScale, FromDateTime, FromFineDateTime, IntoDateTime, IntoFineDateTime,
@@ -11,6 +11,11 @@ mod gpst;
 pub use gpst::{GpsTime, Gpst};
 mod gst;
 pub use gst::{GalileoTime, Gst};
+mod leap_seconds;
+pub use leap_seconds::{
+    FromLeapSecondDateTime, IntoLeapSecondDateTime, LeapSecondProvider,
+    STATIC_LEAP_SECOND_PROVIDER, StaticLeapSecondProvider,
+};
 mod tai;
 pub use tai::{Tai, TaiTime};
 mod tcg;
@@ -19,6 +24,8 @@ mod tt;
 pub use tt::{Tt, TtTime};
 mod terrestrial_time;
 pub use terrestrial_time::TerrestrialTime;
+mod utc;
+pub use utc::{Utc, UtcTime};
 
 use crate::Date;
 

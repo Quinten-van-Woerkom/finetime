@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    ConvertUnit, Duration, FromScale, TimePoint, TryFromExact, time_scale::TimeScale,
+    ConvertUnit, Duration, FromTimeScale, TimePoint, TryFromExact, time_scale::TimeScale,
     units::SecondsPerDay,
 };
 
@@ -28,7 +28,7 @@ pub trait TerrestrialTime: TimeScale {
     const TAI_OFFSET: Duration<Self::Representation, Self::Period>;
 }
 
-impl<ScaleFrom, ScaleInto, Representation, Period> FromScale<ScaleFrom, Representation, Period>
+impl<ScaleFrom, ScaleInto, Representation, Period> FromTimeScale<ScaleFrom, Representation, Period>
     for TimePoint<ScaleInto, Representation, Period>
 where
     ScaleFrom: TerrestrialTime + TimeScale,

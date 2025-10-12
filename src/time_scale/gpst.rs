@@ -36,9 +36,9 @@ impl TerrestrialTime for Gpst {
 /// Astrodynamics".
 #[test]
 fn known_timestamps() {
-    use crate::{IntoScale, TaiTime};
+    use crate::{IntoTimeScale, TaiTime};
     let tai =
         TaiTime::<i64, Second>::from_historic_datetime(2004, Month::May, 14, 16, 43, 32).unwrap();
     let gpst = GpsTime::from_historic_datetime(2004, Month::May, 14, 16, 43, 13).unwrap();
-    assert_eq!(tai, gpst.into_scale());
+    assert_eq!(tai, gpst.into_time_scale());
 }

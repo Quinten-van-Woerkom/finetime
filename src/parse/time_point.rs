@@ -3,8 +3,8 @@
 use core::str::FromStr;
 
 use crate::{
-    FromDateTime, FromFineDateTime, HistoricDate, TimePoint, UnitRatio,
-    errors::TimePointParsingError, parse::TimeOfDay, units::Second,
+    FromFineDateTime, HistoricDate, TimePoint, UnitRatio, errors::TimePointParsingError,
+    parse::TimeOfDay, units::Second,
 };
 
 impl<Scale, Period> FromStr for TimePoint<Scale, i64, Period>
@@ -12,7 +12,7 @@ where
     Self: FromFineDateTime<i64, Period>,
     Period: UnitRatio,
 {
-    type Err = TimePointParsingError<<Self as FromDateTime>::Error>;
+    type Err = TimePointParsingError<<Self as FromFineDateTime<i64, Period>>::Error>;
 
     /// Parses a `TimePoint` based on some ISO 8610 date and time of day string. Note that time
     /// shifts are explicitly not supported: those are already included in the choice of `Scale`

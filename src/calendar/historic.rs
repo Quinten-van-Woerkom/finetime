@@ -228,6 +228,12 @@ impl From<Date<i32>> for HistoricDate {
     }
 }
 
+impl core::fmt::Display for HistoricDate {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}-{:02}-{:02}", self.year, self.month as u8, self.day)
+    }
+}
+
 /// Tests the day-of-year function using some examples from Meeus.
 #[test]
 fn day_of_year() {

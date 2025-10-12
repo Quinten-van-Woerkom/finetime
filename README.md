@@ -15,7 +15,7 @@ With this fine degree of control and precision, `finetime` is suitable for all t
 In `finetime`, time points are always bound to a specific timekeeping standard, indicated as `TimeScale`. One such example is Coordinated Universal Time (UTC). Time points may be constructed directly from some given datetime in the historic calendar:
 ```rust
 use finetime::{UtcTime, Month};
-let epoch = UtcTime::from_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
+let epoch = UtcTime::<i64, _>::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
 ```
 Note that constructing time points from datetimes may fail, because the given arguments do not form a valid time-of-day, or because the given date did not occur in the historic calendar: `finetime` makes this explicit. Users must acknowledge this possibility by unwrapping the returned `Result` before being able to use the created `UtcTime`.
 
@@ -24,8 +24,8 @@ A wide variety of time scales may be encountered in the context of precise timek
 Unix time is explicitly not included, as it is not a continuous time scale: the difference between two Unix times does not reflect the physically elapsed time, because leap seconds are not accounted for.
 Where possible, times can be converted between time scales using the `into_time_scale()` function.
 ```rust
-use finetime::{GalileoTime, GpsTime, TaiTime, UtcTime, Month};
-let epoch_utc = UtcTime::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
+use finetime::{GalileoTime, GpsTime, TaiTime, UtcTime, Month, IntoTimeScale, Second};
+let epoch_utc = UtcTime::<i64, Second>::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
 let epoch_tai = TaiTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 19).unwrap();
 let epoch_gps = GpsTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 0).unwrap();
 let epoch_galileo = GalileoTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 0).unwrap();
@@ -37,7 +37,7 @@ If a desired time scale is not present, users may provide their own by implement
 
 There is also support for subsecond datetime values, and conversion into more fine-grained `TimePoint` types to support higher-fidelity time types.
 ```rust
-use finetime::{UtcTime, TtTime, Month, MilliSeconds};
+use finetime::{UtcTime, TtTime, Month, MilliSeconds, IntoTimeScale};
 let epoch_utc = UtcTime::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
 let epoch_tt = TtTime::from_fine_historic_datetime(2025, Month::August, 3, 20, 26, 51, MilliSeconds::new(184i64)).unwrap();
 assert_eq!(epoch_utc.into_unit().into_time_scale(), epoch_tt);
