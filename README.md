@@ -67,19 +67,19 @@ assert_eq!(epoch3 - epoch1, Seconds::new(2));
 ```
 The same goes when a time scale does not apply leap seconds:
 ```rust
-use finetime::{TaiTime, Month, Seconds};
+use finetime::{TaiTime, Month, Seconds, Second};
 let epoch1 = TaiTime::from_historic_datetime(2016, Month::December, 31, 23, 59, 59).unwrap();
-let _ = TaiTime::from_historic_datetime(2016, Month::December, 31, 23, 59, 60).unwrap_err();
+let _ = TaiTime::<i64, Second>::from_historic_datetime(2016, Month::December, 31, 23, 59, 60).unwrap_err();
 let epoch3 = TaiTime::from_historic_datetime(2017, Month::January, 1, 0, 0, 0).unwrap();
-assert_eq!(epoch3 - epoch1, Seconds::new(1));
+assert_eq!(epoch3 - epoch1, Seconds::new(1i64));
 ```
 
 As with `TimePoint`s, unit compatibility is checked at compile time, with conversions permit using the `into_unit()` method:
 ```rust
-use finetime::{GpsTime, Month, Hours, MilliSeconds};
+use finetime::{GpsTime, Month, Hours, MilliSeconds, Second};
 let epoch1 = GpsTime::from_historic_datetime(2024, Month::August, 13, 19, 30, 0).unwrap();
 let epoch2 = epoch1 + Hours::new(2).into_unit();
-let epoch3 = epoch1.into_unit() + MilliSeconds::new(1);
+let epoch3 = epoch1.into_unit() + MilliSeconds::new(1i64);
 assert_eq!(epoch2, GpsTime::from_historic_datetime(2024, Month::August, 13, 21, 30, 0).unwrap());
 assert_eq!(epoch3, GpsTime::from_fine_historic_datetime(2024, Month::August, 13, 19, 30, 0, MilliSeconds::new(1)).unwrap());
 ```

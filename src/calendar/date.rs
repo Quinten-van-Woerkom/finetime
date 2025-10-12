@@ -130,9 +130,9 @@ impl Date<i32> {
 
 impl<Representation> Add<Days<Representation>> for Date<Representation>
 where
-    Representation: Add,
+    Representation: Add<Output = Representation>,
 {
-    type Output = Date<<Representation as Add>::Output>;
+    type Output = Date<Representation>;
 
     fn add(self, rhs: Days<Representation>) -> Self::Output {
         Date {

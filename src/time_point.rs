@@ -118,7 +118,7 @@ impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Per
     }
 }
 
-impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
+impl<Scale, Representation> TimePoint<Scale, Representation, Second>
 where
     Self: FromDateTime,
 {
@@ -581,58 +581,62 @@ where
     }
 }
 
-impl<Scale, R1, R2, Period> Sub<TimePoint<Scale, R2, Period>> for TimePoint<Scale, R1, Period>
+impl<Scale, Representation, Period> Sub for TimePoint<Scale, Representation, Period>
 where
-    R1: Sub<R2>,
+    Duration<Representation, Period>: Sub<Output = Duration<Representation, Period>>,
     Scale: ?Sized,
 {
-    type Output = Duration<<R1 as Sub<R2>>::Output, Period>;
+    type Output = Duration<Representation, Period>;
 
-    fn sub(self, rhs: TimePoint<Scale, R2, Period>) -> Self::Output {
+    fn sub(self, rhs: Self) -> Self::Output {
         self.time_since_epoch - rhs.time_since_epoch
     }
 }
 
-impl<Scale, R1, R2, Period> Add<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
+impl<Scale, Representation, Period> Add<Duration<Representation, Period>>
+    for TimePoint<Scale, Representation, Period>
 where
-    R1: Add<R2>,
+    Duration<Representation, Period>: Add<Output = Duration<Representation, Period>>,
     Scale: ?Sized,
 {
-    type Output = TimePoint<Scale, <R1 as Add<R2>>::Output, Period>;
+    type Output = Self;
 
-    fn add(self, rhs: Duration<R2, Period>) -> Self::Output {
+    fn add(self, rhs: Duration<Representation, Period>) -> Self::Output {
         TimePoint::from_time_since_epoch(self.time_since_epoch + rhs)
     }
 }
 
-impl<Scale, R1, R2, Period> AddAssign<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
+impl<Scale, Representation, Period> AddAssign<Duration<Representation, Period>>
+    for TimePoint<Scale, Representation, Period>
 where
-    R1: AddAssign<R2>,
+    Duration<Representation, Period>: AddAssign,
     Scale: ?Sized,
 {
-    fn add_assign(&mut self, rhs: Duration<R2, Period>) {
+    fn add_assign(&mut self, rhs: Duration<Representation, Period>) {
         self.time_since_epoch += rhs;
     }
 }
 
-impl<Scale, R1, R2, Period> Sub<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
+impl<Scale, Representation, Period> Sub<Duration<Representation, Period>>
+    for TimePoint<Scale, Representation, Period>
 where
-    R1: Sub<R2>,
+    Duration<Representation, Period>: Sub<Output = Duration<Representation, Period>>,
     Scale: ?Sized,
 {
-    type Output = TimePoint<Scale, <R1 as Sub<R2>>::Output, Period>;
+    type Output = Self;
 
-    fn sub(self, rhs: Duration<R2, Period>) -> Self::Output {
+    fn sub(self, rhs: Duration<Representation, Period>) -> Self::Output {
         TimePoint::from_time_since_epoch(self.time_since_epoch - rhs)
     }
 }
 
-impl<Scale, R1, R2, Period> SubAssign<Duration<R2, Period>> for TimePoint<Scale, R1, Period>
+impl<Scale, Representation, Period> SubAssign<Duration<Representation, Period>>
+    for TimePoint<Scale, Representation, Period>
 where
-    R1: SubAssign<R2>,
+    Duration<Representation, Period>: SubAssign,
     Scale: ?Sized,
 {
-    fn sub_assign(&mut self, rhs: Duration<R2, Period>) {
+    fn sub_assign(&mut self, rhs: Duration<Representation, Period>) {
         self.time_since_epoch -= rhs;
     }
 }

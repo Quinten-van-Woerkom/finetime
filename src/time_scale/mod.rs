@@ -7,6 +7,10 @@ pub use datetime::{
     ContinuousDateTimeScale, FromDateTime, FromFineDateTime, IntoDateTime, IntoFineDateTime,
 };
 
+mod gpst;
+pub use gpst::{GpsTime, Gpst};
+mod gst;
+pub use gst::{GalileoTime, Gst};
 mod tai;
 pub use tai::{Tai, TaiTime};
 mod tcg;

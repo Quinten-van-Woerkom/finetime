@@ -285,15 +285,18 @@ pub type Months<T> = Duration<T, SecondsPerMonth>;
 /// The length of an average year in the Gregorian calendar.
 pub type Years<T> = Duration<T, SecondsPerYear>;
 
-/// Two `Duration`s may only be added if they are of the same `Period`.
-impl<R1, R2, Period> Add<Duration<R2, Period>> for Duration<R1, Period>
+/// Two `Duration`s may only be added if they are of the same `Period`. We also (relatively
+/// arbitrarily) restrict addition to `Duration`s with the same underlying representation. This
+/// turns out to be very useful in improving type inference, with the reduced flexibility being of
+/// little consequence for any "regular" representation.
+impl<Representation, Period> Add for Duration<Representation, Period>
 where
-    R1: Add<R2>,
+    Representation: Add<Output = Representation>,
     Period: ?Sized,
 {
-    type Output = Duration<<R1 as Add<R2>>::Output, Period>;
+    type Output = Self;
 
-    fn add(self, rhs: Duration<R2, Period>) -> Self::Output {
+    fn add(self, rhs: Self) -> Self::Output {
         Self::Output {
             count: self.count + rhs.count,
             period: core::marker::PhantomData,
@@ -301,25 +304,29 @@ where
     }
 }
 
-impl<R1, R2, Period> AddAssign<Duration<R2, Period>> for Duration<R1, Period>
+impl<Representation, Period> AddAssign<Duration<Representation, Period>>
+    for Duration<Representation, Period>
 where
-    R1: AddAssign<R2>,
+    Representation: AddAssign<Representation>,
     Period: ?Sized,
 {
-    fn add_assign(&mut self, rhs: Duration<R2, Period>) {
+    fn add_assign(&mut self, rhs: Duration<Representation, Period>) {
         self.count += rhs.count;
     }
 }
 
-/// Two `Duration`s may only be subtracted if they are of the same `Period`.
-impl<R1, R2, Period> Sub<Duration<R2, Period>> for Duration<R1, Period>
+/// Two `Duration`s may only be subtracted if they are of the same `Period`.  We also (relatively
+/// arbitrarily) restrict subtraction to `Duration`s with the same underlying representation. This
+/// turns out to be very useful in improving type inference, with the reduced flexibility being of
+/// little consequence for any "regular" representation.
+impl<Representation, Period> Sub for Duration<Representation, Period>
 where
-    R1: Sub<R2>,
+    Representation: Sub<Output = Representation>,
     Period: ?Sized,
 {
-    type Output = Duration<<R1 as Sub<R2>>::Output, Period>;
+    type Output = Self;
 
-    fn sub(self, rhs: Duration<R2, Period>) -> Self::Output {
+    fn sub(self, rhs: Self) -> Self::Output {
         Self::Output {
             count: self.count - rhs.count,
             period: core::marker::PhantomData,

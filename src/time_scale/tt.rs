@@ -49,7 +49,7 @@ fn known_timestamps() {
         crate::MilliSeconds::new(184i64),
     )
     .unwrap();
-    assert_eq!(tai, tt.into_scale());
+    assert_eq!(tai.into_unit(), tt.into_scale());
 }
 
 #[test]

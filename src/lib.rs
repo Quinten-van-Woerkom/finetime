@@ -21,8 +21,13 @@ mod time_point;
 pub use time_point::TimePoint;
 mod time_scale;
 pub use time_scale::{
-    ContinuousDateTimeScale, FromDateTime, FromFineDateTime, FromScale, IntoDateTime,
-    IntoFineDateTime, IntoScale, Tai, TaiTime, Tcg, TcgTime, TerrestrialTime, Tt, TtTime,
+    ContinuousDateTimeScale, FromDateTime, FromFineDateTime, FromScale, GalileoTime, GpsTime, Gpst,
+    Gst, IntoDateTime, IntoFineDateTime, IntoScale, Tai, TaiTime, Tcg, TcgTime, TerrestrialTime,
+    Tt, TtTime,
 };
 mod units;
-pub use units::{ConvertUnit, TryConvertUnit, UnitRatio};
+pub use units::{
+    Atto, BinaryFraction1, BinaryFraction2, BinaryFraction3, BinaryFraction4, BinaryFraction5,
+    BinaryFraction6, Centi, ConvertUnit, Deca, Deci, Exa, Femto, Giga, Hecto, Kilo, Mega, Micro,
+    Milli, Nano, Peta, Pico, Second, Tera, TryConvertUnit, UnitRatio,
+};

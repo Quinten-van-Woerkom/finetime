@@ -125,7 +125,7 @@ fn known_timestamps() {
         MilliSeconds::new(184i64),
     )
     .unwrap();
-    let tai_tt: TtTime<_, _> = tai.into_scale();
+    let tai_tt: TtTime<_, _> = tai.into_unit().into_scale();
     let tcg_tt: TtTime<_, _> = tcg.into_scale();
     assert_eq!(tai_tt, tcg_tt);
 
