@@ -1,7 +1,7 @@
 //! Leap seconds are applied when converting date-time pairs to underlying time scales, to better
 //! align those time scales with the human-centric time based on the Earth's rotation (UT1).
 
-use crate::{Date, FromDateTime, IntoDateTime, Seconds};
+use crate::{Date, FromDateTime, IntoDateTime, Second, Seconds, UtcTime};
 
 /// Since leap seconds are hard to predict in advance (due to irregular variations in the Earth's
 /// rotation), their insertion and deletion is based on short-term predictions. This means that
@@ -19,6 +19,10 @@ pub trait LeapSecondProvider {
     /// end of that day. In tandem, returns the accumulated number of leap seconds before (!) that
     /// date.
     fn leap_seconds_on_date(&self, utc_date: Date<i32>) -> (bool, Seconds<u8>);
+
+    /// Given some UTC time, returns the number of leap seconds that apply, and whether the
+    /// requested date-time is a leap second (exactly).
+    fn leap_seconds_at_time(&self, utc_time: UtcTime<i64, Second>) -> (bool, Seconds<u8>);
 }
 
 /// This trait is the leap second equivalent of `FromDateTime`. It permits the creation of time
@@ -132,10 +136,78 @@ impl LeapSecondProvider for StaticLeapSecondProvider {
         };
         (is_leap_second, Seconds::new(leap_seconds))
     }
+
+    /// To determine the leap second offset applicable at a given time, we just use a generated
+    /// jump table, similar to the date-to-leap-seconds conversion. Note that leap seconds are
+    /// applied only after the leap second itself: during a leap second, the count is still the
+    /// same as before.
+    fn leap_seconds_at_time(&self, utc_time: UtcTime<i64, Second>) -> (bool, Seconds<u8>) {
+        let seconds_since_1972_01_01 = utc_time.time_since_epoch().count();
+        let (is_leap_second, leap_seconds) = match seconds_since_1972_01_01 {
+            1420156837.. => (false, 37),
+            1420156836 => (true, 36),
+            1372636836.. => (false, 36),
+            1372636835 => (true, 35),
+            1278028835.. => (false, 35),
+            1278028834 => (true, 34),
+            1167696034.. => (false, 34),
+            1167696033 => (true, 33),
+            1073001633.. => (false, 33),
+            1073001632 => (true, 32),
+            852076832.. => (false, 32),
+            852076831 => (true, 31),
+            804643231.. => (false, 31),
+            804643230 => (true, 30),
+            757382430.. => (false, 30),
+            757382429 => (true, 29),
+            709948829.. => (false, 29),
+            709948828 => (true, 28),
+            678412828.. => (false, 28),
+            678412827 => (true, 27),
+            646876827.. => (false, 27),
+            646876826 => (true, 26),
+            599616026.. => (false, 26),
+            599616025 => (true, 25),
+            568080025.. => (false, 25),
+            568080024 => (true, 24),
+            504921624.. => (false, 24),
+            504921623 => (true, 23),
+            425952023.. => (false, 23),
+            425952022 => (true, 22),
+            362793622.. => (false, 22),
+            362793621 => (true, 21),
+            331257621.. => (false, 21),
+            331257620 => (true, 20),
+            299721620.. => (false, 20),
+            299721619 => (true, 19),
+            252460819.. => (false, 19),
+            252460818 => (true, 18),
+            220924818.. => (false, 18),
+            220924817 => (true, 17),
+            189388817.. => (false, 17),
+            189388816 => (true, 16),
+            157852816.. => (false, 16),
+            157852815 => (true, 15),
+            126230415.. => (false, 15),
+            126230414 => (true, 14),
+            94694414.. => (false, 14),
+            94694413 => (true, 13),
+            63158413.. => (false, 13),
+            63158412 => (true, 12),
+            31622412.. => (false, 12),
+            31622411 => (true, 11),
+            15724811.. => (false, 11),
+            15724810 => (true, 10),
+            10.. => (false, 10),
+            9 => (true, 9),
+            _ => (false, 9),
+        };
+        (is_leap_second, Seconds::new(leap_seconds))
+    }
 }
 
 // #[cfg(test)]
-// fn print_date(year: i32, month: crate::Month, day: u8, leap_seconds: u8) {
+// fn print_leap_seconds_on_date(year: i32, month: crate::Month, day: u8, leap_seconds: u8) {
 //     let day_count = Date::from_historic_date(year, month, day)
 //         .unwrap()
 //         .time_since_epoch()
@@ -146,34 +218,78 @@ impl LeapSecondProvider for StaticLeapSecondProvider {
 
 // #[test]
 // fn print_dates() {
-//     print_date(2017, crate::Month::January, 1, 37);
-//     print_date(2015, crate::Month::July, 1, 36);
-//     print_date(2012, crate::Month::July, 1, 35);
-//     print_date(2009, crate::Month::January, 1, 34);
-//     print_date(2006, crate::Month::January, 1, 33);
-//     print_date(1999, crate::Month::January, 1, 32);
-//     print_date(1997, crate::Month::July, 1, 31);
-//     print_date(1996, crate::Month::January, 1, 30);
-//     print_date(1994, crate::Month::July, 1, 29);
-//     print_date(1993, crate::Month::July, 1, 28);
-//     print_date(1992, crate::Month::July, 1, 27);
-//     print_date(1991, crate::Month::January, 1, 26);
-//     print_date(1990, crate::Month::January, 1, 25);
-//     print_date(1988, crate::Month::January, 1, 24);
-//     print_date(1985, crate::Month::July, 1, 23);
-//     print_date(1983, crate::Month::July, 1, 22);
-//     print_date(1982, crate::Month::July, 1, 21);
-//     print_date(1981, crate::Month::July, 1, 20);
-//     print_date(1980, crate::Month::January, 1, 19);
-//     print_date(1979, crate::Month::January, 1, 18);
-//     print_date(1978, crate::Month::January, 1, 17);
-//     print_date(1977, crate::Month::January, 1, 16);
-//     print_date(1976, crate::Month::January, 1, 15);
-//     print_date(1975, crate::Month::January, 1, 14);
-//     print_date(1974, crate::Month::January, 1, 13);
-//     print_date(1973, crate::Month::January, 1, 12);
-//     print_date(1972, crate::Month::July, 1, 11);
-//     print_date(1972, crate::Month::January, 1, 10);
+//     print_leap_seconds_on_date(2017, crate::Month::January, 1, 37);
+//     print_leap_seconds_on_date(2015, crate::Month::July, 1, 36);
+//     print_leap_seconds_on_date(2012, crate::Month::July, 1, 35);
+//     print_leap_seconds_on_date(2009, crate::Month::January, 1, 34);
+//     print_leap_seconds_on_date(2006, crate::Month::January, 1, 33);
+//     print_leap_seconds_on_date(1999, crate::Month::January, 1, 32);
+//     print_leap_seconds_on_date(1997, crate::Month::July, 1, 31);
+//     print_leap_seconds_on_date(1996, crate::Month::January, 1, 30);
+//     print_leap_seconds_on_date(1994, crate::Month::July, 1, 29);
+//     print_leap_seconds_on_date(1993, crate::Month::July, 1, 28);
+//     print_leap_seconds_on_date(1992, crate::Month::July, 1, 27);
+//     print_leap_seconds_on_date(1991, crate::Month::January, 1, 26);
+//     print_leap_seconds_on_date(1990, crate::Month::January, 1, 25);
+//     print_leap_seconds_on_date(1988, crate::Month::January, 1, 24);
+//     print_leap_seconds_on_date(1985, crate::Month::July, 1, 23);
+//     print_leap_seconds_on_date(1983, crate::Month::July, 1, 22);
+//     print_leap_seconds_on_date(1982, crate::Month::July, 1, 21);
+//     print_leap_seconds_on_date(1981, crate::Month::July, 1, 20);
+//     print_leap_seconds_on_date(1980, crate::Month::January, 1, 19);
+//     print_leap_seconds_on_date(1979, crate::Month::January, 1, 18);
+//     print_leap_seconds_on_date(1978, crate::Month::January, 1, 17);
+//     print_leap_seconds_on_date(1977, crate::Month::January, 1, 16);
+//     print_leap_seconds_on_date(1976, crate::Month::January, 1, 15);
+//     print_leap_seconds_on_date(1975, crate::Month::January, 1, 14);
+//     print_leap_seconds_on_date(1974, crate::Month::January, 1, 13);
+//     print_leap_seconds_on_date(1973, crate::Month::January, 1, 12);
+//     print_leap_seconds_on_date(1972, crate::Month::July, 1, 11);
+//     print_leap_seconds_on_date(1972, crate::Month::January, 1, 10);
+
+//     assert!(false);
+// }
+
+// #[cfg(test)]
+// fn print_leap_seconds_at_utc_time(year: i32, month: crate::Month, day: u8, leap_seconds: u8) {
+//     let second_count = UtcTime::<i64, Second>::from_historic_datetime(year, month, day, 0, 0, 0)
+//         .unwrap()
+//         .time_since_epoch()
+//         .count();
+//     println!("{second_count}.. => (false, {leap_seconds}),");
+//     println!("{} => (true, {}),", second_count - 1, leap_seconds - 1);
+// }
+
+// #[test]
+// fn print_times() {
+//     print_leap_seconds_at_utc_time(2017, crate::Month::January, 1, 37);
+//     print_leap_seconds_at_utc_time(2015, crate::Month::July, 1, 36);
+//     print_leap_seconds_at_utc_time(2012, crate::Month::July, 1, 35);
+//     print_leap_seconds_at_utc_time(2009, crate::Month::January, 1, 34);
+//     print_leap_seconds_at_utc_time(2006, crate::Month::January, 1, 33);
+//     print_leap_seconds_at_utc_time(1999, crate::Month::January, 1, 32);
+//     print_leap_seconds_at_utc_time(1997, crate::Month::July, 1, 31);
+//     print_leap_seconds_at_utc_time(1996, crate::Month::January, 1, 30);
+//     print_leap_seconds_at_utc_time(1994, crate::Month::July, 1, 29);
+//     print_leap_seconds_at_utc_time(1993, crate::Month::July, 1, 28);
+//     print_leap_seconds_at_utc_time(1992, crate::Month::July, 1, 27);
+//     print_leap_seconds_at_utc_time(1991, crate::Month::January, 1, 26);
+//     print_leap_seconds_at_utc_time(1990, crate::Month::January, 1, 25);
+//     print_leap_seconds_at_utc_time(1988, crate::Month::January, 1, 24);
+//     print_leap_seconds_at_utc_time(1985, crate::Month::July, 1, 23);
+//     print_leap_seconds_at_utc_time(1983, crate::Month::July, 1, 22);
+//     print_leap_seconds_at_utc_time(1982, crate::Month::July, 1, 21);
+//     print_leap_seconds_at_utc_time(1981, crate::Month::July, 1, 20);
+//     print_leap_seconds_at_utc_time(1980, crate::Month::January, 1, 19);
+//     print_leap_seconds_at_utc_time(1979, crate::Month::January, 1, 18);
+//     print_leap_seconds_at_utc_time(1978, crate::Month::January, 1, 17);
+//     print_leap_seconds_at_utc_time(1977, crate::Month::January, 1, 16);
+//     print_leap_seconds_at_utc_time(1976, crate::Month::January, 1, 15);
+//     print_leap_seconds_at_utc_time(1975, crate::Month::January, 1, 14);
+//     print_leap_seconds_at_utc_time(1974, crate::Month::January, 1, 13);
+//     print_leap_seconds_at_utc_time(1973, crate::Month::January, 1, 12);
+//     print_leap_seconds_at_utc_time(1972, crate::Month::July, 1, 11);
+//     print_leap_seconds_at_utc_time(1972, crate::Month::January, 1, 10);
 
 //     assert!(false);
 // }

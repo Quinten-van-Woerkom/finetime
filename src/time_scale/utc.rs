@@ -3,8 +3,9 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    ConvertUnit, Date, FromDateTime, Hours, LeapSecondProvider, Minutes, Month, Second, Seconds,
-    StaticLeapSecondProvider, TerrestrialTime, TimePoint, TryFromExact, Years,
+    ConvertUnit, Date, Days, Fraction, FromDateTime, Hours, IntoDateTime, LeapSecondProvider,
+    Minutes, Month, MulFloor, Second, Seconds, StaticLeapSecondProvider, TerrestrialTime,
+    TimePoint, TryFromExact, TryIntoExact, Years,
     errors::{InvalidTimeOfDay, InvalidUtcDateTime},
     time_scale::TimeScale,
     units::{SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerYear},
@@ -134,6 +135,59 @@ where
     }
 }
 
+impl<Representation> IntoDateTime for UtcTime<Representation, Second>
+where
+    Representation: Copy
+        + ConvertUnit<SecondsPerMinute, Second>
+        + ConvertUnit<SecondsPerHour, Second>
+        + ConvertUnit<SecondsPerDay, Second>
+        + MulFloor<Fraction, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + TryIntoExact<i32>
+        + TryIntoExact<u8>
+        + TryFromExact<u8>,
+    i64: TryFromExact<Representation>,
+{
+    fn into_datetime(self) -> (Date<i32>, u8, u8, u8) {
+        // Step-by-step factoring of the time since epoch into days, hours, minutes, and seconds.
+        let seconds_since_scale_epoch = self.time_since_epoch();
+
+        let time_i64 = self.try_into_exact().unwrap_or_else(|_| panic!());
+        let (is_leap_second, leap_seconds) =
+            StaticLeapSecondProvider {}.leap_seconds_at_time(time_i64);
+        let leap_seconds = leap_seconds.try_into_exact().unwrap_or_else(|_| panic!());
+
+        let seconds_since_scale_epoch = seconds_since_scale_epoch - leap_seconds;
+        let (days_since_scale_epoch, seconds_in_day) =
+            seconds_since_scale_epoch.factor_out::<SecondsPerDay>();
+        let days_since_scale_epoch: Days<i32> = days_since_scale_epoch
+            .try_cast()
+            .unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in days since scale epoch outside of `i32` range"));
+        let (hour, seconds_in_hour) = seconds_in_day.factor_out::<SecondsPerHour>();
+        let (minute, second) = seconds_in_hour.factor_out::<SecondsPerMinute>();
+        // This last step will be a no-op for integer representations, but is necessary for float
+        // representations.
+        let second = second.floor::<Second>();
+        let days_since_universal_epoch = Utc::EPOCH.time_since_epoch() + days_since_scale_epoch;
+        let date = Date::from_time_since_epoch(days_since_universal_epoch);
+
+        if is_leap_second {
+            let date = (date - Days::new(1)).try_cast().expect("Call of `datetime_from_time_point` results in date outside of representable range of `i32`");
+            (date, 23, 59, 60)
+        } else {
+            (
+            // We must narrow-cast all results, but only the cast of `date` may fail. The rest will
+            // always succeed by construction: hour < 24, minute < 60, second < 60, so all fit in `u8`.
+            date.try_cast()
+                .expect("Call of `datetime_from_time_point` results in date outside of representable range of `i32`"),
+            hour.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in hour value that cannot be expressed as `u8`")),
+            minute.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in minute value that cannot be expressed as `u8`")),
+            second.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in second value that cannot be expressed as `u8`")),
+        )
+        }
+    }
+}
+
 /// Tests the creation of UTC time points from calendar dates for some known values. We explicitly
 /// try out times near leap second insertions to see if those are handled properly, including:
 /// - Durations should be handled correctly before, during, and after a leap second.
@@ -189,4 +243,67 @@ fn trivial_times() {
     assert_eq!(epoch.time_since_epoch(), Seconds::new(10));
     let epoch = UtcTime::from_historic_datetime(1971, Month::December, 31, 23, 59, 60).unwrap();
     assert_eq!(epoch.time_since_epoch(), Seconds::new(9));
+}
+
+#[test]
+fn tai_roundtrip_near_leap_seconds() {
+    use crate::Month::*;
+    use crate::{FromTimeScale, HistoricDate, IntoTimeScale, TaiTime};
+    // Leap second insertion of June 2015.
+    let date = HistoricDate::new(2015, June, 30).unwrap().into();
+    let date2 = HistoricDate::new(2015, July, 1).unwrap().into();
+    let date3 = HistoricDate::new(2016, December, 31).unwrap().into();
+    let date4 = HistoricDate::new(2017, January, 1).unwrap().into();
+    let date5 = HistoricDate::new(2016, June, 30).unwrap().into();
+
+    let times = [
+        UtcTime::<i64, Second>::from_datetime(date, 23, 59, 58).unwrap(),
+        UtcTime::from_datetime(date, 23, 59, 59).unwrap(),
+        UtcTime::from_datetime(date2, 0, 0, 0).unwrap(),
+        UtcTime::from_datetime(date2, 0, 0, 1).unwrap(),
+        UtcTime::from_datetime(date3, 23, 59, 58).unwrap(),
+        UtcTime::from_datetime(date3, 23, 59, 59).unwrap(),
+        UtcTime::from_datetime(date4, 0, 0, 0).unwrap(),
+        UtcTime::from_datetime(date5, 23, 59, 58).unwrap(),
+        UtcTime::from_datetime(date5, 23, 59, 59).unwrap(),
+    ];
+
+    for &time in times.iter() {
+        let tai = TaiTime::from_time_scale(time);
+        let time2 = tai.into_time_scale();
+        assert_eq!(time, time2);
+    }
+}
+
+#[test]
+fn datetime_roundtrip_near_leap_seconds() {
+    use crate::Month::*;
+    use crate::{HistoricDate, IntoDateTime};
+
+    // Leap second insertion of June 2015.
+    let dates = [
+        HistoricDate::new(2015, June, 30).unwrap().into(),
+        HistoricDate::new(2015, July, 1).unwrap().into(),
+        HistoricDate::new(2016, December, 31).unwrap().into(),
+        HistoricDate::new(2017, January, 1).unwrap().into(),
+        HistoricDate::new(2016, June, 30).unwrap().into(),
+    ];
+
+    let times_of_day = [(23, 59, 58), (23, 59, 59), (0, 0, 0), (0, 0, 1)];
+
+    for date in dates.iter() {
+        for time_of_day in times_of_day.iter() {
+            let hour = time_of_day.0;
+            let minute = time_of_day.1;
+            let second = time_of_day.2;
+            let utc_time =
+                UtcTime::<i64, Second>::from_datetime(*date, hour, minute, second).unwrap();
+            let datetime = utc_time.into_datetime();
+
+            assert_eq!(datetime.0, *date);
+            assert_eq!(datetime.1, hour);
+            assert_eq!(datetime.2, minute);
+            assert_eq!(datetime.3, second);
+        }
+    }
 }

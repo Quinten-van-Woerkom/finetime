@@ -12,7 +12,7 @@ use num_traits::{Bounded, Zero};
 use crate::{
     ConvertUnit, Date, Duration, Fraction, FractionalDigits, FromDateTime, FromFineDateTime,
     GregorianDate, HistoricDate, IntoDateTime, IntoFineDateTime, JulianDate, Month, MulCeil,
-    MulFloor, MulRound, TryConvertUnit, TryIntoExact, UnitRatio,
+    MulFloor, MulRound, TryConvertUnit, TryFromExact, TryIntoExact, UnitRatio,
     errors::{
         InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime, InvalidTimeOfDay,
     },
@@ -666,5 +666,18 @@ where
 
     fn max_value() -> Self {
         Self::from_time_since_epoch(Duration::<Representation, Period>::max_value())
+    }
+}
+
+impl<Scale, R1, R2, Period> TryFromExact<TimePoint<Scale, R2, Period>>
+    for TimePoint<Scale, R1, Period>
+where
+    R1: TryFromExact<R2>,
+{
+    type Error = <R1 as TryFromExact<R2>>::Error;
+
+    fn try_from_exact(value: TimePoint<Scale, R2, Period>) -> Result<Self, Self::Error> {
+        let time_since_epoch = value.time_since_epoch.try_into_exact()?;
+        Ok(Self::from_time_since_epoch(time_since_epoch))
     }
 }

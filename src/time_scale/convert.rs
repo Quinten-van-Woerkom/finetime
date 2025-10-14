@@ -11,7 +11,7 @@ use crate::TimePoint;
 /// simply implement `FromScale` and let `IntoScale` be derived.
 pub trait FromTimeScale<Scale, Representation, Period> {
     /// Constructs a time point from an instant expressed in another scale.
-    fn from_scale(time_point: TimePoint<Scale, Representation, Period>) -> Self;
+    fn from_time_scale(time_point: TimePoint<Scale, Representation, Period>) -> Self;
 }
 
 /// Trait representing the ability to convert from one scale into another. Note that this
@@ -29,6 +29,6 @@ where
     TimePoint<S1, R1, P1>: FromTimeScale<S2, R2, P2>,
 {
     fn into_time_scale(self) -> TimePoint<S1, R1, P1> {
-        TimePoint::from_scale(self)
+        TimePoint::from_time_scale(self)
     }
 }

@@ -82,8 +82,8 @@ where
         + PartialOrd
         + MulRound<Fraction, Output = Representation>,
 {
-    fn from_scale(time_point: TimePoint<Scale, Representation, Period>) -> Self {
-        let tt_time = TtTime::from_scale(time_point);
+    fn from_time_scale(time_point: TimePoint<Scale, Representation, Period>) -> Self {
+        let tt_time = TtTime::from_time_scale(time_point);
         Self::from_tt(tt_time)
     }
 }
@@ -104,7 +104,7 @@ where
         + ConvertUnit<SecondsPerDay, Period>
         + PartialOrd,
 {
-    fn from_scale(tcg_time: TcgTime<Representation, Period>) -> Self {
+    fn from_time_scale(tcg_time: TcgTime<Representation, Period>) -> Self {
         let tt_time = tcg_time.into_tt();
         tt_time.into_time_scale()
     }
@@ -162,7 +162,7 @@ fn check_roundtrip() {
         let milliseconds_since_epoch = rng.random::<u64>();
         let time_since_epoch = MilliSeconds::new(milliseconds_since_epoch);
         let tt = TtTime::from_time_since_epoch(time_since_epoch);
-        let tcg: TcgTime<_, _> = TcgTime::from_scale(tt);
+        let tcg: TcgTime<_, _> = TcgTime::from_time_scale(tt);
         let tt2 = tcg.into_time_scale();
         assert_eq!(tt, tt2);
     }

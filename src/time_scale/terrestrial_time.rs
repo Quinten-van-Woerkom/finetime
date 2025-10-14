@@ -44,7 +44,7 @@ where
         + ConvertUnit<SecondsPerDay, Period>
         + PartialOrd,
 {
-    fn from_scale(time_point: TimePoint<ScaleFrom, Representation, Period>) -> Self {
+    fn from_time_scale(time_point: TimePoint<ScaleFrom, Representation, Period>) -> Self {
         let epoch_offset = ScaleFrom::EPOCH.elapsed_calendar_days_since(ScaleInto::EPOCH);
         let epoch_offset = epoch_offset
             .try_cast()

@@ -11,7 +11,7 @@ use core::{
 use num_traits::{Bounded, ConstZero, Signed, Zero};
 
 use crate::{
-    Fraction, FractionalDigits, MulCeil, MulFloor, MulRound, TryIntoExact, TryMul,
+    Fraction, FractionalDigits, MulCeil, MulFloor, MulRound, TryFromExact, TryIntoExact, TryMul,
     units::{
         Atto, ConvertUnit, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay,
         SecondsPerHalfDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
@@ -598,6 +598,18 @@ where
             count: rhs.count.mul_floor(self),
             period: core::marker::PhantomData,
         }
+    }
+}
+
+impl<R1, R2, Period> TryFromExact<Duration<R2, Period>> for Duration<R1, Period>
+where
+    R1: TryFromExact<R2>,
+{
+    type Error = <R1 as TryFromExact<R2>>::Error;
+
+    fn try_from_exact(value: Duration<R2, Period>) -> Result<Self, Self::Error> {
+        let count = value.count.try_into_exact()?;
+        Ok(Duration::new(count))
     }
 }
 
