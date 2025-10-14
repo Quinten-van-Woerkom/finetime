@@ -84,7 +84,7 @@ impl Date<i32> {
         day: u8,
     ) -> Result<Self, InvalidHistoricDate> {
         match HistoricDate::new(year, month, day) {
-            Ok(historic_date) => Ok(historic_date.to_date()),
+            Ok(historic_date) => Ok(historic_date.into_date()),
             Err(error) => Err(error),
         }
     }
@@ -96,7 +96,7 @@ impl Date<i32> {
         day: u8,
     ) -> Result<Self, InvalidGregorianDate> {
         match GregorianDate::new(year, month, day) {
-            Ok(gregorian_date) => Ok(gregorian_date.to_date()),
+            Ok(gregorian_date) => Ok(gregorian_date.into_date()),
             Err(error) => Err(error),
         }
     }
@@ -108,7 +108,7 @@ impl Date<i32> {
         day: u8,
     ) -> Result<Self, InvalidJulianDate> {
         match JulianDate::new(year, month, day) {
-            Ok(julian_date) => Ok(julian_date.to_date()),
+            Ok(julian_date) => Ok(julian_date.into_date()),
             Err(error) => Err(error),
         }
     }

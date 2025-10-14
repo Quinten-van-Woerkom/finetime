@@ -64,7 +64,7 @@ impl GregorianDate {
 
     /// Constructs a `Date` from a given Gregorian date. Uses Howard Hinnant's `days_from_civil`
     /// algorithm.
-    pub const fn to_date(&self) -> Date<i32> {
+    pub const fn into_date(&self) -> Date<i32> {
         let mut year = self.year;
         let month = self.month as i32;
         let day = self.day as i32;
@@ -144,7 +144,7 @@ impl GregorianDate {
 
 impl From<GregorianDate> for Date<i32> {
     fn from(value: GregorianDate) -> Self {
-        value.to_date()
+        value.into_date()
     }
 }
 
@@ -171,7 +171,7 @@ fn roundtrip() {
     for time_since_epoch in times_since_epoch.iter() {
         let date = Date::from_time_since_epoch(*time_since_epoch);
         let gregorian_date = GregorianDate::from_date(date);
-        let date2 = gregorian_date.to_date();
+        let date2 = gregorian_date.into_date();
         let gregorian_date2 = GregorianDate::from_date(date2);
         assert_eq!(date, date2);
         assert_eq!(gregorian_date, gregorian_date2);
@@ -185,7 +185,7 @@ fn roundtrip() {
         let time_since_epoch = Days::new(days_since_epoch);
         let date = Date::from_time_since_epoch(time_since_epoch);
         let gregorian_date = GregorianDate::from_date(date);
-        let date2 = gregorian_date.to_date();
+        let date2 = gregorian_date.into_date();
         let gregorian_date2 = GregorianDate::from_date(date2);
         assert_eq!(date, date2);
         assert_eq!(gregorian_date, gregorian_date2);
@@ -212,7 +212,7 @@ fn roundtrip() {
                 };
 
                 if let Ok(gregorian_date) = GregorianDate::new(year, month, day) {
-                    let date = gregorian_date.to_date();
+                    let date = gregorian_date.into_date();
                     let gregorian_date2 = GregorianDate::from_date(date);
                     assert_eq!(gregorian_date, gregorian_date2);
                 }

@@ -37,7 +37,7 @@ where
         }
 
         let time_point = Self::from_fine_datetime(
-            historic_date.to_date(),
+            historic_date.into_date(),
             time_of_day.hour,
             time_of_day.minute,
             time_of_day.second,

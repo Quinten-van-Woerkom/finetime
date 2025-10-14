@@ -12,14 +12,21 @@ use crate::{
 
 /// The Modified Julian Day (MJD) representation of any given date.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ModifiedJulianDate<Representation, Period = SecondsPerDay> {
+pub struct ModifiedJulianDate<Representation, Period: ?Sized = SecondsPerDay> {
     time_since_epoch: Duration<Representation, Period>,
 }
 
 /// The modified Julian date of the Unix epoch is useful as constant in some calculations.
 const MODIFIED_JULIAN_DATE_UNIX_EPOCH: Days<i32> = Days::new(40587);
 
-impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
+impl<Representation> ModifiedJulianDate<Representation, SecondsPerDay> {
+    /// Convenience function that constructs a modified Julian day directly from some day count.
+    pub const fn new(mjd: Representation) -> Self {
+        Self::from_time_since_epoch(Days::new(mjd))
+    }
+}
+
+impl<Representation, Period: ?Sized> ModifiedJulianDate<Representation, Period> {
     /// Constructs a new MJD directly from some duration since the MJD epoch, November 17 1858.
     pub const fn from_time_since_epoch(time_since_epoch: Duration<Representation, Period>) -> Self {
         Self { time_since_epoch }
@@ -48,7 +55,7 @@ impl<Representation, Period> ModifiedJulianDate<Representation, Period> {
     }
 
     /// Converts this modified Julian date into the equivalent "universal" calendar date.
-    pub fn to_date(&self) -> Date<Representation>
+    pub fn into_date(&self) -> Date<Representation>
     where
         Representation: Copy
             + From<i32>
@@ -116,7 +123,7 @@ impl ModifiedJulianDate<i32> {
     }
 }
 
-impl<Representation, Period> From<Date<Representation>>
+impl<Representation, Period: ?Sized> From<Date<Representation>>
     for ModifiedJulianDate<Representation, Period>
 where
     Representation: Copy
@@ -129,7 +136,7 @@ where
     }
 }
 
-impl<Representation, Period> From<ModifiedJulianDate<Representation, Period>>
+impl<Representation, Period: ?Sized> From<ModifiedJulianDate<Representation, Period>>
     for Date<Representation>
 where
     Representation: Copy
@@ -138,7 +145,7 @@ where
         + ConvertUnit<Period, SecondsPerDay>,
 {
     fn from(value: ModifiedJulianDate<Representation, Period>) -> Self {
-        value.to_date()
+        value.into_date()
     }
 }
 

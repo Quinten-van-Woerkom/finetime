@@ -11,13 +11,14 @@ use num_traits::{Bounded, Zero};
 
 use crate::{
     ConvertUnit, Date, Duration, Fraction, FractionalDigits, FromDateTime, FromFineDateTime,
-    GregorianDate, HistoricDate, IntoDateTime, IntoFineDateTime, JulianDate, Month, MulCeil,
-    MulFloor, MulRound, TryConvertUnit, TryFromExact, TryIntoExact, UnitRatio,
+    GregorianDate, HalfDays, HistoricDate, IntoDateTime, IntoFineDateTime, JulianDate, JulianDay,
+    ModifiedJulianDate, Month, MulCeil, MulFloor, MulRound, TryConvertUnit, TryFromExact,
+    TryIntoExact, UnitRatio,
     errors::{
         InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime, InvalidTimeOfDay,
     },
-    time_scale::UniformDateTimeScale,
-    units::Second,
+    time_scale::{TimeScale, UniformDateTimeScale},
+    units::{Second, SecondsPerDay, SecondsPerHalfDay},
 };
 
 /// A `TimePoint` identifies a specific instant in time. It is templated on a `Representation` and
@@ -43,6 +44,14 @@ impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representat
         Representation: Copy,
     {
         self.time_since_epoch
+    }
+
+    /// Returns the raw underlying representation of this time point.
+    pub const fn count(&self) -> Representation
+    where
+        Representation: Copy,
+    {
+        self.time_since_epoch().count()
     }
 
     /// Converts this `TimePoint` into a different unit. May only be used if the time unit is
@@ -172,6 +181,162 @@ where
             Err(error) => Err(InvalidJulianDateTime::InvalidDateTime(error)),
         }
     }
+}
+
+impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representation, Period>
+where
+    Scale: UniformDateTimeScale,
+    Representation: Copy
+        + Sub<Output = Representation>
+        + TryFromExact<i32>
+        + ConvertUnit<SecondsPerHalfDay, Period>,
+{
+    /// Constructs a time point from a Julian day, expressed in the resulting time scale itself.
+    /// A Julian day is the count of days since noon on 1 January 4713 BC (in the proleptic Julian
+    /// calendar).
+    ///
+    /// Conversions from Julian days into `TimePoint`s are supported only for uniform date time
+    /// scales. For non-uniform time scales, leap second days result in ambiguous and difficult to
+    /// implement interpretations of the fractional part of a day. Based on the "Resolution B1 on
+    /// the use of Julian Dates" of the IAU, it is also not recommended to use such Julian date
+    /// expressions: hence, we do not support it.
+    pub fn from_julian_day(jd: JulianDay<Representation, Period>) -> Self {
+        const JULIAN_EPOCH: Date<i32> = match Date::from_julian_date(-4712, Month::January, 1) {
+            Ok(epoch) => epoch,
+            Err(_) => panic!("Internal error: start of Julian period found invalid"),
+        };
+        let epoch_julian_day = Scale::EPOCH
+            .elapsed_calendar_days_since(JULIAN_EPOCH)
+            .into_unit()
+            - HalfDays::new(1i32);
+        let time_since_epoch = jd.time_since_epoch()
+            - epoch_julian_day
+                .try_cast()
+                .unwrap_or_else(|_| panic!())
+                .into_unit();
+        Self::from_time_since_epoch(time_since_epoch)
+    }
+}
+
+impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representation, Period>
+where
+    Scale: UniformDateTimeScale,
+    Representation: Copy
+        + Sub<Output = Representation>
+        + TryFromExact<i32>
+        + ConvertUnit<SecondsPerDay, Period>,
+{
+    /// Constructs a time point from a modified Julian date, expressed in the resulting time scale
+    /// itself. The modified Julian date uses 17 November, 1858 (historic calendar) as epoch, or
+    /// 2400000.5 days less than the Julian day.
+    ///
+    /// Conversions from modified Julian days into `TimePoint`s are supported only for uniform date
+    /// time scales. For non-uniform time scales, leap second days result in ambiguous and
+    /// difficult to implement interpretations of the fractional part of a day. Based on the
+    /// "Resolution B1 on the use of Julian Dates" of the IAU, it is also not recommended to use
+    /// such Julian date expressions: hence, we do not support it.
+    pub fn from_modified_julian_date(mjd: ModifiedJulianDate<Representation, Period>) -> Self {
+        const MODIFIED_JULIAN_EPOCH: Date<i32> =
+            match Date::from_historic_date(1858, Month::November, 17) {
+                Ok(epoch) => epoch,
+                Err(_) => panic!("Internal error: start of modified Julian period found invalid"),
+            };
+        let epoch_julian_day = Scale::EPOCH.elapsed_calendar_days_since(MODIFIED_JULIAN_EPOCH);
+        let time_since_epoch = mjd.time_since_epoch()
+            - epoch_julian_day
+                .try_cast()
+                .unwrap_or_else(|_| panic!())
+                .into_unit();
+        Self::from_time_since_epoch(time_since_epoch)
+    }
+}
+
+impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representation, Period>
+where
+    Scale: TimeScale,
+    Representation: Copy
+        + Add<Output = Representation>
+        + TryFromExact<i32>
+        + ConvertUnit<SecondsPerHalfDay, Period>,
+{
+    /// Converts this time point into the equivalent Julian day representation.
+    pub fn into_julian_day(&self) -> JulianDay<Representation, Period> {
+        const JULIAN_EPOCH: Date<i32> = match Date::from_julian_date(-4712, Month::January, 1) {
+            Ok(epoch) => epoch,
+            Err(_) => panic!("Internal error: start of Julian period found invalid"),
+        };
+        let epoch_julian_day = Scale::EPOCH
+            .elapsed_calendar_days_since(JULIAN_EPOCH)
+            .into_unit()
+            - HalfDays::new(1);
+        let time_since_epoch = epoch_julian_day
+            .try_cast()
+            .unwrap_or_else(|_| panic!())
+            .into_unit()
+            + self.time_since_epoch();
+        JulianDay::from_time_since_epoch(time_since_epoch)
+    }
+}
+
+impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representation, Period>
+where
+    Scale: TimeScale,
+    Representation: Copy
+        + Add<Output = Representation>
+        + TryFromExact<i32>
+        + ConvertUnit<SecondsPerDay, Period>,
+{
+    /// Converts this time point into the equivalent Julian day representation.
+    pub fn into_modified_julian_date(&self) -> ModifiedJulianDate<Representation, Period> {
+        const MODIFIED_JULIAN_EPOCH: Date<i32> =
+            match Date::from_historic_date(1858, Month::November, 17) {
+                Ok(epoch) => epoch,
+                Err(_) => panic!("Internal error: start of modified Julian period found invalid"),
+            };
+        let epoch_julian_day = Scale::EPOCH.elapsed_calendar_days_since(MODIFIED_JULIAN_EPOCH);
+        let time_since_epoch = epoch_julian_day
+            .try_cast()
+            .unwrap_or_else(|_| panic!())
+            .into_unit()
+            + self.time_since_epoch();
+        ModifiedJulianDate::from_time_since_epoch(time_since_epoch)
+    }
+}
+
+#[cfg(test)]
+fn check_julian_date(year: i32, month: Month, day: u8) {
+    use crate::TtTime;
+
+    let julian_day = JulianDay::from_historic_date(year, month, day).unwrap();
+    let modified_julian_date = ModifiedJulianDate::from_historic_date(year, month, day).unwrap();
+    let time = TtTime::from_julian_day(julian_day);
+    let time2 = TtTime::from_modified_julian_date(modified_julian_date);
+    let time3 = TtTime::from_historic_datetime(year, month, day, 0, 0, 0).unwrap();
+    assert_eq!(time.cast().into_unit(), time3);
+    assert_eq!(time.into_julian_day(), julian_day);
+    assert_eq!(time2.cast().into_unit(), time3);
+    assert_eq!(time2.into_modified_julian_date(), modified_julian_date);
+}
+
+#[test]
+fn julian_dates() {
+    use crate::Month;
+    check_julian_date(2000, Month::January, 1);
+    check_julian_date(1999, Month::January, 1);
+    check_julian_date(1987, Month::January, 27);
+    check_julian_date(1987, Month::June, 19);
+    check_julian_date(1988, Month::June, 27);
+    check_julian_date(1988, Month::July, 19);
+    check_julian_date(1900, Month::January, 1);
+    check_julian_date(1600, Month::January, 1);
+    check_julian_date(1600, Month::December, 31);
+    check_julian_date(837, Month::April, 10);
+    check_julian_date(-123, Month::December, 31);
+    check_julian_date(-122, Month::January, 1);
+    check_julian_date(-1000, Month::July, 12);
+    check_julian_date(-1000, Month::February, 29);
+    check_julian_date(-1001, Month::August, 17);
+    check_julian_date(-4712, Month::January, 1);
 }
 
 impl<Scale: ?Sized, Representation> TimePoint<Scale, Representation, Second>

@@ -59,7 +59,7 @@ impl HistoricDate {
     pub const fn from_date(date: Date<i32>) -> Self {
         // Determine which calendar applies: Julian or Gregorian
         const GREGORIAN_REFORM: Date<i32> = match GregorianDate::new(1582, Month::October, 15) {
-            Ok(date) => date.to_date(),
+            Ok(date) => date.into_date(),
             Err(_) => unreachable!(),
         };
         let is_gregorian =
@@ -86,16 +86,16 @@ impl HistoricDate {
     /// on the approach described by Meeus in Astronomical Algorithms (Chapter 7, Julian Day). This
     /// variation adapts the algorithm to the Unix epoch and removes the dependency on floating
     /// point arithmetic.
-    pub const fn to_date(self) -> Date<i32> {
+    pub const fn into_date(self) -> Date<i32> {
         let HistoricDate { year, month, day } = self;
         if self.is_gregorian() {
             match GregorianDate::new(year, month, day) {
-                Ok(date) => date.to_date(),
+                Ok(date) => date.into_date(),
                 Err(_) => unreachable!(),
             }
         } else {
             match JulianDate::new(year, month, day) {
-                Ok(date) => date.to_date(),
+                Ok(date) => date.into_date(),
                 Err(_) => unreachable!(),
             }
         }
@@ -218,7 +218,7 @@ pub(crate) const fn month_day_from_ordinal_date(
 
 impl From<HistoricDate> for Date<i32> {
     fn from(value: HistoricDate) -> Self {
-        value.to_date()
+        value.into_date()
     }
 }
 

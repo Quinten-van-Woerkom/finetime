@@ -4,7 +4,7 @@
 use core::ops::{Add, Sub};
 
 use crate::{
-    ConvertUnit, Date, Duration, HalfDays, Month,
+    ConvertUnit, Date, Days, Duration, HalfDays, Month, TryIntoExact,
     errors::{InvalidGregorianDate, InvalidHistoricDate, InvalidJulianDate},
     units::{SecondsPerDay, SecondsPerHalfDay},
 };
@@ -23,15 +23,22 @@ use crate::{
 /// It must be noted that this time representation does not contain an associated time scale, so it
 /// is actually ambiguous. Indeed, it may only indicate a calendrical date, but not an actual point
 /// in time.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, derive_more::Constructor)]
-pub struct JulianDay<Representation, Period = SecondsPerHalfDay> {
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct JulianDay<Representation, Period: ?Sized = SecondsPerHalfDay> {
     time_since_epoch: Duration<Representation, Period>,
 }
 
 /// The Julian date of the Unix epoch is useful as constant in some calculations.
 const JULIAN_DAY_UNIX_EPOCH: HalfDays<i32> = HalfDays::new(4881175);
 
-impl<Representation, Period> JulianDay<Representation, Period> {
+impl<Representation> JulianDay<Representation, SecondsPerDay> {
+    /// Convenience function that constructs a Julian day directly from some day count.
+    pub const fn new(jd: Representation) -> Self {
+        Self::from_time_since_epoch(Days::new(jd))
+    }
+}
+
+impl<Representation, Period: ?Sized> JulianDay<Representation, Period> {
     /// Constructs a Julian day from some duration since the epoch of the Julian period.
     pub const fn from_time_since_epoch(time_since_epoch: Duration<Representation, Period>) -> Self {
         Self { time_since_epoch }
@@ -60,7 +67,7 @@ impl<Representation, Period> JulianDay<Representation, Period> {
         }
     }
 
-    pub fn to_date(&self) -> Date<Representation>
+    pub fn into_date(&self) -> Date<Representation>
     where
         Representation: Copy
             + From<i32>
@@ -83,18 +90,14 @@ impl<Representation, Period> JulianDay<Representation, Period> {
 
     /// Converts towards a different representation. If the underlying representation cannot store
     /// the result of this cast, returns `None`.
-    #[allow(clippy::type_complexity)]
     pub fn try_cast<Target>(
         self,
-    ) -> Result<
-        JulianDay<Target, Period>,
-        <Duration<Representation, Period> as TryInto<Duration<Target, Period>>>::Error,
-    >
+    ) -> Result<JulianDay<Target, Period>, <Representation as TryIntoExact<Target>>::Error>
     where
-        Duration<Representation, Period>: TryInto<Duration<Target, Period>>,
+        Representation: TryIntoExact<Target>,
     {
         Ok(JulianDay::from_time_since_epoch(
-            self.time_since_epoch.try_into()?,
+            self.time_since_epoch.try_cast()?,
         ))
     }
 }
@@ -133,7 +136,8 @@ impl JulianDay<i32, SecondsPerHalfDay> {
     }
 }
 
-impl<Representation, Period> From<JulianDay<Representation, Period>> for Date<Representation>
+impl<Representation, Period: ?Sized> From<JulianDay<Representation, Period>>
+    for Date<Representation>
 where
     Representation: Copy
         + From<i32>
@@ -142,11 +146,12 @@ where
         + ConvertUnit<SecondsPerHalfDay, SecondsPerDay>,
 {
     fn from(value: JulianDay<Representation, Period>) -> Self {
-        value.to_date()
+        value.into_date()
     }
 }
 
-impl<Representation, Period> From<Date<Representation>> for JulianDay<Representation, Period>
+impl<Representation, Period: ?Sized> From<Date<Representation>>
+    for JulianDay<Representation, Period>
 where
     Representation: Copy
         + From<i32>
