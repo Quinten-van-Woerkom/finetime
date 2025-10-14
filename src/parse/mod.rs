@@ -4,7 +4,9 @@
 //! Primarily, a subset of ISO 8601 is supported.
 
 mod duration;
+mod gregorian_date;
 mod historic_date;
+mod julian_date;
 pub use duration::{DurationComponent, DurationDesignator};
 mod decimal;
 pub(crate) use decimal::DecimalNumber;

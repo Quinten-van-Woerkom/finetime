@@ -1,4 +1,4 @@
-//! Implementation of string parsing logic for `Date<i32>` types.
+//! Implementation of string parsing logic for `HistoricDate` types.
 
 use core::str::FromStr;
 
@@ -76,7 +76,7 @@ fn parse_known_historic_date(input: &str, year: i32, month: Month, day: u8) {
 
 /// Verifies string parsing for some known valid dates.
 #[test]
-fn known_historic_dates() {
+fn known_dates() {
     use crate::Month::*;
     parse_known_historic_date("2000-01-01", 2000, January, 1);
     parse_known_historic_date("1999-01-01", 1999, January, 1);

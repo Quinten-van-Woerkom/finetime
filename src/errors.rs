@@ -99,7 +99,7 @@ pub enum TimePointParsingError<DateTimeError> {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
-#[error("error parsing `Date`")]
+#[error("error parsing `HistoricDate`")]
 pub enum HistoricDateParsingError {
     IntegerParsingError(#[from] lexical_core::Error),
     InvalidHistoricDate(#[from] InvalidHistoricDate),
@@ -113,6 +113,42 @@ pub enum HistoricDateParsingError {
     #[error("day representation must be exactly two digits")]
     DayRepresentationNotTwoDigits,
     #[error("could not parse entire string: data remains after historic date")]
+    UnexpectedRemainder,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[error("error parsing `GregorianDate`")]
+pub enum GregorianDateParsingError {
+    IntegerParsingError(#[from] lexical_core::Error),
+    InvalidGregorianDate(#[from] InvalidGregorianDate),
+    InvalidMonthNumber(#[from] InvalidMonthNumber),
+    #[error("expected but did not find year-month delimiter '-'")]
+    ExpectedYearMonthDelimiter,
+    #[error("month representation must be exactly two digits")]
+    MonthRepresentationNotTwoDigits,
+    #[error("expected but did not find month-day delimiter '-'")]
+    ExpectedMonthDayDelimiter,
+    #[error("day representation must be exactly two digits")]
+    DayRepresentationNotTwoDigits,
+    #[error("could not parse entire string: data remains after Gregorian date")]
+    UnexpectedRemainder,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[error("error parsing `JulianDate`")]
+pub enum JulianDateParsingError {
+    IntegerParsingError(#[from] lexical_core::Error),
+    InvalidJulianDate(#[from] InvalidJulianDate),
+    InvalidMonthNumber(#[from] InvalidMonthNumber),
+    #[error("expected but did not find year-month delimiter '-'")]
+    ExpectedYearMonthDelimiter,
+    #[error("month representation must be exactly two digits")]
+    MonthRepresentationNotTwoDigits,
+    #[error("expected but did not find month-day delimiter '-'")]
+    ExpectedMonthDayDelimiter,
+    #[error("day representation must be exactly two digits")]
+    DayRepresentationNotTwoDigits,
+    #[error("could not parse entire string: data remains after Julian date")]
     UnexpectedRemainder,
 }
 
