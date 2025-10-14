@@ -6,7 +6,7 @@ use core::ops::{Add, Sub};
 use crate::{
     ConvertUnit, Date, Fraction, FromTimeScale, IntoTimeScale, MilliSeconds, Month, MulRound,
     TerrestrialTime, TimePoint, TryFromExact, Tt, TtTime,
-    time_scale::{TimeScale, datetime::ContinuousDateTimeScale},
+    time_scale::{TimeScale, datetime::UniformDateTimeScale},
     units::{Milli, Second, SecondsPerDay},
 };
 
@@ -31,7 +31,7 @@ impl TimeScale for Tcg {
     };
 }
 
-impl ContinuousDateTimeScale for Tcg {}
+impl UniformDateTimeScale for Tcg {}
 
 /// This constant describes the rate difference of terrestrial time with respect to TCG. It is the
 /// number of seconds that terrestrial time is slower per second.

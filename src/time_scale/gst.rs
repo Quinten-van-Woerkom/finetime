@@ -1,7 +1,7 @@
 //! Representation of Galileo System Time (GST), which is broadcast by the Galileo constellation.
 
 use crate::{
-    ContinuousDateTimeScale, Date, Duration, Month, Seconds, TerrestrialTime, TimePoint,
+    UniformDateTimeScale, Date, Duration, Month, Seconds, TerrestrialTime, TimePoint,
     time_scale::TimeScale, units::Second,
 };
 
@@ -25,7 +25,7 @@ impl TimeScale for Gst {
     };
 }
 
-impl ContinuousDateTimeScale for Gst {}
+impl UniformDateTimeScale for Gst {}
 
 impl TerrestrialTime for Gst {
     type Representation = i8;

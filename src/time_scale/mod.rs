@@ -4,7 +4,7 @@ mod convert;
 pub use convert::{FromTimeScale, IntoTimeScale};
 mod datetime;
 pub use datetime::{
-    ContinuousDateTimeScale, FromDateTime, FromFineDateTime, IntoDateTime, IntoFineDateTime,
+    FromDateTime, FromFineDateTime, IntoDateTime, IntoFineDateTime, UniformDateTimeScale,
 };
 
 mod gpst;

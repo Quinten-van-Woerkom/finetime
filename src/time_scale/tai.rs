@@ -2,7 +2,7 @@
 
 use crate::{
     Date, Duration, Month, TimePoint, Years,
-    time_scale::{TerrestrialTime, TimeScale, datetime::ContinuousDateTimeScale},
+    time_scale::{TerrestrialTime, TimeScale, datetime::UniformDateTimeScale},
     units::{Second, SecondsPerYear},
 };
 
@@ -25,7 +25,7 @@ impl TimeScale for Tai {
     };
 }
 
-impl ContinuousDateTimeScale for Tai {}
+impl UniformDateTimeScale for Tai {}
 
 impl TerrestrialTime for Tai {
     type Representation = u8;

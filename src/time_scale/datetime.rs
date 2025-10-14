@@ -10,13 +10,13 @@ use crate::{
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
 
-/// Some time scales are continuous with respect to date-times: they do not apply leap seconds. In
+/// Some time scales are uniform with respect to date-times: they do not apply leap seconds. In
 /// such cases, their implementation of the `DateTime` mapping reduces to a simple add-and-multiply
 /// of days, hours, minutes, and seconds with respect to the "arbitrary" measurement epoch in which
 /// their resulting time points are measured.
 ///
 /// This trait is only a marker trait.
-pub trait ContinuousDateTimeScale: TimeScale {}
+pub trait UniformDateTimeScale: TimeScale {}
 
 /// This trait may be implemented for time points that can be constructed based on a date-time
 /// pair: they can connect a date and time-of-day to a specific time instant within their internal
@@ -40,7 +40,7 @@ pub trait FromDateTime: Sized {
 
 impl<Scale> FromDateTime for TimePoint<Scale, i64, Second>
 where
-    Scale: ?Sized + ContinuousDateTimeScale,
+    Scale: ?Sized + UniformDateTimeScale,
 {
     type Error = InvalidTimeOfDay;
 
@@ -101,7 +101,7 @@ pub trait IntoDateTime: Sized {
 
 impl<Scale, Representation> IntoDateTime for TimePoint<Scale, Representation, Second>
 where
-    Scale: ?Sized + ContinuousDateTimeScale,
+    Scale: ?Sized + UniformDateTimeScale,
     Representation: Copy
         + ConvertUnit<SecondsPerMinute, Second>
         + ConvertUnit<SecondsPerHour, Second>

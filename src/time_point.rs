@@ -16,7 +16,7 @@ use crate::{
     errors::{
         InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime, InvalidTimeOfDay,
     },
-    time_scale::ContinuousDateTimeScale,
+    time_scale::UniformDateTimeScale,
     units::Second,
 };
 
@@ -298,7 +298,7 @@ where
 impl<Scale, Representation, Period> IntoFineDateTime<Representation, Period>
     for TimePoint<Scale, Representation, Period>
 where
-    Scale: ?Sized + ContinuousDateTimeScale,
+    Scale: ?Sized + UniformDateTimeScale,
     Representation: Copy
         + ConvertUnit<Second, Period>
         + MulFloor<Fraction, Output = Representation>

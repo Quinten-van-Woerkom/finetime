@@ -1,7 +1,7 @@
 //! Implementation of the time broadcast by the Global Positioning System (GPS).
 
 use crate::{
-    ContinuousDateTimeScale, Date, Duration, Month, Seconds, TerrestrialTime, TimePoint,
+    UniformDateTimeScale, Date, Duration, Month, Seconds, TerrestrialTime, TimePoint,
     time_scale::TimeScale, units::Second,
 };
 
@@ -24,7 +24,7 @@ impl TimeScale for Gpst {
     };
 }
 
-impl ContinuousDateTimeScale for Gpst {}
+impl UniformDateTimeScale for Gpst {}
 
 impl TerrestrialTime for Gpst {
     type Representation = i8;
