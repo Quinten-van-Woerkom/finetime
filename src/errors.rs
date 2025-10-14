@@ -92,6 +92,10 @@ pub enum TimePointParsingError<DateTimeError> {
     TimeOfDayParsingError(#[from] TimeOfDayParsingError),
     #[error("expected but did not find time designator 'T'")]
     ExpectedTimeDesignator,
+    #[error("expected but did not find space between time-of-day and time scale designator")]
+    ExpectedSpace,
+    #[error("expected but did not find time scale designator")]
+    ExpectedTimeScaleDesignator,
     #[error("could not parse entire string: data remains after time point")]
     UnexpectedRemainder,
     CannotRepresentDecimalNumber(#[from] CannotRepresentDecimalNumber),

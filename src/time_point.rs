@@ -14,9 +14,7 @@ use crate::{
     GregorianDate, HalfDays, HistoricDate, IntoDateTime, IntoFineDateTime, JulianDate, JulianDay,
     ModifiedJulianDate, Month, MulCeil, MulFloor, MulRound, TryConvertUnit, TryFromExact,
     TryIntoExact, UnitRatio,
-    errors::{
-        InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime, InvalidTimeOfDay,
-    },
+    errors::{InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime},
     time_scale::{TimeScale, UniformDateTimeScale},
     units::{Second, SecondsPerDay, SecondsPerHalfDay},
 };
@@ -370,9 +368,9 @@ where
     Representation: Add<Representation, Output = Representation>
         + ConvertUnit<Second, Period>
         + TryFromExact<i64>,
-    TimePoint<Scale, i64, Second>: FromDateTime<Error = InvalidTimeOfDay>,
+    TimePoint<Scale, i64, Second>: FromDateTime,
 {
-    type Error = InvalidTimeOfDay;
+    type Error = <TimePoint<Scale, i64, Second> as FromDateTime>::Error;
 
     fn from_fine_datetime(
         date: Date<i32>,
@@ -463,7 +461,7 @@ where
 impl<Scale, Representation, Period> IntoFineDateTime<Representation, Period>
     for TimePoint<Scale, Representation, Period>
 where
-    Scale: ?Sized + UniformDateTimeScale,
+    Scale: ?Sized,
     Representation: Copy
         + ConvertUnit<Second, Period>
         + MulFloor<Fraction, Output = Representation>
@@ -508,7 +506,7 @@ where
 impl<Scale, Representation, Period> Display for TimePoint<Scale, Representation, Period>
 where
     Self: IntoFineDateTime<Representation, Period>,
-    Scale: ?Sized,
+    Scale: ?Sized + TimeScale,
     Duration<Representation, Period>: Zero,
     Representation: Copy + FractionalDigits,
     Period: UnitRatio + ?Sized,
@@ -532,10 +530,9 @@ where
             for digit in subseconds.decimal_digits(max_digits_printed) {
                 write!(f, "{digit}")?;
             }
-            Ok(())
-        } else {
-            Ok(())
         }
+
+        write!(f, " {}", Scale::ABBREVIATION)
     }
 }
 
@@ -568,16 +565,43 @@ fn check_formatting_i64(
 #[test]
 fn formatting_i64() {
     use crate::Month::*;
-    check_formatting_i64("1958-01-01T00:00:00.001", 1958, January, 1, 0, 0, 0, 1);
-    check_formatting_i64("1958-01-02T00:00:00", 1958, January, 2, 0, 0, 0, 0);
-    check_formatting_i64("1960-01-01T12:34:56.789", 1960, January, 1, 12, 34, 56, 789);
-    check_formatting_i64("1961-01-01T00:00:00", 1961, January, 1, 0, 0, 0, 0);
-    check_formatting_i64("1970-01-01T00:00:00", 1970, January, 1, 0, 0, 0, 0);
-    check_formatting_i64("1976-01-01T23:59:59.999", 1976, January, 1, 23, 59, 59, 999);
-    check_formatting_i64("2025-07-16T16:23:24", 2025, July, 16, 16, 23, 24, 0);
-    check_formatting_i64("2034-12-26T08:02:37.123", 2034, December, 26, 8, 2, 37, 123);
-    check_formatting_i64("2760-04-01T21:59:58", 2760, April, 1, 21, 59, 58, 0);
-    check_formatting_i64("1643-01-04T01:01:33", 1643, January, 4, 1, 1, 33, 0);
+    check_formatting_i64("1958-01-01T00:00:00.001 TAI", 1958, January, 1, 0, 0, 0, 1);
+    check_formatting_i64("1958-01-02T00:00:00 TAI", 1958, January, 2, 0, 0, 0, 0);
+    check_formatting_i64(
+        "1960-01-01T12:34:56.789 TAI",
+        1960,
+        January,
+        1,
+        12,
+        34,
+        56,
+        789,
+    );
+    check_formatting_i64("1961-01-01T00:00:00 TAI", 1961, January, 1, 0, 0, 0, 0);
+    check_formatting_i64("1970-01-01T00:00:00 TAI", 1970, January, 1, 0, 0, 0, 0);
+    check_formatting_i64(
+        "1976-01-01T23:59:59.999 TAI",
+        1976,
+        January,
+        1,
+        23,
+        59,
+        59,
+        999,
+    );
+    check_formatting_i64("2025-07-16T16:23:24 TAI", 2025, July, 16, 16, 23, 24, 0);
+    check_formatting_i64(
+        "2034-12-26T08:02:37.123 TAI",
+        2034,
+        December,
+        26,
+        8,
+        2,
+        37,
+        123,
+    );
+    check_formatting_i64("2760-04-01T21:59:58 TAI", 2760, April, 1, 21, 59, 58, 0);
+    check_formatting_i64("1643-01-04T01:01:33 TAI", 1643, January, 4, 1, 1, 33, 0);
 }
 
 #[cfg(test)]
@@ -609,10 +633,10 @@ fn check_formatting_f64(
 #[test]
 fn formatting_f64() {
     use crate::Month::*;
-    check_formatting_f64("1958-01-01T00:00:00.001", 1958, January, 1, 0, 0, 0, 1.);
-    check_formatting_f64("1958-01-02T00:00:00", 1958, January, 2, 0, 0, 0, 0.);
+    check_formatting_f64("1958-01-01T00:00:00.001 TAI", 1958, January, 1, 0, 0, 0, 1.);
+    check_formatting_f64("1958-01-02T00:00:00 TAI", 1958, January, 2, 0, 0, 0, 0.);
     check_formatting_f64(
-        "1960-01-01T12:34:56.789",
+        "1960-01-01T12:34:56.789 TAI",
         1960,
         January,
         1,
@@ -621,10 +645,10 @@ fn formatting_f64() {
         56,
         789.,
     );
-    check_formatting_f64("1961-01-01T00:00:00", 1961, January, 1, 0, 0, 0, 0.);
-    check_formatting_f64("1970-01-01T00:00:00", 1970, January, 1, 0, 0, 0, 0.);
+    check_formatting_f64("1961-01-01T00:00:00 TAI", 1961, January, 1, 0, 0, 0, 0.);
+    check_formatting_f64("1970-01-01T00:00:00 TAI", 1970, January, 1, 0, 0, 0, 0.);
     check_formatting_f64(
-        "1976-01-01T23:59:59.999",
+        "1976-01-01T23:59:59.999 TAI",
         1976,
         January,
         1,
@@ -633,9 +657,9 @@ fn formatting_f64() {
         59,
         999.,
     );
-    check_formatting_f64("2025-07-16T16:23:24", 2025, July, 16, 16, 23, 24, 0.);
+    check_formatting_f64("2025-07-16T16:23:24 TAI", 2025, July, 16, 16, 23, 24, 0.);
     check_formatting_f64(
-        "2034-12-26T08:02:37.123",
+        "2034-12-26T08:02:37.123 TAI",
         2034,
         December,
         26,
@@ -644,15 +668,15 @@ fn formatting_f64() {
         37,
         123.,
     );
-    check_formatting_f64("2760-04-01T21:59:58", 2760, April, 1, 21, 59, 58, 0.);
-    check_formatting_f64("1643-01-04T01:01:33", 1643, January, 4, 1, 1, 33, 0.);
+    check_formatting_f64("2760-04-01T21:59:58 TAI", 2760, April, 1, 21, 59, 58, 0.);
+    check_formatting_f64("1643-01-04T01:01:33 TAI", 1643, January, 4, 1, 1, 33, 0.);
 }
 
 /// Verifies that truncation is properly applied when the underlying fraction exceeds the number of
 /// digits specified in the formatting precision (or 9 by default, if none is specified).
 #[test]
 fn truncated_format() {
-    let time = crate::TaiTime::from_fine_historic_datetime(
+    let time = crate::UtcTime::from_fine_historic_datetime(
         1998,
         Month::December,
         17,
@@ -662,7 +686,7 @@ fn truncated_format() {
         crate::PicoSeconds::new(450103789401i128),
     )
     .unwrap();
-    assert_eq!(format!("{time:.9}"), "1998-12-17T23:21:58.450103789");
+    assert_eq!(format!("{time:.9}"), "1998-12-17T23:21:58.450103789 UTC");
 }
 
 /// Verifies that formatting does not panic for a large randomized range of values.

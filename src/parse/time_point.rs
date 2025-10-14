@@ -4,13 +4,14 @@ use core::str::FromStr;
 
 use crate::{
     FromFineDateTime, HistoricDate, TimePoint, UnitRatio, errors::TimePointParsingError,
-    parse::TimeOfDay, units::Second,
+    parse::TimeOfDay, time_scale::TimeScale, units::Second,
 };
 
 impl<Scale, Period> FromStr for TimePoint<Scale, i64, Period>
 where
     Self: FromFineDateTime<i64, Period>,
     Period: UnitRatio,
+    Scale: TimeScale,
 {
     type Err = TimePointParsingError<<Self as FromFineDateTime<i64, Period>>::Error>;
 
@@ -31,7 +32,21 @@ where
             return Err(TimePointParsingError::ExpectedTimeDesignator);
         }
 
-        let (time_of_day, string) = TimeOfDay::parse_partial(string)?;
+        let (time_of_day, mut string) = TimeOfDay::parse_partial(string)?;
+
+        // Finally, the time point must end with a space, followed by the time zone abbreviation.
+        if string.starts_with(" ") {
+            string = string.get(1..).unwrap();
+        } else {
+            return Err(TimePointParsingError::ExpectedSpace);
+        }
+
+        if string.starts_with(Scale::ABBREVIATION) {
+            string = string.get(Scale::ABBREVIATION.len()..).unwrap();
+        } else {
+            return Err(TimePointParsingError::ExpectedTimeScaleDesignator);
+        }
+
         if !string.is_empty() {
             return Err(TimePointParsingError::UnexpectedRemainder);
         }
@@ -43,6 +58,7 @@ where
             time_of_day.second,
             time_of_day.subseconds.convert_period::<Second, Period>()?,
         );
+
         match time_point {
             Ok(time_point) => Ok(time_point),
             Err(datetime_error) => Err(TimePointParsingError::DateTimeError(datetime_error)),
@@ -85,7 +101,7 @@ fn known_timestamps() {
     use num_traits::ConstZero;
 
     check_historic_datetime(
-        "1958-01-01T00:00:00.000001",
+        "1958-01-01T00:00:00.000001 TAI",
         1958,
         January,
         1,
@@ -95,7 +111,7 @@ fn known_timestamps() {
         MicroSeconds::new(1),
     );
     check_historic_datetime(
-        "1958-01-02T00:00:00",
+        "1958-01-02T00:00:00 TAI",
         1958,
         January,
         2,
@@ -105,7 +121,7 @@ fn known_timestamps() {
         MicroSeconds::ZERO,
     );
     check_historic_datetime(
-        "1960-01-01T12:34:56.789123",
+        "1960-01-01T12:34:56.789123 TAI",
         1960,
         January,
         1,
@@ -115,7 +131,7 @@ fn known_timestamps() {
         MicroSeconds::new(789123),
     );
     check_historic_datetime(
-        "1961-01-01T00:00:00",
+        "1961-01-01T00:00:00 TAI",
         1961,
         January,
         1,
@@ -125,7 +141,7 @@ fn known_timestamps() {
         MicroSeconds::ZERO,
     );
     check_historic_datetime(
-        "1970-01-01T00:00:00",
+        "1970-01-01T00:00:00 TAI",
         1970,
         January,
         1,
@@ -135,7 +151,7 @@ fn known_timestamps() {
         MicroSeconds::ZERO,
     );
     check_historic_datetime(
-        "1976-01-01T23:59:59.999",
+        "1976-01-01T23:59:59.999 TAI",
         1976,
         January,
         1,
@@ -145,7 +161,7 @@ fn known_timestamps() {
         MicroSeconds::new(999000),
     );
     check_historic_datetime(
-        "2025-07-16T16:23:24.000000000",
+        "2025-07-16T16:23:24.000000000 TAI",
         2025,
         July,
         16,
@@ -155,7 +171,7 @@ fn known_timestamps() {
         MicroSeconds::ZERO,
     );
     check_historic_datetime(
-        "2034-12-26T08:02:37.123456000",
+        "2034-12-26T08:02:37.123456000 TAI",
         2034,
         December,
         26,
@@ -165,7 +181,7 @@ fn known_timestamps() {
         MicroSeconds::new(123456),
     );
     check_historic_datetime(
-        "2760-04-01T21:59:58",
+        "2760-04-01T21:59:58 TAI",
         2760,
         April,
         1,
@@ -175,7 +191,7 @@ fn known_timestamps() {
         MicroSeconds::ZERO,
     );
     check_historic_datetime(
-        "1643-01-04T01:01:33.000",
+        "1643-01-04T01:01:33.000 TAI",
         1643,
         January,
         4,
