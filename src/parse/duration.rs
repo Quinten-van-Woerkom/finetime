@@ -96,11 +96,13 @@ impl DurationComponent {
         Period: UnitRatio,
     {
         match self.designator {
-            DurationDesignator::Seconds => self.number.convert_period::<Second, Period>(),
-            DurationDesignator::Minutes => self.number.convert_period::<SecondsPerMinute, Period>(),
-            DurationDesignator::Hours => self.number.convert_period::<SecondsPerHour, Period>(),
-            DurationDesignator::Days => self.number.convert_period::<SecondsPerDay, Period>(),
-            DurationDesignator::Years => self.number.convert_period::<SecondsPerYear, Period>(),
+            DurationDesignator::Seconds => self.number.convert_period::<Second, Period, _>(),
+            DurationDesignator::Minutes => {
+                self.number.convert_period::<SecondsPerMinute, Period, _>()
+            }
+            DurationDesignator::Hours => self.number.convert_period::<SecondsPerHour, Period, _>(),
+            DurationDesignator::Days => self.number.convert_period::<SecondsPerDay, Period, _>(),
+            DurationDesignator::Years => self.number.convert_period::<SecondsPerYear, Period, _>(),
         }
     }
 }

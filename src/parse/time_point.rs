@@ -3,17 +3,18 @@
 use core::str::FromStr;
 
 use crate::{
-    FromFineDateTime, HistoricDate, TimePoint, UnitRatio, errors::TimePointParsingError,
-    parse::TimeOfDay, time_scale::TimeScale, units::Second,
+    Fraction, FromFineDateTime, HistoricDate, TimePoint, TryFromExact, TryMul, UnitRatio,
+    errors::TimePointParsingError, parse::TimeOfDay, time_scale::TimeScale, units::Second,
 };
 
-impl<Scale, Period> FromStr for TimePoint<Scale, i64, Period>
+impl<Scale, Representation, Period> FromStr for TimePoint<Scale, Representation, Period>
 where
-    Self: FromFineDateTime<i64, Period>,
+    Self: FromFineDateTime<Representation, Period>,
     Period: UnitRatio,
     Scale: TimeScale,
+    Representation: TryFromExact<i64> + TryMul<Fraction, Output = Representation>,
 {
-    type Err = TimePointParsingError<<Self as FromFineDateTime<i64, Period>>::Error>;
+    type Err = TimePointParsingError<<Self as FromFineDateTime<Representation, Period>>::Error>;
 
     /// Parses a `TimePoint` based on some ISO 8610 date and time of day string. Note that time
     /// shifts are explicitly not supported: those are already included in the choice of `Scale`
@@ -56,7 +57,9 @@ where
             time_of_day.hour,
             time_of_day.minute,
             time_of_day.second,
-            time_of_day.subseconds.convert_period::<Second, Period>()?,
+            time_of_day
+                .subseconds
+                .convert_period::<Second, Period, Representation>()?,
         );
 
         match time_point {
@@ -191,6 +194,144 @@ fn known_timestamps() {
         MicroSeconds::ZERO,
     );
     check_historic_datetime(
+        "1643-01-04T01:01:33.000 TAI",
+        1643,
+        January,
+        4,
+        1,
+        1,
+        33,
+        MicroSeconds::ZERO,
+    );
+}
+
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn check_historic_datetime_float(
+    string: &str,
+    year: i32,
+    month: crate::Month,
+    day: u8,
+    hour: u8,
+    minute: u8,
+    second: u8,
+    subseconds: crate::MicroSeconds<f64>,
+) {
+    use crate::{Date, FromDateTime, IntoFineDateTime, TaiTime};
+    let datetime = TaiTime::from_str(string).unwrap();
+    let date = Date::from_historic_date(year, month, day).unwrap();
+    let expected_datetime = TaiTime::from_datetime(date, hour, minute, second)
+        .unwrap()
+        .try_cast()
+        .unwrap()
+        .into_unit()
+        + subseconds;
+    assert_eq!(datetime, expected_datetime);
+    let (date2, hour2, minute2, second2, subseconds2) = datetime.into_fine_datetime();
+    assert_eq!(date, date2);
+    assert_eq!(hour, hour2);
+    assert_eq!(minute, minute2);
+    assert_eq!(second, second2);
+    assert_eq!(subseconds, subseconds2);
+}
+
+#[test]
+fn known_timestamps_float() {
+    use crate::MicroSeconds;
+    use crate::Month::*;
+    use num_traits::ConstZero;
+
+    check_historic_datetime_float(
+        "1958-01-01T00:00:00.000001 TAI",
+        1958,
+        January,
+        1,
+        0,
+        0,
+        0,
+        MicroSeconds::new(1.),
+    );
+    check_historic_datetime_float(
+        "1958-01-02T00:00:00 TAI",
+        1958,
+        January,
+        2,
+        0,
+        0,
+        0,
+        MicroSeconds::ZERO,
+    );
+    check_historic_datetime_float(
+        "1960-01-01T12:34:56.789123 TAI",
+        1960,
+        January,
+        1,
+        12,
+        34,
+        56,
+        MicroSeconds::new(789123.),
+    );
+    check_historic_datetime_float(
+        "1961-01-01T00:00:00 TAI",
+        1961,
+        January,
+        1,
+        0,
+        0,
+        0,
+        MicroSeconds::ZERO,
+    );
+    check_historic_datetime_float(
+        "1970-01-01T00:00:00 TAI",
+        1970,
+        January,
+        1,
+        0,
+        0,
+        0,
+        MicroSeconds::ZERO,
+    );
+    check_historic_datetime_float(
+        "1976-01-01T23:59:59.999 TAI",
+        1976,
+        January,
+        1,
+        23,
+        59,
+        59,
+        MicroSeconds::new(999000.),
+    );
+    check_historic_datetime_float(
+        "2025-07-16T16:23:24.000000000 TAI",
+        2025,
+        July,
+        16,
+        16,
+        23,
+        24,
+        MicroSeconds::ZERO,
+    );
+    check_historic_datetime_float(
+        "2034-12-26T08:02:37.123456000 TAI",
+        2034,
+        December,
+        26,
+        8,
+        2,
+        37,
+        MicroSeconds::new(123456.),
+    );
+    check_historic_datetime_float(
+        "2760-04-01T21:59:58 TAI",
+        2760,
+        April,
+        1,
+        21,
+        59,
+        58,
+        MicroSeconds::ZERO,
+    );
+    check_historic_datetime_float(
         "1643-01-04T01:01:33.000 TAI",
         1643,
         January,

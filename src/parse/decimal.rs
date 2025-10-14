@@ -5,7 +5,7 @@
 use lexical_core::parse_partial;
 
 use crate::{
-    Duration, Fraction, TryMul, UnitRatio,
+    Duration, Fraction, TryFromExact, TryMul, UnitRatio,
     errors::{CannotRepresentDecimalNumber, NumberParsingError},
 };
 
@@ -73,12 +73,13 @@ impl DecimalNumber {
     /// This function provides the ability to do such a conversion: given the parsed decimal number
     /// "3.142", it losslessly converts it from the expressed unit `From` into the target unit
     /// `Into`. If this conversion cannot be done exactly, raises an appropriate error.
-    pub(crate) fn convert_period<From, Into>(
+    pub(crate) fn convert_period<From, Into, Representation>(
         self,
-    ) -> Result<Duration<i64, Into>, CannotRepresentDecimalNumber>
+    ) -> Result<Duration<Representation, Into>, CannotRepresentDecimalNumber>
     where
         From: UnitRatio,
         Into: UnitRatio,
+        Representation: TryFromExact<i64> + TryMul<Fraction, Output = Representation>,
     {
         let fraction = Fraction::new(1, 10u64.pow(self.fractional_digits));
         let mantissa = if self.integer >= 0 {
@@ -89,7 +90,11 @@ impl DecimalNumber {
         let uncorrected_duration = Duration::<_, From>::new(mantissa)
             .try_into_unit()
             .ok_or(CannotRepresentDecimalNumber { number: self })?;
-        uncorrected_duration
+        let duration: Duration<Representation, Into> = match uncorrected_duration.try_cast() {
+            Ok(uncorrected_duration) => uncorrected_duration,
+            Err(_) => Err(CannotRepresentDecimalNumber { number: self })?,
+        };
+        duration
             .try_mul(fraction)
             .ok_or(CannotRepresentDecimalNumber { number: self })
     }
