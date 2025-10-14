@@ -67,7 +67,7 @@ impl DecimalNumber {
     }
 
     /// While parsing, it is common to encounter scenarios like "3.142 s" where a decimal number,
-    /// expressed in one unit (seconds, here) but must be converted into the actual "underlying"
+    /// expressed in one unit (seconds, here) must be converted into the actual "underlying"
     /// representation of higher accuracy (milliseconds, here).
     ///
     /// This function provides the ability to do such a conversion: given the parsed decimal number
