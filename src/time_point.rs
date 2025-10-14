@@ -23,12 +23,12 @@ use crate::{
 /// A `TimePoint` identifies a specific instant in time. It is templated on a `Representation` and
 /// `Period`, which the define the characteristics of the `Duration` type used to represent the
 /// time elapsed since the epoch of the underlying time scale `Scale`.
-pub struct TimePoint<Scale: ?Sized, Representation = i64, Period = Second> {
+pub struct TimePoint<Scale: ?Sized, Representation = i64, Period: ?Sized = Second> {
     time_since_epoch: Duration<Representation, Period>,
     time_scale: core::marker::PhantomData<Scale>,
 }
 
-impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Period> {
+impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representation, Period> {
     /// Constructs a new `TimePoint` from a known time since epoch.
     pub const fn from_time_since_epoch(time_since_epoch: Duration<Representation, Period>) -> Self {
         Self {
@@ -51,6 +51,7 @@ impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Per
     pub fn into_unit<Target>(self) -> TimePoint<Scale, Representation, Target>
     where
         Representation: ConvertUnit<Period, Target>,
+        Target: ?Sized,
     {
         TimePoint::from_time_since_epoch(self.time_since_epoch.into_unit())
     }
@@ -120,7 +121,7 @@ impl<Scale: ?Sized, Representation, Period> TimePoint<Scale, Representation, Per
     }
 }
 
-impl<Scale, Representation> TimePoint<Scale, Representation, Second>
+impl<Scale: ?Sized> TimePoint<Scale, i64, Second>
 where
     Self: FromDateTime,
 {
@@ -173,7 +174,7 @@ where
     }
 }
 
-impl<Scale, Representation> TimePoint<Scale, Representation, Second>
+impl<Scale: ?Sized, Representation> TimePoint<Scale, Representation, Second>
 where
     Self: IntoDateTime,
 {
@@ -200,8 +201,11 @@ impl<Scale, Representation, Period> FromFineDateTime<Representation, Period>
     for TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized,
-    Representation: Add<Representation, Output = Representation> + ConvertUnit<Second, Period>,
-    TimePoint<Scale, Representation, Second>: FromDateTime<Error = InvalidTimeOfDay>,
+    Period: ?Sized,
+    Representation: Add<Representation, Output = Representation>
+        + ConvertUnit<Second, Period>
+        + TryFromExact<i64>,
+    TimePoint<Scale, i64, Second>: FromDateTime<Error = InvalidTimeOfDay>,
 {
     type Error = InvalidTimeOfDay;
 
@@ -212,7 +216,10 @@ where
         second: u8,
         subseconds: Duration<Representation, Period>,
     ) -> Result<Self, Self::Error> {
-        let coarse_time_point = TimePoint::from_datetime(date, hour, minute, second)?;
+        let coarse_time_point: TimePoint<Scale, Representation, Second> =
+            TimePoint::from_datetime(date, hour, minute, second)?
+                .try_into_exact()
+                .unwrap_or_else(|_| panic!());
         Ok(coarse_time_point.into_unit() + subseconds)
     }
 }
@@ -220,7 +227,9 @@ where
 impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
 where
     Self: FromFineDateTime<Representation, Period>,
-    TimePoint<Scale, Representation, Second>: FromDateTime,
+    TimePoint<Scale, i64, Second>: FromDateTime,
+    Scale: ?Sized,
+    Period: ?Sized,
 {
     /// Constructs a `TimePoint` in the given time scale, based on a subsecond-accuracy historic
     /// date-time.
@@ -294,7 +303,7 @@ where
         + ConvertUnit<Second, Period>
         + MulFloor<Fraction, Output = Representation>
         + Sub<Representation, Output = Representation>,
-    Period: UnitRatio,
+    Period: UnitRatio + ?Sized,
     TimePoint<Scale, Representation, Second>: IntoDateTime,
 {
     fn into_fine_datetime(self) -> (Date<i32>, u8, u8, u8, Duration<Representation, Period>) {
@@ -305,7 +314,7 @@ where
     }
 }
 
-impl<Scale, Representation, Period> TimePoint<Scale, Representation, Period>
+impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representation, Period>
 where
     Self: IntoFineDateTime<Representation, Period>,
 {
@@ -334,9 +343,10 @@ where
 impl<Scale, Representation, Period> Display for TimePoint<Scale, Representation, Period>
 where
     Self: IntoFineDateTime<Representation, Period>,
+    Scale: ?Sized,
     Duration<Representation, Period>: Zero,
     Representation: Copy + FractionalDigits,
-    Period: UnitRatio,
+    Period: UnitRatio + ?Sized,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let (historic_date, hour, minute, second, subseconds) = self.into_fine_historic_datetime();
@@ -512,6 +522,7 @@ impl<Scale, Representation: kani::Arbitrary, Period> kani::Arbitrary
     for TimePoint<Scale, Representation, Period>
 where
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn any() -> Self {
         TimePoint::from_time_since_epoch(kani::any())
@@ -522,6 +533,7 @@ impl<Scale, Representation, Period> Debug for TimePoint<Scale, Representation, P
 where
     Representation: Debug,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("TimePoint")
@@ -535,6 +547,7 @@ impl<Scale, Representation, Period> Copy for TimePoint<Scale, Representation, Pe
 where
     Representation: Copy,
     Scale: ?Sized,
+    Period: ?Sized,
 {
 }
 
@@ -542,6 +555,7 @@ impl<Scale, Representation, Period> Clone for TimePoint<Scale, Representation, P
 where
     Representation: Clone,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn clone(&self) -> Self {
         Self::from_time_since_epoch(self.time_since_epoch.clone())
@@ -552,6 +566,7 @@ impl<Scale, Representation, Period> PartialEq for TimePoint<Scale, Representatio
 where
     Representation: PartialEq,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn eq(&self, other: &Self) -> bool {
         self.time_since_epoch == other.time_since_epoch
@@ -562,6 +577,7 @@ impl<Scale, Representation, Period> Eq for TimePoint<Scale, Representation, Peri
 where
     Representation: Eq,
     Scale: ?Sized,
+    Period: ?Sized,
 {
 }
 
@@ -569,6 +585,7 @@ impl<Scale, Representation, Period> PartialOrd for TimePoint<Scale, Representati
 where
     Representation: PartialOrd,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.time_since_epoch.partial_cmp(&other.time_since_epoch)
@@ -579,6 +596,7 @@ impl<Scale, Representation, Period> Ord for TimePoint<Scale, Representation, Per
 where
     Representation: Ord,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.time_since_epoch.cmp(&other.time_since_epoch)
@@ -589,6 +607,7 @@ impl<Scale, Representation, Period> Hash for TimePoint<Scale, Representation, Pe
 where
     Representation: Hash,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.time_since_epoch.hash(state);
@@ -599,6 +618,7 @@ impl<Scale, Representation, Period> Sub for TimePoint<Scale, Representation, Per
 where
     Duration<Representation, Period>: Sub<Output = Duration<Representation, Period>>,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     type Output = Duration<Representation, Period>;
 
@@ -612,6 +632,7 @@ impl<Scale, Representation, Period> Add<Duration<Representation, Period>>
 where
     Duration<Representation, Period>: Add<Output = Duration<Representation, Period>>,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     type Output = Self;
 
@@ -625,6 +646,7 @@ impl<Scale, Representation, Period> AddAssign<Duration<Representation, Period>>
 where
     Duration<Representation, Period>: AddAssign,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn add_assign(&mut self, rhs: Duration<Representation, Period>) {
         self.time_since_epoch += rhs;
@@ -636,6 +658,7 @@ impl<Scale, Representation, Period> Sub<Duration<Representation, Period>>
 where
     Duration<Representation, Period>: Sub<Output = Duration<Representation, Period>>,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     type Output = Self;
 
@@ -649,6 +672,7 @@ impl<Scale, Representation, Period> SubAssign<Duration<Representation, Period>>
 where
     Duration<Representation, Period>: SubAssign,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn sub_assign(&mut self, rhs: Duration<Representation, Period>) {
         self.time_since_epoch -= rhs;
@@ -659,6 +683,7 @@ impl<Scale, Representation, Period> Bounded for TimePoint<Scale, Representation,
 where
     Representation: Bounded,
     Scale: ?Sized,
+    Period: ?Sized,
 {
     fn min_value() -> Self {
         Self::from_time_since_epoch(Duration::<Representation, Period>::min_value())
@@ -673,6 +698,8 @@ impl<Scale, R1, R2, Period> TryFromExact<TimePoint<Scale, R2, Period>>
     for TimePoint<Scale, R1, Period>
 where
     R1: TryFromExact<R2>,
+    Scale: ?Sized,
+    Period: ?Sized,
 {
     type Error = <R1 as TryFromExact<R2>>::Error;
 

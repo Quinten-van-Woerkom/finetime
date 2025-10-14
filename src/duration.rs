@@ -604,6 +604,7 @@ where
 impl<R1, R2, Period> TryFromExact<Duration<R2, Period>> for Duration<R1, Period>
 where
     R1: TryFromExact<R2>,
+    Period: ?Sized,
 {
     type Error = <R1 as TryFromExact<R2>>::Error;
 

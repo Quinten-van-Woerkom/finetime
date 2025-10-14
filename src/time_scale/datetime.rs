@@ -1,10 +1,10 @@
 //! Implementation of the concept of date and time-of-day within a time scale.
 
-use core::ops::{Add, Sub};
+use core::ops::Sub;
 
 use crate::{
     ConvertUnit, Date, Days, Duration, Fraction, Hours, Minutes, MulFloor, Seconds, TimePoint,
-    TryFromExact, TryIntoExact,
+    TryIntoExact,
     errors::InvalidTimeOfDay,
     time_scale::TimeScale,
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
@@ -38,17 +38,9 @@ pub trait FromDateTime: Sized {
     ) -> Result<Self, Self::Error>;
 }
 
-impl<Scale, Representation> FromDateTime for TimePoint<Scale, Representation, Second>
+impl<Scale> FromDateTime for TimePoint<Scale, i64, Second>
 where
     Scale: ?Sized + ContinuousDateTimeScale,
-    Representation: Copy
-        + ConvertUnit<SecondsPerMinute, Second>
-        + ConvertUnit<SecondsPerHour, Second>
-        + ConvertUnit<SecondsPerDay, Second>
-        + Add<Representation, Output = Representation>
-        + Sub<Representation, Output = Representation>
-        + TryFromExact<i32>
-        + TryFromExact<u8>,
 {
     type Error = InvalidTimeOfDay;
 
@@ -69,33 +61,12 @@ where
         let days_since_scale_epoch = {
             let days_since_1970 = date.time_since_epoch();
             let epoch_days_since_1970 = Scale::EPOCH.time_since_epoch();
-
-            // First we try to compute the difference by subtracting first and then converting into
-            // the target representation.
-            let difference = (days_since_1970 - epoch_days_since_1970).try_cast::<Representation>();
-            if let Ok(difference) = difference {
-                difference
-            } else {
-                // If that fails, we try first casting into the target representation and then
-                // subtracting. If that also fails, we just error.
-                days_since_1970
-                    .try_cast::<Representation>()
-                    .unwrap_or_else(|_| panic!())
-                    - epoch_days_since_1970
-                        .try_cast::<Representation>()
-                        .unwrap_or_else(|_| panic!())
-            }
+            days_since_1970.cast() - epoch_days_since_1970.cast()
         };
 
-        let hours = Hours::new(hour)
-            .try_cast::<Representation>()
-            .unwrap_or_else(|_| panic!());
-        let minutes = Minutes::new(minute)
-            .try_cast::<Representation>()
-            .unwrap_or_else(|_| panic!());
-        let seconds = Seconds::new(second)
-            .try_cast::<Representation>()
-            .unwrap_or_else(|_| panic!());
+        let hours = Hours::new(hour).cast();
+        let minutes = Minutes::new(minute).cast();
+        let seconds = Seconds::new(second).cast();
         let time_since_epoch =
             days_since_scale_epoch.into_unit() + hours.into_unit() + minutes.into_unit() + seconds;
         Ok(TimePoint::from_time_since_epoch(time_since_epoch))
@@ -104,7 +75,7 @@ where
 
 /// This trait may be implemented for time points that can be created based on "fine" date-time
 /// pairs, which have subsecond accuracy.
-pub trait FromFineDateTime<Representation, Period>: Sized {
+pub trait FromFineDateTime<Representation, Period: ?Sized>: Sized {
     type Error: core::error::Error;
 
     /// Maps a given combination of date and fine time-of-day to an instant on this time scale. May
@@ -169,7 +140,7 @@ where
     }
 }
 
-pub trait IntoFineDateTime<Representation, Period> {
+pub trait IntoFineDateTime<Representation, Period: ?Sized> {
     /// Convenience function that maps from a "fine" (subsecond-accuracy) time point to a date-time
     /// according to this time scale. Returns a tuple of date, hour, minute, second, and subsecond.
     /// Shall not fail, unless overflow occurs in the underlying integer arithmetic.

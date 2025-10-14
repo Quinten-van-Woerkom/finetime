@@ -15,7 +15,7 @@ With this fine degree of control and precision, `finetime` is suitable for all t
 In `finetime`, time points are always bound to a specific timekeeping standard, indicated as `TimeScale`. One such example is Coordinated Universal Time (UTC). Time points may be constructed directly from some given datetime in the historic calendar:
 ```rust
 use finetime::{UtcTime, Month};
-let epoch = UtcTime::<i64, _>::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
+let epoch = UtcTime::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
 ```
 Note that constructing time points from datetimes may fail, because the given arguments do not form a valid time-of-day, or because the given date did not occur in the historic calendar: `finetime` makes this explicit. Users must acknowledge this possibility by unwrapping the returned `Result` before being able to use the created `UtcTime`.
 
@@ -25,7 +25,7 @@ Unix time is explicitly not included, as it is not a continuous time scale: the 
 Where possible, times can be converted between time scales using the `into_time_scale()` function.
 ```rust
 use finetime::{GalileoTime, GpsTime, TaiTime, UtcTime, Month, IntoTimeScale, Second};
-let epoch_utc = UtcTime::<i64, Second>::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
+let epoch_utc = UtcTime::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
 let epoch_tai = TaiTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 19).unwrap();
 let epoch_gps = GpsTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 0).unwrap();
 let epoch_galileo = GalileoTime::from_historic_datetime(2025, Month::August, 3, 20, 26, 0).unwrap();
@@ -69,7 +69,7 @@ The same goes when a time scale does not apply leap seconds:
 ```rust
 use finetime::{TaiTime, Month, Seconds, Second};
 let epoch1 = TaiTime::from_historic_datetime(2016, Month::December, 31, 23, 59, 59).unwrap();
-let _ = TaiTime::<i64, Second>::from_historic_datetime(2016, Month::December, 31, 23, 59, 60).unwrap_err();
+let _ = TaiTime::from_historic_datetime(2016, Month::December, 31, 23, 59, 60).unwrap_err();
 let epoch3 = TaiTime::from_historic_datetime(2017, Month::January, 1, 0, 0, 0).unwrap();
 assert_eq!(epoch3 - epoch1, Seconds::new(1i64));
 ```
@@ -79,7 +79,7 @@ As with `TimePoint`s, unit compatibility is checked at compile time, with conver
 use finetime::{GpsTime, Month, Hours, MilliSeconds, Second};
 let epoch1 = GpsTime::from_historic_datetime(2024, Month::August, 13, 19, 30, 0).unwrap();
 let epoch2 = epoch1 + Hours::new(2).into_unit();
-let epoch3 = epoch1.into_unit() + MilliSeconds::new(1i64);
+let epoch3 = epoch1.into_unit() + MilliSeconds::new(1);
 assert_eq!(epoch2, GpsTime::from_historic_datetime(2024, Month::August, 13, 21, 30, 0).unwrap());
 assert_eq!(epoch3, GpsTime::from_fine_historic_datetime(2024, Month::August, 13, 19, 30, 0, MilliSeconds::new(1)).unwrap());
 ```
