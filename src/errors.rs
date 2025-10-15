@@ -239,3 +239,16 @@ pub enum InvalidUtcDateTime {
         second: u8,
     },
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
+pub enum InvalidGlonassDateTime {
+    #[error("invalid time-of-day")]
+    InvalidTimeOfDay(#[from] InvalidTimeOfDay),
+    #[error("not a valid GLONASST leap second date-time: {}T{hour:02}-{minute:02}-{second:02}", <Date<i32> as Into<HistoricDate>>::into(*date))]
+    NonLeapSecondDateTime {
+        date: Date<i32>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    },
+}
