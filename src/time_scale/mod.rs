@@ -16,6 +16,8 @@ pub use leap_seconds::{
     FromLeapSecondDateTime, IntoLeapSecondDateTime, LeapSecondProvider,
     STATIC_LEAP_SECOND_PROVIDER, StaticLeapSecondProvider,
 };
+mod qzsst;
+pub use qzsst::{QzssTime, Qzsst};
 mod tai;
 pub use tai::{Tai, TaiTime};
 mod tcg;
