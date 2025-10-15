@@ -1,10 +1,11 @@
+//! Implementation of the historic or "civil" calendar.
+
 //! Implementation of the historic calendar, which is Julian before and Gregorian after the
 //! Gregoric calendar reform of 1582. When in doubt, use this calendar.
 
-use core::ops::Sub;
-
 use crate::{
-    InvalidDayOfYear, InvalidHistoricDate, calendar::Month, duration::Days, time_scale::LocalDays,
+    Date, GregorianDate, JulianDate, Month,
+    errors::{InvalidDayOfYear, InvalidDayOfYearCount, InvalidHistoricDate},
 };
 
 /// Implementation of a date in the historic calendar. After 15 October 1582, this coincides with
@@ -15,13 +16,13 @@ use crate::{
 /// Astronomical Algorithms book. Hence, most users probably expect it to be the calendar of
 /// choice.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Date {
+pub struct HistoricDate {
     year: i32,
     month: Month,
     day: u8,
 }
 
-impl Date {
+impl HistoricDate {
     /// Creates a new date, given its `year`, `month`, and `day`. If the date is not a valid date
     /// in the historic calendar, returns a `DateDoesNotExist` error to indicate that the
     /// requested date does not exist.
@@ -39,103 +40,81 @@ impl Date {
     /// algorithm found by A. Pouplier and reported by Jean Meeus in Astronomical Algorithms.
     ///
     /// This function will never panic.
-    pub const fn from_year_day(year: i32, day_of_year: u16) -> Result<Self, InvalidDayOfYear> {
-        // Validate the input
+    pub const fn from_ordinal_date(year: i32, day_of_year: u16) -> Result<Self, InvalidDayOfYear> {
         let is_leap_year = Self::is_leap_year(year);
-        if day_of_year == 0 || day_of_year > 366 || (day_of_year == 366 && !is_leap_year) {
-            return Err(InvalidDayOfYear { year, day_of_year });
-        }
-
-        // Compute the month and day-of-month.
-        let k = if is_leap_year { 1 } else { 2 };
-        let month = if day_of_year < 32 {
-            1
-        } else {
-            (9 * (k + day_of_year as i32) + 269) / 275
-        };
-        let day = day_of_year as i32 - (275 * month) / 9 + k * ((month + 9) / 12) + 30;
-
-        // Validate the output range. This should not actually fail, but we need to handle it for
-        // casting to the proper output types.
-        use Month::*;
-        let day = match day {
-            0..=32 => day as u8,
-            _ => unreachable!(),
-        };
-        let month = match month {
-            1 => January,
-            2 => February,
-            3 => March,
-            4 => April,
-            5 => May,
-            6 => June,
-            7 => July,
-            8 => August,
-            9 => September,
-            10 => October,
-            11 => November,
-            12 => December,
-            _ => unreachable!(),
+        let (month, day) = match month_day_from_ordinal_date(year, day_of_year, is_leap_year) {
+            Ok((month, day)) => (month, day),
+            Err(error) => return Err(error),
         };
 
-        // This call may actually fail again, because it is still possible for a date to have been
-        // computed that is part of the Gregorian calendar reform period (5 October up to and
-        // including 14 October 1582, which don't exist).
-        match Date::new(year, month, day) {
+        // It is still possible for a date to have been computed that is part of the Gregorian
+        // calendar reform period (5 October up to and including 14 October 1582). We must reject
+        // such dates in the historic calendar.
+        match Self::new(year, month, day) {
             Ok(date) => Ok(date),
-            Err(_) => Err(InvalidDayOfYear { year, day_of_year }),
+            Err(err) => Err(InvalidDayOfYear::InvalidHistoricDate(err)),
         }
     }
 
-    /// Constructs a MJD from a given historic calendar date. Applies a slight variation on the
-    /// approach described by Meeus in Astronomical Algorithms (Chapter 7, Julian Day). This
+    pub const fn from_date(date: Date<i32>) -> Self {
+        // Determine which calendar applies: Julian or Gregorian
+        const GREGORIAN_REFORM: Date<i32> = match GregorianDate::new(1582, Month::October, 15) {
+            Ok(date) => date.into_date(),
+            Err(_) => unreachable!(),
+        };
+        let is_gregorian =
+            date.time_since_epoch().count() >= GREGORIAN_REFORM.time_since_epoch().count();
+
+        if is_gregorian {
+            let date = GregorianDate::from_date(date);
+            Self {
+                year: date.year(),
+                month: date.month(),
+                day: date.day(),
+            }
+        } else {
+            let date = JulianDate::from_date(date);
+            Self {
+                year: date.year(),
+                month: date.month(),
+                day: date.day(),
+            }
+        }
+    }
+
+    /// Constructs a generic date from a given historic calendar date. Applies a slight variation
+    /// on the approach described by Meeus in Astronomical Algorithms (Chapter 7, Julian Day). This
     /// variation adapts the algorithm to the Unix epoch and removes the dependency on floating
     /// point arithmetic.
-    pub const fn to_local_days(self) -> LocalDays<i64> {
-        let (mut year, mut month, day) =
-            (self.year() as i64, self.month() as i64, self.day() as i64);
-        if month <= 2 {
-            year -= 1;
-            month += 12;
-        }
-
-        // Applies the leap year correction, as described in Meeus. This is needed only for
-        // Gregorian dates: for dates in the Julian calendar, no such correction is needed.
-        let gregorian_correction = if self.is_gregorian() {
-            let a = year.div_euclid(100);
-            2 - a + a / 4
+    pub const fn into_date(self) -> Date<i32> {
+        let HistoricDate { year, month, day } = self;
+        if self.is_gregorian() {
+            match GregorianDate::new(year, month, day) {
+                Ok(date) => date.into_date(),
+                Err(_) => unreachable!(),
+            }
         } else {
-            0
-        };
-
-        // Computes the days because of elapsed years. Equivalent to `INT(365.25(Y + 4716))` from
-        // Meeus.
-        let year_days = (365 * (year + 4716)) + (year + 4716) / 4;
-
-        // Computes the days due to elapsed months. Equivalent to `INT(30.6001(M + 1))` from Meeus.
-        let month_days = (306001 * (month + 1)) / 10000;
-
-        // Computes the Julian day number following Meeus' approach - though as an integer with an
-        // offset of 0.5 days. Then, we subtract 2440587.5 (on top of Meeus' 1524.5) to obtain the
-        // time since the Unix epoch.
-        let days_since_epoch = year_days + month_days + day + gregorian_correction - 2442112;
-        LocalDays::from_time_since_epoch(Days::new(days_since_epoch))
+            match JulianDate::new(year, month, day) {
+                Ok(date) => date.into_date(),
+                Err(_) => unreachable!(),
+            }
+        }
     }
 
-    /// Returns the year stored inside this proleptic Gregorian date. Astronomical year
-    /// numbering is used (as also done in NAIF SPICE): the year 1 BCE is represented as 0, 2 BCE as
-    /// -1, etc. Hence, around the year 0, the numbering is ..., -2 (3 BCE), -1 (2 BCE), 0 (1 BCE),
-    /// 1 (1 CE), 2 (2 CE), et cetera. In this manner, the year numbering proceeds smoothly through 0.
+    /// Returns the year stored inside this historic date. Astronomical year numbering is used (as
+    /// also done in NAIF SPICE): the year 1 BCE is represented as 0, 2 BCE as -1, etc. Hence,
+    /// around the year 0, the numbering is ..., -2 (3 BCE), -1 (2 BCE), 0 (1 BCE), 1 (1 CE), 2 (2
+    /// CE), et cetera. In this manner, the year numbering proceeds smoothly through 0.
     pub const fn year(&self) -> i32 {
         self.year
     }
 
-    /// Returns the month stored inside this proleptic Gregorian date.
+    /// Returns the month stored inside this historic date.
     pub const fn month(&self) -> Month {
         self.month
     }
 
-    /// Returns the day-of-month stored inside this proleptic Gregorian date.
+    /// Returns the day-of-month stored inside this historic date.
     pub const fn day(&self) -> u8 {
         self.day
     }
@@ -162,7 +141,7 @@ impl Date {
     /// Returns the number of days in a given month of a year. Also considers whether the given
     /// year-month combination would fall in the Gregorian or Julian calendar.
     pub const fn days_in_month(year: i32, month: Month) -> u8 {
-        use crate::calendar::Month::*;
+        use crate::Month::*;
         match month {
             January | March | May | July | August | October | December => 31,
             April | June | September | November => 30,
@@ -201,22 +180,57 @@ impl Date {
     }
 }
 
-impl From<Date> for LocalDays<i64> {
-    fn from(value: Date) -> Self {
-        value.to_local_days()
+/// It turns out that the `from_ordinal_date` implementation can largely be factored into one
+/// function that is valid for both the historic, proleptic Gregorian, and proleptic Julian
+/// calendars. After all, the function depends only on whether or not some year is a leap year.
+pub(crate) const fn month_day_from_ordinal_date(
+    year: i32,
+    day_of_year: u16,
+    is_leap_year: bool,
+) -> Result<(Month, u8), InvalidDayOfYear> {
+    if day_of_year == 0 || day_of_year > 366 || (day_of_year == 366 && !is_leap_year) {
+        return Err(InvalidDayOfYear::InvalidDayOfYearCount(
+            InvalidDayOfYearCount { year, day_of_year },
+        ));
+    }
+
+    // Compute the month and day-of-month.
+    let k = if is_leap_year { 1 } else { 2 };
+    let month = if day_of_year < 32 {
+        1
+    } else {
+        (9 * (k + day_of_year as i32) + 269) / 275
+    };
+    let day = day_of_year as i32 - (275 * month) / 9 + k * ((month + 9) / 12) + 30;
+
+    // Validate the output range. This should not actually fail, but we need to handle it for
+    // casting to the proper output types.
+    let day = match day {
+        0..=32 => day as u8,
+        _ => unreachable!(),
+    };
+    let month = match Month::try_from(month as u8) {
+        Ok(month) => month,
+        Err(_) => unreachable!(),
+    };
+    Ok((month, day))
+}
+
+impl From<HistoricDate> for Date<i32> {
+    fn from(value: HistoricDate) -> Self {
+        value.into_date()
     }
 }
 
-impl Sub for Date {
-    type Output = Days<i64>;
+impl From<Date<i32>> for HistoricDate {
+    fn from(value: Date<i32>) -> Self {
+        Self::from_date(value)
+    }
+}
 
-    /// The difference between two Gregorian dates can be computed exactly as a number of days,
-    /// accounting for the variable number of days per leap year. Note that this is only possible
-    /// up to an accuracy of days because leap seconds depend on the time scale.
-    fn sub(self, rhs: Self) -> Self::Output {
-        let days_lhs = self.to_local_days();
-        let days_rhs = rhs.to_local_days();
-        days_lhs - days_rhs
+impl core::fmt::Display for HistoricDate {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}-{:02}-{:02}", self.year, self.month as u8, self.day)
     }
 }
 
@@ -224,21 +238,30 @@ impl Sub for Date {
 #[test]
 fn day_of_year() {
     // Computing the day-of-year based on some date.
-    let date1 = Date::new(1978, Month::November, 14).unwrap();
-    // 336 - 2*((11 + 9)/12) + 14 - 30 =
+    let date1 = HistoricDate::new(1978, Month::November, 14).unwrap();
     assert_eq!(date1.day_of_year(), 318);
-    let date2 = Date::new(1988, Month::April, 22).unwrap();
+    let date2 = HistoricDate::new(1988, Month::April, 22).unwrap();
     assert_eq!(date2.day_of_year(), 113);
 
     // The reverse procedure: computing the date based on a year and day-of-year.
-    let date3 = Date::from_year_day(1978, 318).unwrap();
+    let date3 = HistoricDate::from_ordinal_date(1978, 318).unwrap();
     assert_eq!(date3, date1);
-    let date4 = Date::from_year_day(1988, 113).unwrap();
+    let date4 = HistoricDate::from_ordinal_date(1988, 113).unwrap();
     assert_eq!(date4, date2);
 }
 
+/// Verifies that the Gregorian calendar reform is properly modelled.
+#[test]
+fn gregorian_reform() {
+    use crate::Days;
+    use crate::Month::*;
+    let date1 = Date::from_historic_date(1582, October, 4).unwrap();
+    let date2 = Date::from_historic_date(1582, October, 15).unwrap();
+    assert_eq!(date1 + Days::new(1), date2);
+}
+
 #[cfg(kani)]
-impl kani::Arbitrary for Date {
+impl kani::Arbitrary for HistoricDate {
     fn any() -> Self {
         let mut year: i32 = kani::any();
         let month: Month = kani::any();
@@ -264,7 +287,7 @@ mod proof_harness {
         let year: i32 = kani::any();
         let month: Month = kani::any();
         let day: u8 = kani::any();
-        let _ = Date::new(year, month, day);
+        let _ = HistoricDate::new(year, month, day);
     }
 
     /// Verifies that construction of a historic date from a year and day-of-year never panics,
@@ -273,17 +296,26 @@ mod proof_harness {
     fn day_of_year_never_panics() {
         let year: i32 = kani::any();
         let day_of_year: u16 = kani::any();
-        let _ = Date::from_year_day(year, day_of_year);
+        let _ = HistoricDate::from_ordinal_date(year, day_of_year);
     }
 
     /// Verifies that, for any correct date, computing its day-of-year and using that to
     /// reconstruct the date, will not panic and will result in the exact same value.
     #[kani::proof]
     fn day_of_year_roundtrip() {
-        let date: Date = kani::any();
+        let date: HistoricDate = kani::any();
         let year = date.year();
         let day_of_year = date.day_of_year();
-        let reconstructed = Date::from_year_day(year, day_of_year).unwrap();
+        let reconstructed = HistoricDate::from_ordinal_date(year, day_of_year).unwrap();
         assert_eq!(date, reconstructed);
+    }
+
+    /// Verifies that conversion to and from a `Date` is well-defined for all possible values of
+    /// `Date<i32>`: no panics, undefined behaviour, or arithmetic errors.
+    #[kani::proof]
+    fn date_conversion_well_defined() {
+        let date: Date<i32> = kani::any();
+        let historic_date = HistoricDate::from_date(date);
+        let _ = historic_date.into_date();
     }
 }

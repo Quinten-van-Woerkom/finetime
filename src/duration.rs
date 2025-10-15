@@ -3,37 +3,34 @@
 //! concept is similar to that applied in the C++ `chrono` library.
 
 use core::{
+    fmt::Debug,
     hash::Hash,
-    ops::{Add, AddAssign, Div, Mul, Neg, Sub},
+    ops::{Add, AddAssign, Div, Mul, Neg, Sub, SubAssign},
 };
 
-use num_integer::Integer;
 use num_traits::{Bounded, ConstZero, Signed, Zero};
 
-use crate::arithmetic::{
-    Atto, ConversionRatio, Femto, Fraction, IntoUnit, Micro, Milli, Nano, Pico, Second,
-    SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
-    SecondsPerYear, TimeRepresentation, TryFromExact, TryIntoExact, Unit,
+use crate::{
+    Fraction, FractionalDigits, MulCeil, MulFloor, MulRound, TryFromExact, TryIntoExact, TryMul,
+    units::{
+        Atto, ConvertUnit, Femto, Micro, Milli, Nano, Pico, Second, SecondsPerDay,
+        SecondsPerHalfDay, SecondsPerHour, SecondsPerMinute, SecondsPerMonth, SecondsPerWeek,
+        SecondsPerYear, TryConvertUnit, UnitRatio,
+    },
 };
 
 /// A `Duration` represents the difference between two time points. It has an associated
 /// `Representation`, which determines how the count of elapsed ticks is stored. The `Period`
 /// determines the integer (!) ratio of each tick to seconds. This may be used to convert between
 /// `Duration`s of differing time units.
-#[derive(Debug)]
-pub struct Duration<Representation, Period = Second>
-where
-    Representation: TimeRepresentation,
-    Period: Unit,
-{
+pub struct Duration<Representation, Period: ?Sized = Second> {
     count: Representation,
     period: core::marker::PhantomData<Period>,
 }
 
 impl<Representation, Period> Duration<Representation, Period>
 where
-    Representation: TimeRepresentation,
-    Period: Unit,
+    Period: ?Sized,
 {
     /// Constructs a new `Duration` from a given number of time units.
     pub const fn new(count: Representation) -> Self {
@@ -46,121 +43,179 @@ where
     /// Returns the raw number of time units contained in this `Duration`. It is advised not to
     /// use this function unless absolutely necessary, as it effectively throws away all time unit
     /// information and safety.
-    pub fn count(&self) -> Representation {
-        self.count.clone()
+    pub const fn count(&self) -> Representation
+    where
+        Representation: Copy,
+    {
+        self.count
+    }
+
+    /// Returns an iterator over the fractional (sub-unit) digits of this duration. Useful as
+    /// helper function when printing durations.
+    pub fn fractional_digits(&self, precision: Option<usize>, base: u8) -> impl Iterator<Item = u8>
+    where
+        Representation: Copy + FractionalDigits,
+        Period: UnitRatio,
+    {
+        self.count
+            .fractional_digits(Period::FRACTION, precision, base)
+    }
+
+    /// Returns an iterator over the fractional (sub-unit) digits of this duration, expressed in
+    /// decimal. Useful as helper function when printing durations.
+    pub fn decimal_digits(&self, precision: Option<usize>) -> impl Iterator<Item = u8>
+    where
+        Representation: Copy + FractionalDigits,
+        Period: UnitRatio,
+    {
+        self.fractional_digits(precision, 10)
     }
 
     /// Converts a `Duration` towards a different time unit. May only be used if the time unit is
     /// smaller than the current one (e.g., seconds to milliseconds) or if the representation of
     /// this `Duration` is a float.
-    pub fn into_unit<Target: Unit>(self) -> Duration<Representation, Target>
+    pub fn into_unit<Target>(self) -> Duration<Representation, Target>
     where
-        Period: IntoUnit<Target, Representation>,
+        Representation: ConvertUnit<Period, Target>,
+        Target: ?Sized,
     {
-        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
-        Duration {
-            count: self.count.mul_naive(conversion_ratio),
-            period: core::marker::PhantomData,
-        }
+        Duration::new(self.count.convert())
     }
 
-    /// Tries to convert a `Duration` towards a different time unit. Only applies to integers (as
-    /// all floats may be converted infallibly anyway). Will only return a result if the conversion
-    /// is lossless.
-    pub fn try_into_unit<Target: Unit>(self) -> Option<Duration<Representation, Target>>
+    /// Tries to convert a `Duration` towards a different time unit. Will only return a result if
+    /// the conversion is lossless.
+    pub fn try_into_unit<Target>(self) -> Option<Duration<Representation, Target>>
     where
-        Representation: Integer + TryFromExact<i128>,
+        Representation: TryConvertUnit<Period, Target>,
+        Target: ?Sized,
     {
-        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
-        let count = conversion_ratio.try_mul(self.count)?;
-        Some(Duration {
-            count,
-            period: core::marker::PhantomData,
-        })
+        Some(Duration::new(self.count.try_convert()?))
     }
 
     /// Converts towards a different time unit, rounding towards the nearest whole unit.
-    pub fn round<Target: Unit>(self) -> Duration<Representation, Target> {
-        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
-        Duration {
-            count: self.count.mul_round(conversion_ratio),
-            period: core::marker::PhantomData,
-        }
+    pub fn round<Target>(self) -> Duration<Representation, Target>
+    where
+        Representation: MulRound<Fraction, Output = Representation>,
+        Target: UnitRatio + ?Sized,
+        Period: UnitRatio,
+    {
+        let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
+        Duration::new(self.count.mul_round(unit_ratio))
     }
 
     /// Converts towards a different time unit, rounding towards positive infinity if the unit is
     /// not entirely commensurate with the present unit.
-    pub fn ceil<Target: Unit>(self) -> Duration<Representation, Target> {
-        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
-        Duration {
-            count: conversion_ratio.mul_ceil(self.count),
-            period: core::marker::PhantomData,
-        }
+    pub fn ceil<Target>(self) -> Duration<Representation, Target>
+    where
+        Representation: MulCeil<Fraction, Output = Representation>,
+        Target: UnitRatio + ?Sized,
+        Period: UnitRatio,
+    {
+        let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
+        Duration::new(self.count.mul_ceil(unit_ratio))
     }
 
     /// Converts towards a different time unit, rounding towards negative infinity if the unit is
     /// not entirely commensurate with the present unit.
-    pub fn floor<Target: Unit>(self) -> Duration<Representation, Target> {
-        let conversion_ratio = <Period as ConversionRatio<Target>>::CONVERSION_RATIO;
-        Duration {
-            count: conversion_ratio.mul_floor(self.count),
-            period: core::marker::PhantomData,
-        }
+    pub fn floor<Target>(self) -> Duration<Representation, Target>
+    where
+        Representation: MulFloor<Fraction, Output = Representation>,
+        Target: UnitRatio + ?Sized,
+        Period: UnitRatio,
+    {
+        let unit_ratio = Period::FRACTION.divide_by(&Target::FRACTION);
+        Duration::new(self.count.mul_floor(unit_ratio))
+    }
+
+    /// Segments this `Duration` by factoring out the largest possible number of whole multiples of
+    /// a given unit. Returns this whole number as well as the remainder.
+    ///
+    /// An example would be factoring out the number of whole days from some elapsed time: then,
+    /// `self.factor_out()` would return a tuple of the number of whole days and the fractional
+    /// day part that remains.
+    pub fn factor_out<Unit>(
+        self,
+    ) -> (
+        Duration<Representation, Unit>,
+        Duration<Representation, Period>,
+    )
+    where
+        Representation: Copy
+            + MulFloor<Fraction, Output = Representation>
+            + Sub<Representation, Output = Representation>
+            + ConvertUnit<Unit, Period>,
+        Period: UnitRatio,
+        Unit: UnitRatio + ?Sized,
+    {
+        let factored = self.floor::<Unit>();
+        let remainder = self - factored.into_unit();
+        (factored, remainder)
     }
 
     /// Infallibly converts towards a different representation.
     pub fn cast<Target>(self) -> Duration<Target, Period>
     where
         Representation: Into<Target>,
-        Target: TimeRepresentation,
     {
         Duration::new(self.count.into())
     }
 
     /// Converts towards a different representation. If the underlying representation cannot store
-    /// the result of this cast, returns `None`.
-    pub fn try_cast<Target>(self) -> Option<Duration<Target, Period>>
+    /// the result of this cast, returns an appropriate `Error`.
+    pub fn try_cast<Target>(
+        self,
+    ) -> Result<Duration<Target, Period>, <Representation as TryIntoExact<Target>>::Error>
     where
         Representation: TryIntoExact<Target>,
-        Target: TimeRepresentation,
     {
-        Some(Duration::new(self.count.try_into_exact().ok()?))
+        Ok(Duration::new(self.count.try_into_exact()?))
     }
+}
 
-    /// Multiplies by a fraction. If the underlying representation cannot store fractional values,
-    /// applies rounding-to-nearest.
-    pub fn multiply_fraction(self, fraction: Fraction) -> Self {
-        Self {
-            count: self.count.mul_exact(fraction),
-            period: core::marker::PhantomData,
-        }
+#[cfg(kani)]
+impl<Representation: kani::Arbitrary, Period> kani::Arbitrary for Duration<Representation, Period>
+where
+    Period: ?Sized,
+{
+    fn any() -> Self {
+        Duration::new(kani::any())
+    }
+}
+
+impl<Representation, Period> Debug for Duration<Representation, Period>
+where
+    Representation: Debug,
+    Period: ?Sized,
+{
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Duration")
+            .field("count", &self.count)
+            .field("period", &self.period)
+            .finish()
     }
 }
 
 impl<Representation, Period> Copy for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + Copy,
-    Period: Unit,
+    Representation: Copy,
+    Period: ?Sized,
 {
 }
 
 impl<Representation, Period> Clone for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation,
-    Period: Unit,
+    Representation: Clone,
+    Period: ?Sized,
 {
     fn clone(&self) -> Self {
-        Self {
-            count: self.count.clone(),
-            period: core::marker::PhantomData,
-        }
+        Self::new(self.count.clone())
     }
 }
 
 impl<Representation, Period> PartialEq for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + PartialEq,
-    Period: Unit,
+    Representation: PartialEq,
+    Period: ?Sized,
 {
     fn eq(&self, other: &Self) -> bool {
         self.count == other.count
@@ -169,15 +224,15 @@ where
 
 impl<Representation, Period> Eq for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + Eq,
-    Period: Unit,
+    Representation: Eq,
+    Period: ?Sized,
 {
 }
 
 impl<Representation, Period> PartialOrd for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + PartialOrd,
-    Period: Unit,
+    Representation: PartialOrd,
+    Period: ?Sized,
 {
     fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
         self.count.partial_cmp(&other.count)
@@ -186,8 +241,8 @@ where
 
 impl<Representation, Period> Ord for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + Ord,
-    Period: Unit,
+    Representation: Ord,
+    Period: ?Sized,
 {
     fn cmp(&self, other: &Self) -> core::cmp::Ordering {
         self.count.cmp(&other.count)
@@ -196,25 +251,11 @@ where
 
 impl<Representation, Period> Hash for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + Hash,
-    Period: Unit,
+    Representation: Hash,
+    Period: ?Sized,
 {
     fn hash<H: core::hash::Hasher>(&self, state: &mut H) {
         self.count.hash(state);
-    }
-}
-
-#[cfg(kani)]
-impl<Representation: kani::Arbitrary, Period> kani::Arbitrary for Duration<Representation, Period>
-where
-    Representation: TimeRepresentation,
-    Period: Unit,
-{
-    fn any() -> Self {
-        Duration {
-            count: kani::any(),
-            period: core::marker::PhantomData,
-        }
     }
 }
 
@@ -236,6 +277,8 @@ pub type Seconds<T> = Duration<T, Second>;
 pub type Minutes<T> = Duration<T, SecondsPerMinute>;
 /// A duration that is expressed in units of hours.
 pub type Hours<T> = Duration<T, SecondsPerHour>;
+/// A duration that is expressed in units of half days.
+pub type HalfDays<T> = Duration<T, SecondsPerHalfDay>;
 /// A duration that is expressed in units of days.
 pub type Days<T> = Duration<T, SecondsPerDay>;
 /// A duration that is expressed in terms of weeks.
@@ -245,17 +288,18 @@ pub type Months<T> = Duration<T, SecondsPerMonth>;
 /// The length of an average year in the Gregorian calendar.
 pub type Years<T> = Duration<T, SecondsPerYear>;
 
-/// Two `Duration`s may only be added if they are of the same `Period`.
-impl<R1, R2, Period: Unit> Add<Duration<R2, Period>> for Duration<R1, Period>
+/// Two `Duration`s may only be added if they are of the same `Period`. We also (relatively
+/// arbitrarily) restrict addition to `Duration`s with the same underlying representation. This
+/// turns out to be very useful in improving type inference, with the reduced flexibility being of
+/// little consequence for any "regular" representation.
+impl<Representation, Period> Add for Duration<Representation, Period>
 where
-    R1: TimeRepresentation,
-    R2: TimeRepresentation,
-    R1: Add<R2>,
-    <R1 as Add<R2>>::Output: TimeRepresentation,
+    Representation: Add<Output = Representation>,
+    Period: ?Sized,
 {
-    type Output = Duration<<R1 as Add<R2>>::Output, Period>;
+    type Output = Self;
 
-    fn add(self, rhs: Duration<R2, Period>) -> Self::Output {
+    fn add(self, rhs: Self) -> Self::Output {
         Self::Output {
             count: self.count + rhs.count,
             period: core::marker::PhantomData,
@@ -263,29 +307,29 @@ where
     }
 }
 
-impl<R1, R2, Period: Unit> AddAssign<Duration<R2, Period>> for Duration<R1, Period>
+impl<Representation, Period> AddAssign<Duration<Representation, Period>>
+    for Duration<Representation, Period>
 where
-    R1: TimeRepresentation,
-    R2: TimeRepresentation,
-    R1: AddAssign<R2>,
+    Representation: AddAssign<Representation>,
+    Period: ?Sized,
 {
-    fn add_assign(&mut self, rhs: Duration<R2, Period>) {
+    fn add_assign(&mut self, rhs: Duration<Representation, Period>) {
         self.count += rhs.count;
     }
 }
 
-/// Two `Duration`s may only be subtracted if they are of the same `Period`.
-impl<R1, R2, Period> Sub<Duration<R2, Period>> for Duration<R1, Period>
+/// Two `Duration`s may only be subtracted if they are of the same `Period`.  We also (relatively
+/// arbitrarily) restrict subtraction to `Duration`s with the same underlying representation. This
+/// turns out to be very useful in improving type inference, with the reduced flexibility being of
+/// little consequence for any "regular" representation.
+impl<Representation, Period> Sub for Duration<Representation, Period>
 where
-    R1: TimeRepresentation,
-    R2: TimeRepresentation,
-    R1: Sub<R2>,
-    <R1 as Sub<R2>>::Output: TimeRepresentation,
-    Period: Unit,
+    Representation: Sub<Output = Representation>,
+    Period: ?Sized,
 {
-    type Output = Duration<<R1 as Sub<R2>>::Output, Period>;
+    type Output = Self;
 
-    fn sub(self, rhs: Duration<R2, Period>) -> Self::Output {
+    fn sub(self, rhs: Self) -> Self::Output {
         Self::Output {
             count: self.count - rhs.count,
             period: core::marker::PhantomData,
@@ -293,12 +337,22 @@ where
     }
 }
 
+impl<R1, R2, Period> SubAssign<Duration<R2, Period>> for Duration<R1, Period>
+where
+    R1: SubAssign<R2>,
+    Period: ?Sized,
+{
+    fn sub_assign(&mut self, rhs: Duration<R2, Period>) {
+        self.count -= rhs.count;
+    }
+}
+
 /// A `Duration` may be negated if its `Representation` is `Signed`. This means nothing more than
 /// reversing its direction in time.
 impl<Representation, Period> Neg for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + Neg<Output = Representation>,
-    Period: Unit,
+    Representation: Neg<Output = Representation>,
+    Period: ?Sized,
 {
     type Output = Self;
 
@@ -312,11 +366,8 @@ where
 
 impl<R1, R2, Period> Mul<R2> for Duration<R1, Period>
 where
-    R1: TimeRepresentation,
-    R2: TimeRepresentation,
     R1: Mul<R2>,
-    <R1 as Mul<R2>>::Output: TimeRepresentation,
-    Period: Unit,
+    Period: ?Sized,
 {
     type Output = Duration<<R1 as Mul<R2>>::Output, Period>;
 
@@ -332,11 +383,8 @@ where
 
 impl<R1, R2, Period> Div<R2> for Duration<R1, Period>
 where
-    R1: TimeRepresentation,
-    R2: TimeRepresentation,
     R1: Div<R2>,
-    <R1 as Div<R2>>::Output: TimeRepresentation,
-    Period: Unit,
+    Period: ?Sized,
 {
     type Output = Duration<<R1 as Div<R2>>::Output, Period>;
 
@@ -349,28 +397,10 @@ where
     }
 }
 
-impl<R1, R2, Period> Div<Duration<R2, Period>> for Duration<R1, Period>
-where
-    R1: TimeRepresentation,
-    R2: TimeRepresentation,
-    R1: Div<R2>,
-    Period: Unit,
-{
-    type Output = <R1 as Div<R2>>::Output;
-
-    /// A `Duration` may be divided by another `Duration` of the same `Period` to obtain a unitless
-    /// number, reflecting the number of times that the one fits into the other. Note that
-    /// explicitly the raw output is returned rather than a `Duration` to signal that the result is
-    /// not a `Duration`, but simply a division.
-    fn div(self, rhs: Duration<R2, Period>) -> Self::Output {
-        self.count / rhs.count
-    }
-}
-
 impl<Representation, Period> Bounded for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + Bounded,
-    Period: Unit,
+    Representation: Bounded,
+    Period: ?Sized,
 {
     /// Returns the `Duration` value that is nearest to negative infinity.
     fn min_value() -> Self {
@@ -391,8 +421,8 @@ where
 
 impl<Representation, Period> Zero for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation,
-    Period: Unit,
+    Representation: Zero,
+    Period: ?Sized,
 {
     /// Returns a `Duration` value that represents no time passed.
     fn zero() -> Self {
@@ -410,8 +440,8 @@ where
 
 impl<Representation, Period> ConstZero for Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + ConstZero,
-    Period: Unit,
+    Representation: ConstZero,
+    Period: ?Sized,
 {
     const ZERO: Self = Self {
         count: Representation::ZERO,
@@ -421,8 +451,8 @@ where
 
 impl<Representation, Period> Duration<Representation, Period>
 where
-    Representation: TimeRepresentation + Signed,
-    Period: Unit,
+    Representation: Signed,
+    Period: ?Sized,
 {
     pub fn abs(&self) -> Self {
         Self {
@@ -454,6 +484,139 @@ where
     }
 }
 
+impl<Representation, Period> TryMul<Fraction> for Duration<Representation, Period>
+where
+    Representation: TryMul<Fraction>,
+    Period: ?Sized,
+{
+    type Output = Duration<<Representation as TryMul<Fraction>>::Output, Period>;
+
+    fn try_mul(self, rhs: Fraction) -> Option<Self::Output> {
+        Some(Duration {
+            count: self.count.try_mul(rhs)?,
+            period: core::marker::PhantomData,
+        })
+    }
+}
+
+impl<Representation, Period> TryMul<Duration<Representation, Period>> for Fraction
+where
+    Representation: TryMul<Fraction>,
+    Period: ?Sized,
+{
+    type Output = Duration<<Representation as TryMul<Fraction>>::Output, Period>;
+
+    fn try_mul(self, rhs: Duration<Representation, Period>) -> Option<Self::Output> {
+        Some(Duration {
+            count: rhs.count.try_mul(self)?,
+            period: core::marker::PhantomData,
+        })
+    }
+}
+
+impl<Representation, Period> MulRound<Fraction> for Duration<Representation, Period>
+where
+    Representation: MulRound<Fraction>,
+    Period: ?Sized,
+{
+    type Output = Duration<<Representation as MulRound<Fraction>>::Output, Period>;
+
+    fn mul_round(self, rhs: Fraction) -> Self::Output {
+        Duration {
+            count: self.count.mul_round(rhs),
+            period: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<Representation, Period> MulRound<Duration<Representation, Period>> for Fraction
+where
+    Representation: MulRound<Fraction>,
+    Period: ?Sized,
+{
+    type Output = Duration<<Representation as MulRound<Fraction>>::Output, Period>;
+
+    fn mul_round(self, rhs: Duration<Representation, Period>) -> Self::Output {
+        Duration {
+            count: rhs.count.mul_round(self),
+            period: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<Representation, Period> MulCeil<Fraction> for Duration<Representation, Period>
+where
+    Representation: MulCeil<Fraction>,
+    Period: ?Sized,
+{
+    type Output = Duration<<Representation as MulCeil<Fraction>>::Output, Period>;
+
+    fn mul_ceil(self, rhs: Fraction) -> Self::Output {
+        Duration {
+            count: self.count.mul_ceil(rhs),
+            period: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<Representation, Period> MulCeil<Duration<Representation, Period>> for Fraction
+where
+    Representation: MulCeil<Fraction>,
+    Period: ?Sized,
+{
+    type Output = Duration<<Representation as MulCeil<Fraction>>::Output, Period>;
+
+    fn mul_ceil(self, rhs: Duration<Representation, Period>) -> Self::Output {
+        Duration {
+            count: rhs.count.mul_ceil(self),
+            period: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<Representation, Period> MulFloor<Fraction> for Duration<Representation, Period>
+where
+    Representation: MulFloor<Fraction>,
+    Period: ?Sized,
+{
+    type Output = Duration<<Representation as MulFloor<Fraction>>::Output, Period>;
+
+    fn mul_floor(self, rhs: Fraction) -> Self::Output {
+        Duration {
+            count: self.count.mul_floor(rhs),
+            period: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<Representation, Period> MulFloor<Duration<Representation, Period>> for Fraction
+where
+    Representation: MulFloor<Fraction>,
+    Period: ?Sized,
+{
+    type Output = Duration<<Representation as MulFloor<Fraction>>::Output, Period>;
+
+    fn mul_floor(self, rhs: Duration<Representation, Period>) -> Self::Output {
+        Duration {
+            count: rhs.count.mul_floor(self),
+            period: core::marker::PhantomData,
+        }
+    }
+}
+
+impl<R1, R2, Period> TryFromExact<Duration<R2, Period>> for Duration<R1, Period>
+where
+    R1: TryFromExact<R2>,
+    Period: ?Sized,
+{
+    type Error = <R1 as TryFromExact<R2>>::Error;
+
+    fn try_from_exact(value: Duration<R2, Period>) -> Result<Self, Self::Error> {
+        let count = value.count.try_into_exact()?;
+        Ok(Duration::new(count))
+    }
+}
+
 /// Verification of the fact that conversions to SI units result in the expected ratios.
 #[test]
 fn convert_si_unit_seconds() {
@@ -480,7 +643,7 @@ fn convert_si_unit_seconds() {
 /// Verification of the fact that conversions to binary fractions result in the expected ratios.
 #[test]
 fn convert_binary_fraction_seconds() {
-    use crate::arithmetic::*;
+    use crate::units::*;
     let seconds = Seconds::new(1u64);
     let fraction1: Duration<_, BinaryFraction1> = seconds.into_unit();
     let fraction2: Duration<_, BinaryFraction2> = seconds.into_unit();
@@ -517,7 +680,7 @@ fn rounding_floats() {
 #[cfg(kani)]
 mod proof_harness {
     use super::*;
-    use crate::arithmetic::*;
+    use crate::units::*;
     use paste::paste;
 
     /// Macro for the creation of proof harnesses that verify (formally) that a given integer
@@ -530,19 +693,19 @@ mod proof_harness {
                 #[kani::proof]
                 fn [<roundtrip_ $to:lower _ $repr:lower>]() {
                     let a: Seconds<$repr> = kani::any();
-                    let numerator = <$repr as num::FromPrimitive>::from_i128(<$to>::RATIO.numerator());
-                    let denominator = <$repr as num::FromPrimitive>::from_i128(<$to>::RATIO.denominator());
+                    let numerator: Option<$repr> = <$to>::FRACTION.numerator().try_into().ok();
+                    let denominator: Option<$repr> = <$to>::FRACTION.denominator().try_into().ok();
 
                     // We only check this conversion if the numerator and denominator can actually
                     // be represented by the target representation. It doesn't make sense, for
                     // example, to check the conversion from seconds to milliseconds for a `u8`, for
                     // example, because the conversion factor 1_000 means that a valid
                     // `Seconds<u8>` cannot be converted to a valid `MilliSeconds<u8>`.
-                    if let (Some(_), Some(denominator)) = (numerator, denominator) {
+                    if let (Some(numerator), Some(denominator)) = (numerator, denominator) {
                         kani::assume(a <= Seconds::new(<$repr>::max_value() / denominator));
                         kani::assume(a >= Seconds::new(<$repr>::min_value() / denominator));
                         let b: Duration<_, $to> = a.into_unit();
-                        assert_eq!(b.count(), a.count().mul_naive(<$to>::RATIO.recip()));
+                        assert_eq!(b.count(), (a.count() * denominator) / numerator);
                         let c: Seconds<_> = b.try_into_unit().unwrap();
                         assert_eq!(a, c);
                     }
@@ -578,8 +741,8 @@ mod proof_harness {
                 #[kani::proof]
                 fn [<rounding_ $to:lower _ $repr:lower>]() {
                     let a: Seconds<$repr> = kani::any();
-                    let numerator = <$repr as num::FromPrimitive>::from_i128(<$to>::RATIO.numerator());
-                    let denominator = <$repr as num::FromPrimitive>::from_i128(<$to>::RATIO.denominator());
+                    let numerator: Option<$repr> = <$to>::FRACTION.numerator().try_into().ok();
+                    let denominator: Option<$repr> = <$to>::FRACTION.denominator().try_into().ok();
 
                     // We only check this conversion if the numerator and denominator can actually
                     // be represented by the target representation. It doesn't make sense, for
@@ -633,4 +796,23 @@ mod proof_harness {
     proof_rounding_all_integers!(SecondsPerWeek);
     proof_rounding_all_integers!(SecondsPerMonth);
     proof_rounding_all_integers!(SecondsPerYear);
+}
+
+/// Verifies that integer rounding logic is implemented correctly for some known values.
+#[test]
+fn rounding_integers() {
+    let thirteen_hours = Hours::new(13);
+    assert_eq!(thirteen_hours.round(), Days::new(1));
+
+    let eleven_hours = Hours::new(11);
+    assert_eq!(eleven_hours.round(), Days::new(0));
+
+    let six_days = Days::new(6);
+    assert_eq!(six_days.round(), Weeks::new(1));
+
+    let year_fraction = Days::new(550);
+    assert_eq!(year_fraction.round(), Years::new(2));
+
+    let seconds_per_minute = Seconds::new(-99i8);
+    assert_eq!(seconds_per_minute.round(), Minutes::new(-2));
 }

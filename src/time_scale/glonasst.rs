@@ -1,18 +1,22 @@
 //! Implementation of the GLONASS Time (GLONASST) time scale.
 
+use core::ops::Sub;
+
 use crate::{
-    DateTimeError, Days, LeapSecondError, LocalTime, TaiTime, TerrestrialTimeScale, TimePoint,
-    TimeScale, TryFromTimeScale, Unix, Utc,
-    arithmetic::{
-        FromUnit, Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute, TimeRepresentation,
-        TryFromExact, Unit,
-    },
+    ConvertUnit, Days, Fraction, FromLeapSecondDateTime, Hours, IntoLeapSecondDateTime,
+    IntoTimeScale, LeapSecondProvider, Minutes, MulFloor, Second, Seconds, TerrestrialTime,
+    TimePoint, TryIntoExact,
+    arithmetic::TryFromExact,
     calendar::{Date, Month},
+    errors::{InvalidGlonassDateTime, InvalidTimeOfDay},
+    time_scale::TimeScale,
+    units::{SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
 
 /// `GlonassTime` is a time point that is expressed according to the GLONASS Time time
 /// scale.
-pub type GlonassTime<Representation, Period = Second> = TimePoint<Glonasst, Representation, Period>;
+pub type GlonassTime<Representation = i64, Period = Second> =
+    TimePoint<Glonasst, Representation, Period>;
 
 /// The GLONASS Time (GLONASST) time scale is broadcast by GLONASS satellites. It follows UTC (or
 /// rather, UTC(SU), which is a realization of UTC) and adds three hours (Moscow time). Indeed,
@@ -21,132 +25,134 @@ pub type GlonassTime<Representation, Period = Second> = TimePoint<Glonasst, Repr
 pub struct Glonasst;
 
 impl TimeScale for Glonasst {
-    type NativePeriod = Second;
+    const NAME: &'static str = "Glonass Time";
 
-    type NativeRepresentation = i64;
+    const ABBREVIATION: &'static str = "GLONASST";
 
-    /// The GLONASS epoch is 1996-01-01T00:00:00 UTC(SU). However, the GLONASS broadcast time is
-    /// offset by +3h from UTC(SU) to match Moscow time. This means that its broadcast time (MSK)
-    /// would have been 0 at 1996-01-01T00:00:00 MSK, which is what we define as epoch.
-    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
-        Date::new(1996, Month::January, 1)
-            .unwrap()
-            .to_local_days()
-            .into_unit()
-            .try_cast()
-            .unwrap()
-    }
+    const EPOCH: Date<i32> = match Date::from_historic_date(1996, Month::January, 1) {
+        Ok(epoch) => epoch,
+        Err(_) => unreachable!(),
+    };
+}
 
-    fn from_local_datetime(
-        date: super::LocalDays<i64>,
+impl TerrestrialTime for Glonasst {
+    type Representation = u8;
+
+    type Period = SecondsPerHour;
+
+    /// GLONASS time is in line with Moscow time (MSK), which is 3 hours ahead of UTC. Since leap
+    /// seconds are accounted for in the date-time constructor, this means that GLONASST is three
+    /// hours ahead of TAI.
+    const TAI_OFFSET: Hours<u8> = Hours::new(3);
+}
+
+impl FromLeapSecondDateTime for GlonassTime<i64, Second> {
+    type Error = InvalidGlonassDateTime;
+
+    fn from_datetime(
+        date: Date<i32>,
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<TimePoint<Self, Self::NativeRepresentation, Self::NativePeriod>, DateTimeError>
-    where
-        Self::NativePeriod: FromUnit<SecondsPerDay, Self::NativeRepresentation>
-            + FromUnit<SecondsPerHour, Self::NativeRepresentation>
-            + FromUnit<SecondsPerMinute, Self::NativeRepresentation>
-            + FromUnit<Second, Self::NativeRepresentation>,
-        Second: FromUnit<SecondsPerDay, Self::NativeRepresentation>
-            + FromUnit<SecondsPerHour, Self::NativeRepresentation>
-            + FromUnit<SecondsPerMinute, Self::NativeRepresentation>
-            + FromUnit<Second, Self::NativeRepresentation>,
-    {
-        // First, we convert the requested datetime into the equivalent datetime in UTC. This is
-        // quite simple, because GLONASST is always exactly 3 hours ahead of UTC(SU), the
-        // realization of UTC by the Russian Federation.
-        let (date_utc, hour_utc) = {
-            let wrapped_hour = hour.wrapping_sub(3);
-            // Check whether we crossed a date boundary. Note that we check for <21 instead of <24
-            // to ensure that input times with hours of 24+ result in errors in the
-            // `Utc::from_local_datetime()` call.
-            if wrapped_hour < 21 {
-                // No wrapping occured
-                (date, wrapped_hour)
-            } else {
-                // Wrapping occured, so we correct by removing one day from the date
-                (date - Days::new(1), wrapped_hour.wrapping_add(24))
-            }
+        leap_second_provider: &impl LeapSecondProvider,
+    ) -> Result<Self, Self::Error> {
+        if hour > 23 || minute > 59 || second > 60 {
+            return Err(InvalidGlonassDateTime::InvalidTimeOfDay(InvalidTimeOfDay {
+                hour,
+                minute,
+                second,
+            }));
+        }
+
+        let utc_date = if hour < 3 { date - Days::new(1) } else { date };
+        let (is_leap_second, total_leap_seconds) =
+            leap_second_provider.leap_seconds_on_date(utc_date);
+        if second == 60 && !is_leap_second {
+            return Err(InvalidGlonassDateTime::NonLeapSecondDateTime {
+                date,
+                hour,
+                minute,
+                second,
+            });
+        }
+
+        let days_since_scale_epoch = {
+            let days_since_1970 = date.time_since_epoch();
+            let epoch_days_since_1970 = Glonasst::EPOCH.time_since_epoch();
+
+            // First we try to compute the difference by subtracting first and then converting into
+            // the target representation.
+            (days_since_1970 - epoch_days_since_1970).cast()
         };
 
-        // Finally, we may create the requested UTC time that corresponds with the requested
-        // GLONASS time. However, if we error, we must patch the errors to update them with the
-        // correct requested local datetimes.
-        let utc_time = match Utc::from_local_datetime(date_utc, hour_utc, minute, second) {
-            Ok(utc_time) => utc_time,
-            Err(error) => {
-                return Err(match error {
-                    DateTimeError::InvalidTimeOfDay { .. } => DateTimeError::InvalidTimeOfDay {
-                        hour,
-                        minute,
-                        second,
-                    },
-                    DateTimeError::NoLeapSecondInsertion { .. } => {
-                        DateTimeError::NoLeapSecondInsertion {
-                            date,
-                            hour,
-                            minute,
-                            second,
-                        }
-                    }
-                    DateTimeError::LeapSecondDeletion { .. } => DateTimeError::LeapSecondDeletion {
-                        date,
-                        hour,
-                        minute,
-                        second,
-                    },
-                    DateTimeError::NotRepresentable { .. } => DateTimeError::NotRepresentable {
-                        date,
-                        hour,
-                        minute,
-                        second,
-                    },
-                    DateTimeError::InvalidHistoricDate { .. } => unreachable!(),
-                    DateTimeError::InvalidGregorianDate { .. } => unreachable!(),
-                    DateTimeError::InvalidDayOfYear { .. } => unreachable!(),
-                });
-            }
-        };
-
-        // Finally, we may convert the resulting datetime back to GLONASST by subtracting the
-        // difference between the time scale epochs.
-        let seconds_since_utc = utc_time.elapsed_time_since_epoch();
-        let glonasst_epoch = Self::epoch_tai();
-        let utc_epoch = Utc::epoch_tai();
-        let epoch_difference = glonasst_epoch - utc_epoch;
-        let seconds_since_glonasst = seconds_since_utc - epoch_difference;
-        Ok(GlonassTime::from_time_since_epoch(seconds_since_glonasst))
+        let hours = Hours::new(hour).cast();
+        let minutes = Minutes::new(minute).cast();
+        let seconds = Seconds::new(second).cast();
+        let time_since_epoch = days_since_scale_epoch.into_unit()
+            + hours.into_unit()
+            + minutes.into_unit()
+            + seconds
+            + total_leap_seconds.cast();
+        Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
 }
 
-impl TerrestrialTimeScale for Glonasst {
-    fn epoch_tai() -> TaiTime<Self::NativeRepresentation, Self::NativePeriod> {
-        TaiTime::from_datetime(1995, Month::December, 31, 21, 0, 29)
-            .unwrap()
-            .into_unit()
+impl<Representation> IntoLeapSecondDateTime for GlonassTime<Representation, Second>
+where
+    Representation: Copy
+        + ConvertUnit<SecondsPerMinute, Second>
+        + ConvertUnit<SecondsPerHour, Second>
+        + ConvertUnit<SecondsPerDay, Second>
+        + MulFloor<Fraction, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + TryIntoExact<i32>
+        + TryIntoExact<u8>
+        + TryFromExact<u8>,
+    i64: TryFromExact<Representation>,
+{
+    fn into_datetime(
+        self,
+        leap_second_provider: &impl LeapSecondProvider,
+    ) -> (Date<i32>, u8, u8, u8) {
+        // Step-by-step factoring of the time since epoch into days, hours, minutes, and seconds.
+        let seconds_since_scale_epoch = self.time_since_epoch();
+
+        let time_i64 = self
             .try_cast()
-            .unwrap()
-    }
-}
+            .unwrap_or_else(|_| panic!())
+            .into_time_scale();
+        let (is_leap_second, leap_seconds) = leap_second_provider.leap_seconds_at_time(time_i64);
+        let leap_seconds = leap_seconds.try_into_exact().unwrap_or_else(|_| panic!());
 
-impl TryFromTimeScale<Unix> for Glonasst {
-    type Error = LeapSecondError;
+        let seconds_since_scale_epoch = seconds_since_scale_epoch - leap_seconds;
+        let (days_since_scale_epoch, seconds_in_day) =
+            seconds_since_scale_epoch.factor_out::<SecondsPerDay>();
+        let days_since_scale_epoch: Days<i32> = days_since_scale_epoch
+            .try_cast()
+            .unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in days since scale epoch outside of `i32` range"));
+        let (hour, seconds_in_hour) = seconds_in_day.factor_out::<SecondsPerHour>();
+        let (minute, second) = seconds_in_hour.factor_out::<SecondsPerMinute>();
+        // This last step will be a no-op for integer representations, but is necessary for float
+        // representations.
+        let second = second.floor::<Second>();
+        let days_since_universal_epoch =
+            Glonasst::EPOCH.time_since_epoch() + days_since_scale_epoch;
+        let date = Date::from_time_since_epoch(days_since_universal_epoch);
 
-    fn try_from_time_scale<Representation, Period>(
-        from: TimePoint<Unix, Representation, Period>,
-    ) -> Result<TimePoint<Self, Representation, Period>, Self::Error>
-    where
-        Period: Unit
-            + FromUnit<<Unix as TimeScale>::NativePeriod, <Unix as TimeScale>::NativeRepresentation>
-            + FromUnit<Self::NativePeriod, Self::NativeRepresentation>
-            + FromUnit<Second, Representation>,
-        Representation: TimeRepresentation
-            + TryFromExact<<Unix as TimeScale>::NativeRepresentation>
-            + TryFromExact<Self::NativeRepresentation>,
-    {
-        let utc_time = Utc::try_from_time_scale(from)?;
-        Ok(utc_time.into_time_scale())
+        if is_leap_second {
+            let date = (date - Days::new(1)).try_cast().expect("Call of `datetime_from_time_point` results in date outside of representable range of `i32`");
+            (date, 23, 59, 60)
+        } else {
+            (
+            // We must narrow-cast all results, but only the cast of `date` may fail. The rest will
+            // always succeed by construction: hour < 24, minute < 60, second < 60, so all fit in `u8`.
+            date.try_cast()
+                .expect("Call of `datetime_from_time_point` results in date outside of representable range of `i32`"),
+            hour.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in hour value that cannot be expressed as `u8`")),
+            minute.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in minute value that cannot be expressed as `u8`")),
+            second.count().try_into_exact().unwrap_or_else(|_| panic!("Call of `datetime_from_time_point` results in second value that cannot be expressed as `u8`")),
+        )
+        }
     }
 }
 
@@ -157,26 +163,28 @@ impl TryFromTimeScale<Unix> for Glonasst {
 /// both times, and we also verify that the second is really the zero-duration point of this type.
 #[test]
 fn known_timestamps() {
-    use crate::{Seconds, UtcTime};
-    let utc = UtcTime::from_datetime(1996, Month::January, 1, 0, 0, 0).unwrap();
-    let glonasst = GlonassTime::from_datetime(1996, Month::January, 1, 3, 0, 0).unwrap();
-    assert_eq!(utc, glonasst.into_time_scale());
+    use crate::{IntoTimeScale, Seconds, UtcTime};
+    let utc = UtcTime::from_historic_datetime(1996, Month::January, 1, 0, 0, 0).unwrap();
+    let glonasst = GlonassTime::from_historic_datetime(1996, Month::January, 1, 3, 0, 0).unwrap();
+    assert_eq!(utc.into_time_scale(), glonasst);
 
-    let utc = UtcTime::from_datetime(1995, Month::December, 31, 21, 0, 0).unwrap();
-    let glonasst = GlonassTime::from_datetime(1996, Month::January, 1, 0, 0, 0).unwrap();
+    let utc = UtcTime::from_historic_datetime(1995, Month::December, 31, 21, 0, 0).unwrap();
+    let glonasst = GlonassTime::from_historic_datetime(1996, Month::January, 1, 0, 0, 0).unwrap();
     assert_eq!(utc, glonasst.into_time_scale());
-    assert_eq!(glonasst.elapsed_time_since_epoch(), Seconds::new(0));
+    // At the epoch time, 29 leap seconds are applied - this is the only offset that remains.
+    assert_eq!(glonasst.time_since_epoch(), Seconds::new(29));
 }
 
 #[cfg(test)]
 fn date_roundtrip(year: i32, month: Month, day: u8, hour: u8, minute: u8, second: u8) {
-    let time = GlonassTime::from_datetime(year, month, day, hour, minute, second).unwrap();
-    assert_eq!(time.gregorian_date().year(), year);
-    assert_eq!(time.gregorian_date().month(), month);
-    assert_eq!(time.gregorian_date().day(), day);
-    assert_eq!(time.gregorian_date_hms().1, hour);
-    assert_eq!(time.gregorian_date_hms().2, minute);
-    assert_eq!(time.gregorian_date_hms().3, second);
+    let time = GlonassTime::from_historic_datetime(year, month, day, hour, minute, second).unwrap();
+    let (date, hour2, minute2, second2) = time.into_gregorian_datetime();
+    assert_eq!(date.year(), year);
+    assert_eq!(date.month(), month);
+    assert_eq!(date.day(), day);
+    assert_eq!(hour2, hour);
+    assert_eq!(minute2, minute);
+    assert_eq!(second2, second);
 }
 
 #[test]

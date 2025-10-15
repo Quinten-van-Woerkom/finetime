@@ -1,79 +1,170 @@
-//! Implementation of the Geocentric Coordinate Time (TCG) time scale.
+//! Implementation of Geocentric Coordinate Time (TCG), describing the proper time experienced by a
+//! clock at rest in a coordinate frame co-moving with the center of the Earth.
+
+use core::ops::{Add, Sub};
 
 use crate::{
-    Date, FromTimeScale, LocalTime, MilliSeconds, Month, TimePoint, TimeScale, Tt, TtTime,
-    arithmetic::{Fraction, FromUnit, Milli, Second, TimeRepresentation, TryFromExact, Unit},
+    ConvertUnit, Date, Fraction, FromTimeScale, IntoTimeScale, MilliSeconds, Month, MulRound,
+    TerrestrialTime, TimePoint, TryFromExact, Tt, TtTime,
+    time_scale::{TimeScale, datetime::UniformDateTimeScale},
+    units::{Milli, Second, SecondsPerDay},
 };
 
-/// `TcgTime` is a specialization of `TimePoint` that uses the Geocentric Coordinate Time (TCG)
-/// time scale.
-pub type TcgTime<Representation, Period = Second> = TimePoint<Tcg, Representation, Period>;
+pub type TcgTime<Representation = i64, Period = Second> = TimePoint<Tcg, Representation, Period>;
 
-/// The Geocentric Coordinate Time (TCG) is the time of a hypothetical clock that is placed at the
-/// center of the non-rotating geocentric reference frame.
+/// Time scale representing the Geocentric Coordinate Time (TCG). This scale is equivalent to the
+/// proper time as experienced by an (idealistic) clock outside of Earth's gravity well, but
+/// co-moving with the Earth. The resulting proper time is useful as independent variable for
+/// high-accuracy ephemerides for Earth satellites, and as intermediate variable when transforming
+/// into barycentric coordinate time.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Tcg;
 
 impl TimeScale for Tcg {
-    type NativePeriod = Milli;
+    const NAME: &'static str = "Geocentric Coordinate Time";
 
-    type NativeRepresentation = i128;
+    const ABBREVIATION: &'static str = "TCG";
 
-    /// For practical reasons (conversion to and from TT), it is convenient to set the TCG epoch to
-    /// 1977-01-01T00:00:32.184: at this time, TT and TCG match exactly (by definition).
-    fn epoch() -> LocalTime<Self::NativeRepresentation, Self::NativePeriod> {
-        let date = Date::new(1977, Month::January, 1).unwrap();
-        let epoch = date.to_local_days().into_unit() + MilliSeconds::new(32_184);
-        epoch.try_cast().unwrap()
+    const EPOCH: Date<i32> = match Date::from_historic_date(1977, Month::January, 1) {
+        Ok(epoch) => epoch,
+        Err(_) => unreachable!(),
+    };
+}
+
+impl UniformDateTimeScale for Tcg {}
+
+/// This constant describes the rate difference of terrestrial time with respect to TCG. It is the
+/// number of seconds that terrestrial time is slower per second.
+const L_G: Fraction = Fraction::new(3_484_645_067, 5_000_000_000_000_000_000);
+const L_G_INV: Fraction = Fraction::new(3_484_645_067, 4_999_999_996_515_354_933);
+
+impl<Representation, Period> TcgTime<Representation, Period>
+where
+    Representation: Copy
+        + From<u16>
+        + Add<Representation, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + ConvertUnit<Milli, Period>
+        + MulRound<Fraction, Output = Representation>,
+{
+    fn into_tt(self) -> TtTime<Representation, Period> {
+        let epoch_offset = MilliSeconds::new(32_184u16).cast().into_unit();
+        let tcg_since_1977_01_01 = self.time_since_epoch();
+        let tcg_since_1977_01_01_00_00_32_184 = tcg_since_1977_01_01 - epoch_offset;
+        let rate_difference = tcg_since_1977_01_01_00_00_32_184.mul_round(L_G);
+        let tt_since_1977_01_01_00_00_32_184 = tcg_since_1977_01_01_00_00_32_184 - rate_difference;
+        TtTime::from_time_since_epoch(epoch_offset) + tt_since_1977_01_01_00_00_32_184
+    }
+
+    fn from_tt(tt_time: TtTime<Representation, Period>) -> Self {
+        let epoch_offset = MilliSeconds::new(32_184u16).cast().into_unit();
+        let tt_since_1977_01_01 = tt_time.time_since_epoch();
+        let tt_since_1977_01_01_00_00_32_184 = tt_since_1977_01_01 - epoch_offset;
+        let rate_difference = tt_since_1977_01_01_00_00_32_184.mul_round(L_G_INV);
+        let tcg_since_1977_01_01_00_00_32_184 = tt_since_1977_01_01_00_00_32_184 + rate_difference;
+        TcgTime::from_time_since_epoch(epoch_offset) + tcg_since_1977_01_01_00_00_32_184
     }
 }
 
-impl FromTimeScale<Tcg> for Tt {
-    fn from_time_scale<Representation, Period>(
-        from: TimePoint<Tcg, Representation, Period>,
-    ) -> TimePoint<Tt, Representation, Period>
-    where
-        Period: Unit,
-        Representation: TimeRepresentation
-            + TryFromExact<<Tcg as TimeScale>::NativeRepresentation>
-            + TryFromExact<<Tt as TimeScale>::NativeRepresentation>,
-        Period:
-            FromUnit<<Tcg as TimeScale>::NativePeriod, <Tcg as TimeScale>::NativeRepresentation>,
-        Period: FromUnit<<Tt as TimeScale>::NativePeriod, <Tt as TimeScale>::NativeRepresentation>,
-    {
-        // We encode the conversion factor (= (1.0 - 6.969290134e-10)) as an exact fraction, such
-        // that integer arithmetic can be done to exact precision, even when some rounding is
-        // needed at the end of the conversion. This exactness is warranted by the fact that this
-        // is a defining constant: hence, analytic exactness is actually meaningful and not an
-        // approximation.
-        const CONVERSION_FACTOR: Fraction = Fraction::new(4999999996515354933, 5000000000000000000);
-        let tcg_time_since_epoch = from.elapsed_time_since_epoch();
-        let tt_time_since_epoch = tcg_time_since_epoch.multiply_fraction(CONVERSION_FACTOR);
-        TtTime::from_time_since_epoch(tt_time_since_epoch)
+impl<Scale, Representation, Period> FromTimeScale<Scale, Representation, Period>
+    for TcgTime<Representation, Period>
+where
+    Scale: TerrestrialTime,
+    Representation: Copy
+        + Add<Representation, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + From<<Tt as TerrestrialTime>::Representation>
+        + From<Scale::Representation>
+        + TryFromExact<i32>
+        + ConvertUnit<<Tt as TerrestrialTime>::Period, Period>
+        + ConvertUnit<Scale::Period, Period>
+        + ConvertUnit<SecondsPerDay, Period>
+        + PartialOrd
+        + MulRound<Fraction, Output = Representation>,
+{
+    fn from_time_scale(time_point: TimePoint<Scale, Representation, Period>) -> Self {
+        let tt_time = TtTime::from_time_scale(time_point);
+        Self::from_tt(tt_time)
     }
 }
 
-impl FromTimeScale<Tt> for Tcg {
-    fn from_time_scale<Representation, Period>(
-        from: TimePoint<Tt, Representation, Period>,
-    ) -> TimePoint<Tcg, Representation, Period>
-    where
-        Period: Unit,
-        Representation: TimeRepresentation
-            + TryFromExact<<Tt as TimeScale>::NativeRepresentation>
-            + TryFromExact<Self::NativeRepresentation>,
-        Period: FromUnit<<Tt as TimeScale>::NativePeriod, <Tt as TimeScale>::NativeRepresentation>,
-        Period: FromUnit<Self::NativePeriod, Self::NativeRepresentation>,
-    {
-        // We encode the conversion factor (= (1.0 - 6.969290134e-10)) as an exact fraction, such
-        // that integer arithmetic can be done to exact precision, even when some rounding is
-        // needed at the end of the conversion. This exactness is warranted by the fact that this
-        // is a defining constant: hence, analytic exactness is actually meaningful and not an
-        // approximation.
-        const CONVERSION_FACTOR: Fraction = Fraction::new(5000000000000000000, 4999999996515354933);
-        let tt_time_since_epoch = from.elapsed_time_since_epoch();
-        let tcg_time_since_epoch = tt_time_since_epoch.multiply_fraction(CONVERSION_FACTOR);
-        TcgTime::from_time_since_epoch(tcg_time_since_epoch)
+impl<Scale, Representation, Period> FromTimeScale<Tcg, Representation, Period>
+    for TimePoint<Scale, Representation, Period>
+where
+    Scale: TerrestrialTime,
+    Representation: Copy
+        + Add<Representation, Output = Representation>
+        + Sub<Representation, Output = Representation>
+        + MulRound<Fraction, Output = Representation>
+        + From<<Tt as TerrestrialTime>::Representation>
+        + From<Scale::Representation>
+        + TryFromExact<i32>
+        + ConvertUnit<<Tt as TerrestrialTime>::Period, Period>
+        + ConvertUnit<Scale::Period, Period>
+        + ConvertUnit<SecondsPerDay, Period>
+        + PartialOrd,
+{
+    fn from_time_scale(tcg_time: TcgTime<Representation, Period>) -> Self {
+        let tt_time = tcg_time.into_tt();
+        tt_time.into_time_scale()
+    }
+}
+
+/// Compares with a known timestamp as obtained from the definition of TCG.
+#[test]
+fn known_timestamps() {
+    use crate::{IntoTimeScale, Month, TaiTime};
+    let tai = TaiTime::from_historic_datetime(1977, Month::January, 1, 0, 0, 0).unwrap();
+    let tcg = TcgTime::from_fine_historic_datetime(
+        1977,
+        Month::January,
+        1,
+        0,
+        0,
+        32,
+        MilliSeconds::new(184i64),
+    )
+    .unwrap();
+    let tai_tt: TtTime<_, _> = tai.into_unit().into_time_scale();
+    let tcg_tt: TtTime<_, _> = tcg.into_time_scale();
+    assert_eq!(tai_tt, tcg_tt);
+
+    let tt = TtTime::from_fine_historic_datetime(
+        1977,
+        Month::January,
+        1,
+        0,
+        0,
+        32,
+        MilliSeconds::new(184),
+    )
+    .unwrap();
+    let tcg = TcgTime::from_fine_historic_datetime(
+        1977,
+        Month::January,
+        1,
+        0,
+        0,
+        32,
+        MilliSeconds::new(184i64),
+    )
+    .unwrap();
+    assert_eq!(tt, tcg.into_time_scale());
+}
+
+/// Verifies that conversion to and from TCG/TAI preserves identity.
+#[test]
+fn check_roundtrip() {
+    use crate::IntoTimeScale;
+    use rand::prelude::*;
+    let mut rng = rand_chacha::ChaCha12Rng::seed_from_u64(44);
+    for _ in 0..10_000 {
+        let milliseconds_since_epoch = rng.random::<u64>();
+        let time_since_epoch = MilliSeconds::new(milliseconds_since_epoch);
+        let tt = TtTime::from_time_since_epoch(time_since_epoch);
+        let tcg: TcgTime<_, _> = TcgTime::from_time_scale(tt);
+        let tt2 = tcg.into_time_scale();
+        assert_eq!(tt, tt2);
     }
 }
 
@@ -81,128 +172,14 @@ impl FromTimeScale<Tt> for Tcg {
 mod proof_harness {
     use super::*;
 
-    /// Verifies that construction of a TCG time from a historic date and time stamp never panics.
-    /// An assumption is made on the input range because some dates result in a count of
-    /// milliseconds from the TCG epoch that is too large to store in an `i64`.
+    /// Verifies that construction of a TCG from a date and time stamp never panics.
     #[kani::proof]
     fn from_datetime_never_panics() {
-        let year: i32 = kani::any();
-        let month: Month = kani::any();
-        let day: u8 = kani::any();
+        use crate::FromDateTime;
+        let date: Date<i32> = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = TcgTime::from_datetime(year, month, day, hour, minute, second);
+        let _ = TcgTime::from_datetime(date, hour, minute, second);
     }
-
-    /// Verifies that construction of a TCG time from a Gregorian date and time stamp never panics.
-    /// An assumption is made on the input range because some dates result in a count of
-    /// milliseconds from the TCG epoch that is too large to store in an `i64`.
-    #[kani::proof]
-    fn from_gregorian_never_panics() {
-        let year: i32 = kani::any();
-        let month: Month = kani::any();
-        let day: u8 = kani::any();
-        let hour: u8 = kani::any();
-        let minute: u8 = kani::any();
-        let second: u8 = kani::any();
-        let _ = TcgTime::from_gregorian_datetime(year, month, day, hour, minute, second);
-    }
-
-    /// Verifies that all valid TCG time datetimes can be converted to and from the equivalent TT
-    /// time without panics. An assumption is made on the input range because some dates result
-    /// in a count of milliseconds from the TCG epoch that is too large to store in an `i64`.
-    #[kani::proof]
-    fn datetime_tt_tcg_roundtrip() {
-        let date: Date = kani::any();
-        let year: i32 = date.year();
-        let month: Month = date.month();
-        let day: u8 = date.day();
-        let hour: u8 = kani::any();
-        let minute: u8 = kani::any();
-        let second: u8 = kani::any();
-        kani::assume(hour < 24);
-        kani::assume(minute < 60);
-        kani::assume(second < 60);
-        let time1: TcgTime<i128, crate::arithmetic::Nano> =
-            TcgTime::from_datetime(year, month, day, hour, minute, second)
-                .unwrap()
-                .cast()
-                .into_unit();
-        let tt: TtTime<_, _> = time1.into_time_scale();
-        let _: TcgTime<_, _> = tt.into_time_scale();
-    }
-}
-
-/// Verifies the TT-TCG conversion using some known values.
-#[test]
-fn datetime_tt_tcg_conversion() {
-    use crate::Month::*;
-    use crate::arithmetic::{Atto, Micro, Pico};
-    use crate::{MicroSeconds, NanoSeconds, Seconds};
-
-    // At the epoch 1977-01-01T00:00:32.184, both time stamps should be exactly equivalent. We
-    // check this to attosecond precision, because there should be no overflow anyway at the epoch.
-    let time1 = TcgTime::from_subsecond_generic_datetime(
-        Date::new(1977, January, 1).unwrap(),
-        0,
-        0,
-        32,
-        MilliSeconds::new(184i64),
-    )
-    .unwrap()
-    .into_unit::<Atto>();
-    let time2 = TtTime::from_subsecond_generic_datetime(
-        Date::new(1977, January, 1).unwrap(),
-        0,
-        0,
-        32,
-        MilliSeconds::new(184i64),
-    )
-    .unwrap()
-    .into_unit::<Atto>();
-    assert_eq!(time1, time2.into_time_scale());
-
-    // 10_000_000_000 seconds after that epoch, there should be a difference of 6.969290134 seconds
-    // based on the known rate difference of L_G = 6.969290134e-10. We check this to picosecond
-    // precision: the offset shall be exactly 6.969290134000 seconds (to picosecond accuracy),
-    // since this rate difference is a defining constant (not just an approximation).
-    let time1 = time1.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).into_unit();
-    let time2 = time2.cast::<i128>().round::<Pico>() + Seconds::new(10_000_000_000i128).into_unit()
-        - NanoSeconds::new(6_969_290_134i128).into_unit();
-    assert_eq!(time1.into_time_scale(), time2);
-
-    // At J2000, the difference should be about 505.833 ms (see "Report of the IAU WGAS Sub-group
-    // on Issues on Time", P.K. Seidelmann).
-    let time1 = TtTime::from_datetime(2000, January, 1, 12, 0, 0)
-        .unwrap()
-        .into_unit::<Micro>();
-    let time2 = TcgTime::from_subsecond_generic_datetime(
-        Date::new(2000, January, 1).unwrap(),
-        12,
-        0,
-        0,
-        MicroSeconds::new(505_833),
-    )
-    .unwrap()
-    .into_unit();
-    assert_eq!(time1.into_time_scale(), time2);
-
-    // At J2100 (2100-01-01T12:00:00 TT), the difference should be 2.70517411 seconds (see "Report
-    // of the IAU WGAS Sub-group on Issues on Time", P.K. Seidelmann). Redoing the math using
-    // exact arithmetic leads to an expected result of 2.705173778 seconds (which is also our
-    // result), so we only check this to microsecond precision.
-    let time1 = TtTime::from_datetime(2100, January, 1, 12, 0, 0)
-        .unwrap()
-        .into_unit::<Micro>();
-    let time2 = TcgTime::from_subsecond_generic_datetime(
-        Date::new(2100, January, 1).unwrap(),
-        12,
-        0,
-        2,
-        NanoSeconds::new(705_174_110),
-    )
-    .unwrap()
-    .round::<Micro>();
-    assert_eq!(time1.into_time_scale(), time2);
 }
