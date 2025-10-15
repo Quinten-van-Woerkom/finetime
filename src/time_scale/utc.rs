@@ -1,6 +1,6 @@
 //! Implementation of Coordinated Universal Time (UTC).
 
-use core::ops::{Add, Sub};
+use core::ops::Sub;
 
 use crate::{
     ConvertUnit, Date, Days, Fraction, FromDateTime, Hours, IntoDateTime, LeapSecondProvider,
@@ -40,7 +40,7 @@ impl TimeScale for Utc {
     /// useful, because users may choose to permit "proleptic" UTC dates before 1972 by using a
     /// signed representation, but may also choose to forbid it by using unsigned arithmetic, which
     /// leads to easy-to-detect underflows whenever an ambiguous pre-1972 UTC date-time is created.
-    const EPOCH: Date<i32> = match Date::from_gregorian_date(1972, Month::January, 1) {
+    const EPOCH: Date<i32> = match Date::from_historic_date(1972, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };
@@ -57,16 +57,7 @@ impl TerrestrialTime for Utc {
     const TAI_OFFSET: Years<u8> = Years::new(0);
 }
 
-impl<Representation> FromDateTime for UtcTime<Representation, Second>
-where
-    Representation: ConvertUnit<SecondsPerMinute, Second>
-        + ConvertUnit<SecondsPerHour, Second>
-        + ConvertUnit<SecondsPerDay, Second>
-        + Add<Representation, Output = Representation>
-        + Sub<Representation, Output = Representation>
-        + TryFromExact<i32>
-        + TryFromExact<u8>,
-{
+impl FromDateTime for UtcTime<i64, Second> {
     type Error = InvalidUtcDateTime;
 
     fn from_datetime(
@@ -100,37 +91,17 @@ where
 
             // First we try to compute the difference by subtracting first and then converting into
             // the target representation.
-            let difference = (days_since_1970 - epoch_days_since_1970).try_cast::<Representation>();
-            if let Ok(difference) = difference {
-                difference
-            } else {
-                // If that fails, we try first casting into the target representation and then
-                // subtracting. If that also fails, we just error.
-                days_since_1970
-                    .try_cast::<Representation>()
-                    .unwrap_or_else(|_| panic!())
-                    - epoch_days_since_1970
-                        .try_cast::<Representation>()
-                        .unwrap_or_else(|_| panic!())
-            }
+            (days_since_1970 - epoch_days_since_1970).cast()
         };
 
-        let hours = Hours::new(hour)
-            .try_cast::<Representation>()
-            .unwrap_or_else(|_| panic!());
-        let minutes = Minutes::new(minute)
-            .try_cast::<Representation>()
-            .unwrap_or_else(|_| panic!());
-        let seconds = Seconds::new(second)
-            .try_cast::<Representation>()
-            .unwrap_or_else(|_| panic!());
+        let hours = Hours::new(hour).cast();
+        let minutes = Minutes::new(minute).cast();
+        let seconds = Seconds::new(second).cast();
         let time_since_epoch = days_since_scale_epoch.into_unit()
             + hours.into_unit()
             + minutes.into_unit()
             + seconds
-            + total_leap_seconds
-                .try_cast::<Representation>()
-                .unwrap_or_else(|_| panic!());
+            + total_leap_seconds.cast();
         Ok(TimePoint::from_time_since_epoch(time_since_epoch))
     }
 }
@@ -152,7 +123,7 @@ where
         // Step-by-step factoring of the time since epoch into days, hours, minutes, and seconds.
         let seconds_since_scale_epoch = self.time_since_epoch();
 
-        let time_i64 = self.try_into_exact().unwrap_or_else(|_| panic!());
+        let time_i64 = self.try_cast().unwrap_or_else(|_| panic!());
         let (is_leap_second, leap_seconds) =
             StaticLeapSecondProvider {}.leap_seconds_at_time(time_i64);
         let leap_seconds = leap_seconds.try_into_exact().unwrap_or_else(|_| panic!());

@@ -1,7 +1,7 @@
 //! Representation of Galileo System Time (GST), which is broadcast by the Galileo constellation.
 
 use crate::{
-    UniformDateTimeScale, Date, Duration, Month, Seconds, TerrestrialTime, TimePoint,
+    Date, Duration, Month, Seconds, TerrestrialTime, TimePoint, UniformDateTimeScale,
     time_scale::TimeScale, units::Second,
 };
 
@@ -19,7 +19,7 @@ impl TimeScale for Gst {
 
     const ABBREVIATION: &'static str = "GST";
 
-    const EPOCH: Date<i32> = match Date::from_gregorian_date(1999, Month::August, 22) {
+    const EPOCH: Date<i32> = match Date::from_historic_date(1999, Month::August, 22) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };

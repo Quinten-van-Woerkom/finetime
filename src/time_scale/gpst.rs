@@ -1,7 +1,7 @@
 //! Implementation of the time broadcast by the Global Positioning System (GPS).
 
 use crate::{
-    UniformDateTimeScale, Date, Duration, Month, Seconds, TerrestrialTime, TimePoint,
+    Date, Duration, Month, Seconds, TerrestrialTime, TimePoint, UniformDateTimeScale,
     time_scale::TimeScale, units::Second,
 };
 
@@ -18,7 +18,7 @@ impl TimeScale for Gpst {
 
     const ABBREVIATION: &'static str = "GPST";
 
-    const EPOCH: Date<i32> = match Date::from_gregorian_date(1980, Month::January, 6) {
+    const EPOCH: Date<i32> = match Date::from_historic_date(1980, Month::January, 6) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };

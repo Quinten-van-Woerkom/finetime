@@ -19,7 +19,7 @@ impl TimeScale for Qzsst {
 
     const ABBREVIATION: &'static str = "QZSST";
 
-    const EPOCH: Date<i32> = match Date::from_gregorian_date(1999, Month::August, 22) {
+    const EPOCH: Date<i32> = match Date::from_historic_date(1999, Month::August, 22) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };

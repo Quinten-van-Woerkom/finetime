@@ -19,7 +19,7 @@ impl TimeScale for Tai {
 
     const ABBREVIATION: &'static str = "TAI";
 
-    const EPOCH: Date<i32> = match Date::from_gregorian_date(1958, Month::January, 1) {
+    const EPOCH: Date<i32> = match Date::from_historic_date(1958, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };

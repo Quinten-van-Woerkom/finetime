@@ -19,7 +19,7 @@ impl TimeScale for Tt {
 
     const ABBREVIATION: &'static str = "TT";
 
-    const EPOCH: Date<i32> = match Date::from_gregorian_date(1977, Month::January, 1) {
+    const EPOCH: Date<i32> = match Date::from_historic_date(1977, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),
     };
@@ -71,7 +71,7 @@ mod proof_harness {
     use crate::TaiTime;
 
     /// Verifies that construction of a terrestrial time from a date and time stamp never
-    /// panics.
+    /// panics, even for invalid date-time inputs.
     #[kani::proof]
     fn from_datetime_never_panics() {
         use crate::FromDateTime;
@@ -79,15 +79,14 @@ mod proof_harness {
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
         let second: u8 = kani::any();
-        let _ = TtTime::<i64, Second>::from_datetime(date, hour, minute, second);
+        let _ = TtTime::from_datetime(date, hour, minute, second);
     }
 
     /// Verifies that all valid terrestrial time datetimes can be losslessly converted to and from
     /// the equivalent TAI time.
     #[kani::proof]
     fn datetime_tai_roundtrip() {
-        use crate::units::Milli;
-        use crate::{FromDateTime, IntoTimeScale};
+        use crate::{FromDateTime, IntoTimeScale, units::Milli};
         let date: Date<i32> = kani::any();
         let hour: u8 = kani::any();
         let minute: u8 = kani::any();
@@ -95,10 +94,11 @@ mod proof_harness {
         kani::assume(hour < 24);
         kani::assume(minute < 60);
         kani::assume(second < 60);
-        let time1 = TtTime::<i64, Milli>::from_datetime(date, hour, minute, second);
+        let time1 = TtTime::from_datetime(date, hour, minute, second);
         if let Ok(time1) = time1 {
-            let tai: TaiTime<i64, _> = time1.into_scale();
-            let time2: TtTime<i64, _> = tai.into_scale();
+            let time1: TtTime<_, Milli> = time1.into_unit();
+            let tai: TaiTime<i64, _> = time1.into_time_scale();
+            let time2: TtTime<i64, _> = tai.into_time_scale();
             assert_eq!(time1, time2);
         }
     }
