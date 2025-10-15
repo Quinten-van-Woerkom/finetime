@@ -173,7 +173,10 @@ where
 }
 
 #[cfg(kani)]
-impl<Representation: kani::Arbitrary, Period> kani::Arbitrary for Duration<Representation, Period> {
+impl<Representation: kani::Arbitrary, Period> kani::Arbitrary for Duration<Representation, Period>
+where
+    Period: ?Sized,
+{
     fn any() -> Self {
         Duration::new(kani::any())
     }

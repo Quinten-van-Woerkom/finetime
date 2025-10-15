@@ -316,6 +316,6 @@ mod proof_harness {
     fn date_conversion_well_defined() {
         let date: Date<i32> = kani::any();
         let historic_date = HistoricDate::from_date(date);
-        let _ = historic_date.to_date();
+        let _ = historic_date.into_date();
     }
 }

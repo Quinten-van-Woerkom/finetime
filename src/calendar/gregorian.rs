@@ -253,6 +253,6 @@ mod proof_harness {
     fn date_conversion_well_defined() {
         let date: Date<i32> = kani::any();
         let gregorian_date = GregorianDate::from_date(date);
-        let _ = gregorian_date.to_date();
+        let _ = gregorian_date.into_date();
     }
 }

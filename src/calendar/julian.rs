@@ -251,6 +251,6 @@ mod proof_harness {
     fn date_conversion_well_defined() {
         let date: Date<i32> = kani::any();
         let julian_date = JulianDate::from_date(date);
-        let _ = julian_date.to_date();
+        let _ = julian_date.into_date();
     }
 }
