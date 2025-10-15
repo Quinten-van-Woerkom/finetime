@@ -39,7 +39,7 @@ There is also support for subsecond datetime values, and conversion into more fi
 ```rust
 use finetime::{UtcTime, TtTime, Month, MilliSeconds, IntoTimeScale};
 let epoch_utc = UtcTime::from_historic_datetime(2025, Month::August, 3, 20, 25, 42).unwrap();
-let epoch_tt = TtTime::from_fine_historic_datetime(2025, Month::August, 3, 20, 26, 51, MilliSeconds::new(184i64)).unwrap();
+let epoch_tt = TtTime::from_fine_historic_datetime(2025, Month::August, 3, 20, 26, 51, MilliSeconds::new(184)).unwrap();
 assert_eq!(epoch_utc.into_unit().into_time_scale(), epoch_tt);
 ```
 These conversions must always be performed explicitly via the `into_unit()` method: this ensures that units are not accidentally mixed. If this is not done, `finetime` simply refuses to compile unit-ambiguous expressions.
@@ -71,7 +71,7 @@ use finetime::{TaiTime, Month, Seconds, Second};
 let epoch1 = TaiTime::from_historic_datetime(2016, Month::December, 31, 23, 59, 59).unwrap();
 let _ = TaiTime::from_historic_datetime(2016, Month::December, 31, 23, 59, 60).unwrap_err();
 let epoch3 = TaiTime::from_historic_datetime(2017, Month::January, 1, 0, 0, 0).unwrap();
-assert_eq!(epoch3 - epoch1, Seconds::new(1i64));
+assert_eq!(epoch3 - epoch1, Seconds::new(1));
 ```
 
 As with `TimePoint`s, unit compatibility is checked at compile time, with conversions permit using the `into_unit()` method:
