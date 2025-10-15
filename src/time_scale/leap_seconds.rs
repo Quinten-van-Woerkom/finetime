@@ -27,20 +27,45 @@ pub trait LeapSecondProvider {
 
 /// This trait is the leap second equivalent of `FromDateTime`. It permits the creation of time
 /// points from date-times when a non-standard leap second provider must be used.
-pub trait FromLeapSecondDateTime: FromDateTime {
+pub trait FromLeapSecondDateTime: Sized {
+    type Error: core::error::Error;
+
     /// Maps a given combination of date and time-of-day to an instant on this time scale. May
     /// return an error if the input does not represent a valid combination of date and
     /// time-of-day.
     ///
     /// Takes a leap second provider as additional argument, which is used to determine at which
     /// times leap seconds are inserted or deleted.
-    fn from_leap_second_datetime(
+    fn from_datetime(
         date: Date<i32>,
         hour: u8,
         minute: u8,
         second: u8,
         leap_second_provider: &impl LeapSecondProvider,
     ) -> Result<Self, Self::Error>;
+}
+
+/// We provide a default implementation that uses the static leap second provider.
+impl<TimePoint> FromDateTime for TimePoint
+where
+    TimePoint: FromLeapSecondDateTime,
+{
+    type Error = <TimePoint as FromLeapSecondDateTime>::Error;
+
+    fn from_datetime(
+        date: Date<i32>,
+        hour: u8,
+        minute: u8,
+        second: u8,
+    ) -> Result<Self, Self::Error> {
+        FromLeapSecondDateTime::from_datetime(
+            date,
+            hour,
+            minute,
+            second,
+            &StaticLeapSecondProvider {},
+        )
+    }
 }
 
 /// This trait is the leap second equivalent of `IntoDateTime`. It permits the retrieval of
@@ -56,6 +81,16 @@ pub trait IntoLeapSecondDateTime: IntoDateTime {
         self,
         leap_second_provider: &impl LeapSecondProvider,
     ) -> (Date<i32>, u8, u8, u8);
+}
+
+/// We provide a default implementation that uses the static leap second provider.
+impl<TimePoint> IntoDateTime for TimePoint
+where
+    TimePoint: IntoLeapSecondDateTime,
+{
+    fn into_datetime(self) -> (Date<i32>, u8, u8, u8) {
+        IntoLeapSecondDateTime::into_datetime(self, &StaticLeapSecondProvider {})
+    }
 }
 
 /// Default leap second provider that uses a pre-compiled table to obtain the leap seconds. Will
