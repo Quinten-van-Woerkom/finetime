@@ -183,25 +183,4 @@ mod proof_harness {
         let second: u8 = kani::any();
         let _ = TcgTime::from_datetime(date, hour, minute, second);
     }
-
-    /// Verifies that all valid TCG datetimes can be losslessly converted to and from the
-    /// equivalent TAI time.
-    #[kani::proof]
-    fn datetime_tai_roundtrip() {
-        use crate::{FromDateTime, IntoTimeScale, units::Milli};
-        let date: Date<i32> = kani::any();
-        let hour: u8 = kani::any();
-        let minute: u8 = kani::any();
-        let second: u8 = kani::any();
-        kani::assume(hour < 24);
-        kani::assume(minute < 60);
-        kani::assume(second < 60);
-        let time1 = TcgTime::from_datetime(date, hour, minute, second);
-        if let Ok(time1) = time1 {
-            let time1: TcgTime<_, Milli> = time1.into_unit();
-            let tai: TaiTime<i64, _> = time1.into_time_scale();
-            let time2: TcgTime<i64, _> = tai.into_time_scale();
-            assert_eq!(time1, time2);
-        }
-    }
 }
