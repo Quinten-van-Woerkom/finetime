@@ -7,6 +7,8 @@ pub use datetime::{
     FromDateTime, FromFineDateTime, IntoDateTime, IntoFineDateTime, UniformDateTimeScale,
 };
 
+mod bdt;
+pub use bdt::{Bdt, BeiDouTime};
 mod gpst;
 pub use gpst::{GpsTime, Gpst};
 mod gst;
