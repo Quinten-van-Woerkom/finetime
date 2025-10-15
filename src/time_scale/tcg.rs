@@ -171,7 +171,6 @@ fn check_roundtrip() {
 #[cfg(kani)]
 mod proof_harness {
     use super::*;
-    use crate::TaiTime;
 
     /// Verifies that construction of a TCG from a date and time stamp never panics.
     #[kani::proof]
