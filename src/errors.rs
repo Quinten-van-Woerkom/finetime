@@ -33,7 +33,9 @@ pub struct InvalidJulianDate {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
 #[error("invalid combination of year and day-of-year")]
 pub enum InvalidDayOfYear {
+    #[error(transparent)]
     InvalidDayOfYearCount(#[from] InvalidDayOfYearCount),
+    #[error(transparent)]
     InvalidHistoricDate(#[from] InvalidHistoricDate),
 }
 
@@ -67,6 +69,7 @@ pub struct InvalidTimeOfDay {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
 #[error("invalid historic date-time")]
 pub enum InvalidHistoricDateTime<InvalidDateTime: core::error::Error> {
+    #[error(transparent)]
     InvalidHistoricDate(#[from] InvalidHistoricDate),
     InvalidDateTime(#[source] InvalidDateTime),
 }
@@ -74,6 +77,7 @@ pub enum InvalidHistoricDateTime<InvalidDateTime: core::error::Error> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
 #[error("invalid Gregorian date-time")]
 pub enum InvalidGregorianDateTime<InvalidDateTime: core::error::Error> {
+    #[error(transparent)]
     InvalidGregorianDate(#[from] InvalidGregorianDate),
     InvalidDateTime(#[source] InvalidDateTime),
 }
@@ -81,6 +85,7 @@ pub enum InvalidGregorianDateTime<InvalidDateTime: core::error::Error> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]
 #[error("invalid Julian date-time")]
 pub enum InvalidJulianDateTime<InvalidDateTime: core::error::Error> {
+    #[error(transparent)]
     InvalidJulianDate(#[from] InvalidJulianDate),
     InvalidDateTime(#[source] InvalidDateTime),
 }
@@ -88,7 +93,9 @@ pub enum InvalidJulianDateTime<InvalidDateTime: core::error::Error> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("error parsing `TimePoint`")]
 pub enum TimePointParsingError<DateTimeError> {
+    #[error(transparent)]
     DateParsingError(#[from] HistoricDateParsingError),
+    #[error(transparent)]
     TimeOfDayParsingError(#[from] TimeOfDayParsingError),
     #[error("expected but did not find time designator 'T'")]
     ExpectedTimeDesignator,
@@ -98,6 +105,7 @@ pub enum TimePointParsingError<DateTimeError> {
     ExpectedTimeScaleDesignator,
     #[error("could not parse entire string: data remains after time point")]
     UnexpectedRemainder,
+    #[error(transparent)]
     CannotRepresentDecimalNumber(#[from] CannotRepresentDecimalNumber),
     DateTimeError(#[source] DateTimeError),
 }
@@ -105,8 +113,11 @@ pub enum TimePointParsingError<DateTimeError> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("error parsing `HistoricDate`")]
 pub enum HistoricDateParsingError {
+    #[error(transparent)]
     IntegerParsingError(#[from] lexical_core::Error),
+    #[error(transparent)]
     InvalidHistoricDate(#[from] InvalidHistoricDate),
+    #[error(transparent)]
     InvalidMonthNumber(#[from] InvalidMonthNumber),
     #[error("expected but did not find year-month delimiter '-'")]
     ExpectedYearMonthDelimiter,
@@ -123,8 +134,11 @@ pub enum HistoricDateParsingError {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("error parsing `GregorianDate`")]
 pub enum GregorianDateParsingError {
+    #[error(transparent)]
     IntegerParsingError(#[from] lexical_core::Error),
+    #[error(transparent)]
     InvalidGregorianDate(#[from] InvalidGregorianDate),
+    #[error(transparent)]
     InvalidMonthNumber(#[from] InvalidMonthNumber),
     #[error("expected but did not find year-month delimiter '-'")]
     ExpectedYearMonthDelimiter,
@@ -141,8 +155,11 @@ pub enum GregorianDateParsingError {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("error parsing `JulianDate`")]
 pub enum JulianDateParsingError {
+    #[error(transparent)]
     IntegerParsingError(#[from] lexical_core::Error),
+    #[error(transparent)]
     InvalidJulianDate(#[from] InvalidJulianDate),
+    #[error(transparent)]
     InvalidMonthNumber(#[from] InvalidMonthNumber),
     #[error("expected but did not find year-month delimiter '-'")]
     ExpectedYearMonthDelimiter,
@@ -159,6 +176,7 @@ pub enum JulianDateParsingError {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("error parsing `TimeOfDay`")]
 pub enum TimeOfDayParsingError {
+    #[error(transparent)]
     IntegerParsingError(#[from] lexical_core::Error),
     #[error("hour representation must be exactly two digits")]
     HourRepresentationNotTwoDigits,
@@ -181,7 +199,9 @@ pub enum TimeOfDayParsingError {
 pub enum DurationParsingError {
     #[error("input string did not start with \'P\'")]
     ExpectedDurationPrefix,
+    #[error(transparent)]
     DurationDesignatorParsingError(#[from] DurationDesignatorParsingError),
+    #[error(transparent)]
     DurationComponentParsingError(#[from] DurationComponentParsingError),
     #[error(
         "unit designators must be provided in decreasing error, but found {current} after {previous}"
@@ -192,6 +212,7 @@ pub enum DurationParsingError {
     },
     #[error("only lowest order component may be expressed as decimal fraction")]
     OnlyLowestOrderComponentMayHaveDecimalFraction,
+    #[error(transparent)]
     CannotRepresentDecimalNumber(#[from] CannotRepresentDecimalNumber),
 }
 
@@ -204,7 +225,9 @@ pub struct CannotRepresentDecimalNumber {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("invalid duration component")]
 pub enum DurationComponentParsingError {
+    #[error(transparent)]
     NumberParsingError(#[from] NumberParsingError),
+    #[error(transparent)]
     DurationDesignatorParsingError(#[from] DurationDesignatorParsingError),
 }
 
@@ -220,11 +243,10 @@ pub enum DurationDesignatorParsingError {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("error parsing number")]
 pub enum NumberParsingError {
+    #[error(transparent)]
     ParsingError(#[from] lexical_core::Error),
     #[error("too many fractional digits: {fractional_digits}, only `i32::MAX` are supported")]
-    TooManyFractionalDigits {
-        fractional_digits: usize,
-    },
+    TooManyFractionalDigits { fractional_digits: usize },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Error)]

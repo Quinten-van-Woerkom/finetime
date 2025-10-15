@@ -67,6 +67,37 @@ where
     }
 }
 
+#[cfg(feature = "serde")]
+impl<Representation, Period> serde::Serialize for Duration<Representation, Period>
+where
+    Self: ToString,
+    Period: ?Sized,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let string = self.to_string();
+        serializer.serialize_str(&string)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, Representation, Period> serde::Deserialize<'de> for Duration<Representation, Period>
+where
+    Self: FromStr,
+    <Self as FromStr>::Err: core::fmt::Display,
+    Period: ?Sized,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let string = String::deserialize(deserializer)?;
+        Self::from_str(&string).map_err(serde::de::Error::custom)
+    }
+}
+
 /// A duration is represented as multiple "duration components", each consisting of a number and a
 /// duration designator.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
