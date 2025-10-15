@@ -189,6 +189,7 @@ impl Iterator for FractionalDigitsIterator {
     }
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn integer_fractions() {
     let fraction: Vec<_> = 7854i32
@@ -202,6 +203,7 @@ fn integer_fractions() {
     assert_eq!(fraction, vec![2, 3, 4, 5, 6, 7, 8, 9, 0]);
 }
 
+#[cfg(feature = "std")]
 #[test]
 fn float_fractions() {
     let fraction: Vec<_> = 7_854f32

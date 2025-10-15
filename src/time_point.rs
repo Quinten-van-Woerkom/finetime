@@ -536,6 +536,7 @@ where
     }
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn check_formatting_i64(
@@ -562,6 +563,7 @@ fn check_formatting_i64(
 }
 
 /// Verifies formatting for some known values.
+#[cfg(feature = "std")]
 #[test]
 fn formatting_i64() {
     use crate::Month::*;
@@ -604,6 +606,7 @@ fn formatting_i64() {
     check_formatting_i64("1643-01-04T01:01:33 TAI", 1643, January, 4, 1, 1, 33, 0);
 }
 
+#[cfg(feature = "std")]
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
 fn check_formatting_f64(
@@ -630,6 +633,7 @@ fn check_formatting_f64(
 }
 
 /// Verifies formatting for some known values.
+#[cfg(feature = "std")]
 #[test]
 fn formatting_f64() {
     use crate::Month::*;
@@ -674,6 +678,7 @@ fn formatting_f64() {
 
 /// Verifies that truncation is properly applied when the underlying fraction exceeds the number of
 /// digits specified in the formatting precision (or 9 by default, if none is specified).
+#[cfg(feature = "std")]
 #[test]
 fn truncated_format() {
     let time = crate::UtcTime::from_fine_historic_datetime(
@@ -690,6 +695,7 @@ fn truncated_format() {
 }
 
 /// Verifies that formatting does not panic for a large randomized range of values.
+#[cfg(feature = "std")]
 #[test]
 fn random_formatting() {
     use crate::TaiTime;
