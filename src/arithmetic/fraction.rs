@@ -54,6 +54,7 @@ impl Fraction {
     /// While the repeated application of GCD might seem to be expensive for a simple division,
     /// this function is only expected to be used at compile time. Consequently, the expense should
     /// not be a problem.
+    #[cfg_attr(kani, kani::requires(other.numerator != 0))]
     pub const fn divide_by(&self, other: &Self) -> Self {
         let gcd1 = binary_gcd(self.numerator, other.numerator);
         let gcd2 = binary_gcd(self.denominator, other.denominator);

@@ -116,14 +116,16 @@ impl Date<i32> {
     /// Returns the day-of-the-week of this date.
     pub const fn week_day(&self) -> WeekDay {
         let z = self.time_since_epoch().count();
-        let day = if z >= -4 {
-            (z + 4) % 7
-        } else {
-            (z + 5) % 7 + 6
-        };
-        match WeekDay::try_from(day as u8) {
-            Ok(week_day) => week_day,
-            Err(_) => unreachable!(),
+        let day = if z >= 0 { z % 7 } else { (z + 1) % 7 + 6 };
+        match day {
+            0 => WeekDay::Thursday,
+            1 => WeekDay::Friday,
+            2 => WeekDay::Saturday,
+            3 => WeekDay::Sunday,
+            4 => WeekDay::Monday,
+            5 => WeekDay::Tuesday,
+            6 => WeekDay::Wednesday,
+            _ => unreachable!(),
         }
     }
 }
@@ -213,6 +215,49 @@ fn week_days() {
     check_week_day(1970, Month::January, 6, WeekDay::Tuesday);
     check_week_day(1970, Month::January, 7, WeekDay::Wednesday);
     check_week_day(1970, Month::January, 8, WeekDay::Thursday);
-
     check_week_day(1998, Month::December, 17, WeekDay::Thursday);
+}
+
+#[cfg(kani)]
+mod infallibility {
+    use super::*;
+
+    #[kani::proof]
+    fn week_day() {
+        let date: Date<i32> = kani::any();
+        let _week_day = date.week_day();
+    }
+
+    #[kani::proof]
+    fn historic_date_roundtrip() {
+        let date: Date<i32> = kani::any();
+        let historic_date = HistoricDate::from_date(date);
+        let year = historic_date.year();
+        let month = historic_date.month();
+        let day = historic_date.day();
+        let date2 = Date::from_historic_date(year, month, day).unwrap();
+        assert_eq!(date, date2);
+    }
+
+    #[kani::proof]
+    fn gregorian_date_roundtrip() {
+        let date: Date<i32> = kani::any();
+        let gregorian_date = GregorianDate::from_date(date);
+        let year = gregorian_date.year();
+        let month = gregorian_date.month();
+        let day = gregorian_date.day();
+        let date2 = Date::from_gregorian_date(year, month, day).unwrap();
+        assert_eq!(date, date2);
+    }
+
+    #[kani::proof]
+    fn julian_date_roundtrip() {
+        let date: Date<i32> = kani::any();
+        let julian_date = JulianDate::from_date(date);
+        let year = julian_date.year();
+        let month = julian_date.month();
+        let day = julian_date.day();
+        let date2 = Date::from_julian_date(year, month, day).unwrap();
+        assert_eq!(date, date2);
+    }
 }
