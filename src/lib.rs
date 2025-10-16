@@ -21,11 +21,11 @@ mod time_point;
 pub use time_point::TimePoint;
 mod time_scale;
 pub use time_scale::{
-    Bdt, BeiDouTime, FromDateTime, FromFineDateTime, FromLeapSecondDateTime, FromTimeScale,
-    GalileoTime, GlonassTime, Glonasst, GpsTime, Gpst, Gst, IntoDateTime, IntoFineDateTime,
-    IntoLeapSecondDateTime, IntoTimeScale, LeapSecondProvider, QzssTime, Qzsst,
+    AbsoluteTimeScale, Bdt, BeiDouTime, FromDateTime, FromFineDateTime, FromLeapSecondDateTime,
+    FromTimeScale, GalileoTime, GlonassTime, Glonasst, GpsTime, Gpst, Gst, IntoDateTime,
+    IntoFineDateTime, IntoLeapSecondDateTime, IntoTimeScale, LeapSecondProvider, QzssTime, Qzsst,
     STATIC_LEAP_SECOND_PROVIDER, StaticLeapSecondProvider, Tai, TaiTime, Tcg, TcgTime,
-    TerrestrialTime, Tt, TtTime, UniformDateTimeScale, Utc, UtcTime,
+    TerrestrialTime, TimeScale, Tt, TtTime, UniformDateTimeScale, Utc, UtcTime,
 };
 mod units;
 pub use units::{
