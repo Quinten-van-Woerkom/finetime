@@ -2,7 +2,8 @@
 
 use crate::{
     Date, Duration, Month, Seconds, TerrestrialTime, TimePoint, UniformDateTimeScale,
-    time_scale::TimeScale, units::Second,
+    time_scale::{AbsoluteTimeScale, TimeScale},
+    units::Second,
 };
 
 pub type GpsTime<Representation = i64, Period = Second> = TimePoint<Gpst, Representation, Period>;
@@ -17,7 +18,9 @@ impl TimeScale for Gpst {
     const NAME: &'static str = "Global Positioning System Time";
 
     const ABBREVIATION: &'static str = "GPST";
+}
 
+impl AbsoluteTimeScale for Gpst {
     const EPOCH: Date<i32> = match Date::from_historic_date(1980, Month::January, 6) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),

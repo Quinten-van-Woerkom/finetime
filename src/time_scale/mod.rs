@@ -35,13 +35,19 @@ pub use utc::{Utc, UtcTime};
 
 use crate::Date;
 
+/// A `TimeScale` identifies the relativistic time scale in which some `TimePoint` is expressed.
 pub trait TimeScale {
     /// The full (English) name of a time scale.
     const NAME: &'static str;
 
     /// The abbreviated string used to represent this time scale.
     const ABBREVIATION: &'static str;
+}
 
+/// `TimeScale` that is fixed in calendrical time by an absolute epoch. Note that this does not yet
+/// unambiguously define the scale: for that, it must be linked to a well-defined scale like TAI or
+/// UTC (for example, by implementing the `TerrestrialTime` trait).
+pub trait AbsoluteTimeScale: TimeScale {
     /// Determines the epoch used to convert date-time of this time scale into the equivalent
     /// time-since-epoch `TimePoint` representation. For simplicity, epochs must fall on date
     /// boundaries.

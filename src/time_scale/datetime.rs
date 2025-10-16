@@ -6,7 +6,7 @@ use crate::{
     ConvertUnit, Date, Days, Duration, Fraction, Hours, Minutes, MulFloor, Seconds, TimePoint,
     TryIntoExact,
     errors::InvalidTimeOfDay,
-    time_scale::TimeScale,
+    time_scale::AbsoluteTimeScale,
     units::{Second, SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
 
@@ -16,7 +16,7 @@ use crate::{
 /// their resulting time points are measured.
 ///
 /// This trait is only a marker trait.
-pub trait UniformDateTimeScale: TimeScale {}
+pub trait UniformDateTimeScale: AbsoluteTimeScale {}
 
 /// This trait may be implemented for time points that can be constructed based on a date-time
 /// pair: they can connect a date and time-of-day to a specific time instant within their internal
@@ -125,7 +125,7 @@ where
         // representations.
         let second = second.floor::<Second>();
         let days_since_universal_epoch =
-            <Scale as TimeScale>::EPOCH.time_since_epoch() + days_since_scale_epoch;
+            <Scale as AbsoluteTimeScale>::EPOCH.time_since_epoch() + days_since_scale_epoch;
         let date = Date::from_time_since_epoch(days_since_universal_epoch);
 
         // We must narrow-cast all results, but only the cast of `date` may fail. The rest will

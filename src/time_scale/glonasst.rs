@@ -9,7 +9,7 @@ use crate::{
     arithmetic::TryFromExact,
     calendar::{Date, Month},
     errors::{InvalidGlonassDateTime, InvalidTimeOfDay},
-    time_scale::TimeScale,
+    time_scale::{AbsoluteTimeScale, TimeScale},
     units::{SecondsPerDay, SecondsPerHour, SecondsPerMinute},
 };
 
@@ -28,7 +28,9 @@ impl TimeScale for Glonasst {
     const NAME: &'static str = "Glonass Time";
 
     const ABBREVIATION: &'static str = "GLONASST";
+}
 
+impl AbsoluteTimeScale for Glonasst {
     const EPOCH: Date<i32> = match Date::from_historic_date(1996, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),

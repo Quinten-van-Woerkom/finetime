@@ -2,7 +2,7 @@
 
 use crate::{
     Date, Duration, MilliSeconds, Month, TimePoint,
-    time_scale::{TerrestrialTime, TimeScale, datetime::UniformDateTimeScale},
+    time_scale::{AbsoluteTimeScale, TerrestrialTime, TimeScale, datetime::UniformDateTimeScale},
     units::{Milli, Second},
 };
 
@@ -18,7 +18,9 @@ impl TimeScale for Tt {
     const NAME: &'static str = "Terrestrial Time";
 
     const ABBREVIATION: &'static str = "TT";
+}
 
+impl AbsoluteTimeScale for Tt {
     const EPOCH: Date<i32> = match Date::from_historic_date(1977, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),

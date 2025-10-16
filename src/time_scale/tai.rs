@@ -2,7 +2,7 @@
 
 use crate::{
     Date, Duration, Month, TimePoint, Years,
-    time_scale::{TerrestrialTime, TimeScale, datetime::UniformDateTimeScale},
+    time_scale::{AbsoluteTimeScale, TerrestrialTime, TimeScale, datetime::UniformDateTimeScale},
     units::{Second, SecondsPerYear},
 };
 
@@ -18,7 +18,9 @@ impl TimeScale for Tai {
     const NAME: &'static str = "International Atomic Time";
 
     const ABBREVIATION: &'static str = "TAI";
+}
 
+impl AbsoluteTimeScale for Tai {
     const EPOCH: Date<i32> = match Date::from_historic_date(1958, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),

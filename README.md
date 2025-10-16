@@ -33,7 +33,7 @@ assert_eq!(epoch_utc.into_time_scale(), epoch_tai);
 assert_eq!(epoch_utc.into_time_scale(), epoch_gps);
 assert_eq!(epoch_utc.into_time_scale(), epoch_galileo);
 ```
-If a desired time scale is not present, users may provide their own by implementing the `TimeScale` trait.
+If a desired time scale is not present, users may provide their own by implementing the `TimeScale` trait. To support calendrical functionality, it is additionally necessary to implement the `AbsoluteTimeScale` trait.
 
 There is also support for subsecond datetime values, and conversion into more fine-grained `TimePoint` types to support higher-fidelity time types.
 ```rust

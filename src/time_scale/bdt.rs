@@ -2,7 +2,8 @@
 
 use crate::{
     Date, Duration, Month, Seconds, TerrestrialTime, TimePoint, UniformDateTimeScale,
-    time_scale::TimeScale, units::Second,
+    time_scale::{AbsoluteTimeScale, TimeScale},
+    units::Second,
 };
 
 pub type BeiDouTime<Representation = i64, Period = Second> = TimePoint<Bdt, Representation, Period>;
@@ -17,7 +18,9 @@ impl TimeScale for Bdt {
     const NAME: &'static str = "BeiDou Time";
 
     const ABBREVIATION: &'static str = "BDT";
+}
 
+impl AbsoluteTimeScale for Bdt {
     const EPOCH: Date<i32> = match Date::from_historic_date(2006, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),

@@ -6,7 +6,7 @@ use core::ops::{Add, Sub};
 use crate::{
     ConvertUnit, Date, Fraction, FromTimeScale, IntoTimeScale, MilliSeconds, Month, MulRound,
     TerrestrialTime, TimePoint, TryFromExact, Tt, TtTime,
-    time_scale::{TimeScale, datetime::UniformDateTimeScale},
+    time_scale::{AbsoluteTimeScale, TimeScale, datetime::UniformDateTimeScale},
     units::{Milli, Second, SecondsPerDay},
 };
 
@@ -24,7 +24,9 @@ impl TimeScale for Tcg {
     const NAME: &'static str = "Geocentric Coordinate Time";
 
     const ABBREVIATION: &'static str = "TCG";
+}
 
+impl AbsoluteTimeScale for Tcg {
     const EPOCH: Date<i32> = match Date::from_historic_date(1977, Month::January, 1) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),

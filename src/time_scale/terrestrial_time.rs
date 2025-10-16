@@ -7,7 +7,7 @@ use core::{
 };
 
 use crate::{
-    ConvertUnit, Duration, FromTimeScale, TimePoint, TryFromExact, time_scale::TimeScale,
+    ConvertUnit, Duration, FromTimeScale, TimePoint, TryFromExact, time_scale::AbsoluteTimeScale,
     units::SecondsPerDay,
 };
 
@@ -15,7 +15,7 @@ use crate::{
 /// idealized clock on the Earth geoid. It turns out that a lot of time scales are simply a variant
 /// on terrestrial time (or, equivalently, TAI). All these time scales may easily be converted into
 /// one another through a simple epoch offset: their internal clock rates are identical.
-pub trait TerrestrialTime: TimeScale {
+pub trait TerrestrialTime: AbsoluteTimeScale {
     /// The underlying representation used to represent the offset with respect to TAI. For
     /// compatibility with as wide a range of `TimePoint` types, it's best to make this as small a
     /// type as possible (e.g., u8, u32, etc.).
@@ -31,8 +31,8 @@ pub trait TerrestrialTime: TimeScale {
 impl<ScaleFrom, ScaleInto, Representation, Period> FromTimeScale<ScaleFrom, Representation, Period>
     for TimePoint<ScaleInto, Representation, Period>
 where
-    ScaleFrom: TerrestrialTime + TimeScale,
-    ScaleInto: TerrestrialTime + TimeScale,
+    ScaleFrom: TerrestrialTime,
+    ScaleInto: TerrestrialTime,
     Representation: Copy
         + Add<Representation, Output = Representation>
         + Sub<Representation, Output = Representation>

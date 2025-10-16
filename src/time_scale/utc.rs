@@ -7,7 +7,7 @@ use crate::{
     Minutes, Month, MulFloor, Second, Seconds, StaticLeapSecondProvider, TerrestrialTime,
     TimePoint, TryFromExact, TryIntoExact, Years,
     errors::{InvalidTimeOfDay, InvalidUtcDateTime},
-    time_scale::TimeScale,
+    time_scale::{AbsoluteTimeScale, TimeScale},
     units::{SecondsPerDay, SecondsPerHour, SecondsPerMinute, SecondsPerYear},
 };
 
@@ -35,7 +35,9 @@ impl TimeScale for Utc {
     const NAME: &'static str = "Coordinated Universal Time";
 
     const ABBREVIATION: &'static str = "UTC";
+}
 
+impl AbsoluteTimeScale for Utc {
     /// This epoch is the exact date at which the modern definition of UTC started. This makes it
     /// useful, because users may choose to permit "proleptic" UTC dates before 1972 by using a
     /// signed representation, but may also choose to forbid it by using unsigned arithmetic, which

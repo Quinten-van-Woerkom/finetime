@@ -2,7 +2,8 @@
 
 use crate::{
     Date, Duration, Month, Seconds, TerrestrialTime, TimePoint, UniformDateTimeScale,
-    time_scale::TimeScale, units::Second,
+    time_scale::{AbsoluteTimeScale, TimeScale},
+    units::Second,
 };
 
 pub type GalileoTime<Representation = i64, Period = Second> =
@@ -18,7 +19,9 @@ impl TimeScale for Gst {
     const NAME: &'static str = "Galileo System Time";
 
     const ABBREVIATION: &'static str = "GST";
+}
 
+impl AbsoluteTimeScale for Gst {
     const EPOCH: Date<i32> = match Date::from_historic_date(1999, Month::August, 22) {
         Ok(epoch) => epoch,
         Err(_) => unreachable!(),

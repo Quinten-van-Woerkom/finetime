@@ -15,7 +15,7 @@ use crate::{
     ModifiedJulianDate, Month, MulCeil, MulFloor, MulRound, TryConvertUnit, TryFromExact,
     TryIntoExact, UnitRatio,
     errors::{InvalidGregorianDateTime, InvalidHistoricDateTime, InvalidJulianDateTime},
-    time_scale::{TimeScale, UniformDateTimeScale},
+    time_scale::{AbsoluteTimeScale, TimeScale, UniformDateTimeScale},
     units::{Second, SecondsPerDay, SecondsPerHalfDay},
 };
 
@@ -251,7 +251,7 @@ where
 
 impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representation, Period>
 where
-    Scale: TimeScale,
+    Scale: AbsoluteTimeScale,
     Representation: Copy
         + Add<Output = Representation>
         + TryFromExact<i32>
@@ -278,7 +278,7 @@ where
 
 impl<Scale: ?Sized, Representation, Period: ?Sized> TimePoint<Scale, Representation, Period>
 where
-    Scale: TimeScale,
+    Scale: AbsoluteTimeScale,
     Representation: Copy
         + Add<Output = Representation>
         + TryFromExact<i32>
