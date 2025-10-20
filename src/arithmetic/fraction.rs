@@ -3,19 +3,19 @@
 use core::ops::Mul;
 
 /// Description of an integer ratio. Written to support efficient compile-time arithmetic. To
-/// support conversions between large magnitudes, this is implemented in u64. The numerator may be
+/// support conversions between large magnitudes, this is implemented in u128. The numerator may be
 /// 0, but the denominator may never be.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Fraction {
-    numerator: u64,
-    denominator: u64,
+    numerator: u128,
+    denominator: u128,
 }
 
 impl Fraction {
     /// Creates a new `Ratio` with the given values for `numerator` and `denominator`. Is
     /// normalized to the smallest possible representation.
     #[cfg_attr(kani, kani::requires(denominator != 0))]
-    pub const fn new(numerator: u64, denominator: u64) -> Self {
+    pub const fn new(numerator: u128, denominator: u128) -> Self {
         if denominator == 0 {
             panic!("Created invalid ratio with denominator 0.");
         } else {
@@ -28,12 +28,12 @@ impl Fraction {
     }
 
     /// Returns the value of this fraction's numerator.
-    pub const fn numerator(&self) -> u64 {
+    pub const fn numerator(&self) -> u128 {
         self.numerator
     }
 
     /// Returns the value of this fraction's denominator.
-    pub const fn denominator(&self) -> u64 {
+    pub const fn denominator(&self) -> u128 {
         self.denominator
     }
 
@@ -73,7 +73,7 @@ impl kani::Arbitrary for Fraction {
     fn any() -> Self {
         use num_traits::Zero;
         let numerator = kani::any();
-        let denominator: u64 = kani::any();
+        let denominator: u128 = kani::any();
         Self {
             numerator,
             denominator: if !denominator.is_zero() {
@@ -87,7 +87,7 @@ impl kani::Arbitrary for Fraction {
 
 /// Returns the greatest common denominator of `a` and `b`, computed using Stein's algorithm.
 #[cfg_attr(kani, kani::requires(a != 0 && b != 0))]
-const fn binary_gcd(a: u64, b: u64) -> u64 {
+const fn binary_gcd(a: u128, b: u128) -> u128 {
     if a == 0 || b == 0 {
         panic!("GCD is undefined when one of the arguments is zero");
     }

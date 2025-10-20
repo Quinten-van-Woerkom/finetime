@@ -111,8 +111,8 @@ impl FractionalDigitsIterator {
         let count = if count >= T::ZERO { count } else { -count }
             .try_into()
             .unwrap_or_else(|_| panic!());
-        let numerator = (fraction.numerator() as u128) * count;
-        let denominator = fraction.denominator().into();
+        let numerator = fraction.numerator() * count;
+        let denominator = fraction.denominator();
         Self {
             remainder: numerator % denominator,
             denominator,
@@ -131,8 +131,8 @@ impl FractionalDigitsIterator {
     where
         T: Copy + Into<u128> + Mul<T, Output = T> + Rem<T, Output = T> + ConstZero + PartialOrd,
     {
-        let numerator = (fraction.numerator() as u128) * count.into();
-        let denominator = fraction.denominator().into();
+        let numerator = fraction.numerator() * count.into();
+        let denominator = fraction.denominator();
         Self {
             remainder: numerator % denominator,
             denominator,
@@ -147,8 +147,8 @@ impl FractionalDigitsIterator {
         T: Mul<Fraction, Output = T> + Float,
     {
         let (mantissa, exponent, _) = count.integer_decode();
-        let mut numerator = (mantissa as u128) * (fraction.numerator() as u128);
-        let mut denominator = fraction.denominator() as u128;
+        let mut numerator = (mantissa as u128) * fraction.numerator();
+        let mut denominator = fraction.denominator();
         if exponent > 0 {
             numerator *= 2u128.pow(exponent as u32)
         } else if exponent < 0 {

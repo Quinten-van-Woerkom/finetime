@@ -81,7 +81,7 @@ impl DecimalNumber {
         Into: UnitRatio,
         Representation: TryFromExact<i64> + TryMul<Fraction, Output = Representation>,
     {
-        let fraction = Fraction::new(1, 10u64.pow(self.fractional_digits));
+        let fraction = Fraction::new(1, 10u128.pow(self.fractional_digits));
         let mantissa = if self.integer >= 0 {
             10i64.pow(self.fractional_digits) * self.integer + self.fraction
         } else {
