@@ -20,6 +20,26 @@ pub trait TryFromExact<T>: Sized {
     fn try_from_exact(value: T) -> Result<Self, Self::Error>;
 }
 
+/// An `f64` may always be converted into itself. We do not implement a generic self-to-self
+/// because that leads to problems with conflicting implementations for other generics.
+impl TryFromExact<f64> for f64 {
+    type Error = core::convert::Infallible;
+
+    fn try_from_exact(value: f64) -> Result<Self, Self::Error> {
+        Ok(value)
+    }
+}
+
+/// An `f32` may always be converted into itself. We do not implement a generic self-to-self
+/// because that leads to problems with conflicting implementations for other generics.
+impl TryFromExact<f32> for f32 {
+    type Error = core::convert::Infallible;
+
+    fn try_from_exact(value: f32) -> Result<Self, Self::Error> {
+        Ok(value)
+    }
+}
+
 macro_rules! derive_from_try_from {
     ($from:ty, $into:ty) => {
         impl TryFromExact<$from> for $into {
