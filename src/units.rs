@@ -2,6 +2,9 @@
 //! types are little more than labels that are associated with a given ratio to SI seconds, as may
 //! be used to convert between arbitrary time periods.
 
+#[cfg(feature = "i256")]
+use i256::{I256, U256};
+
 use crate::{Fraction, TryMul};
 
 /// Trait representing a lossless conversion from one unit to another. Note that the underlying
@@ -35,11 +38,15 @@ impl_identity_conversion!(u16);
 impl_identity_conversion!(u32);
 impl_identity_conversion!(u64);
 impl_identity_conversion!(u128);
+#[cfg(feature = "i256")]
+impl_identity_conversion!(U256);
 impl_identity_conversion!(i8);
 impl_identity_conversion!(i16);
 impl_identity_conversion!(i32);
 impl_identity_conversion!(i64);
 impl_identity_conversion!(i128);
+#[cfg(feature = "i256")]
+impl_identity_conversion!(I256);
 
 impl<From, Into> ConvertUnit<From, Into> for f64
 where
@@ -118,6 +125,26 @@ macro_rules! valid_integer_conversions {
             valid_integer_conversion!(i32, $from, $to);
             valid_integer_conversion!(i64, $from, $to);
             valid_integer_conversion!(i128, $from, $to);
+
+            #[cfg(feature = "i256")]
+            impl ConvertUnit<$from, $to> for U256 {
+                fn convert(self) -> Self {
+                    let combined_ratio = <$from>::FRACTION.divide_by(&<$to>::FRACTION);
+                    // For any conversion ratio that is lossless, this division will not truncate.
+                    let factor = combined_ratio.numerator() / combined_ratio.denominator();
+                    self * Self::from(factor)
+                }
+            }
+
+            #[cfg(feature = "i256")]
+            impl ConvertUnit<$from, $to> for I256 {
+                fn convert(self) -> Self {
+                    let combined_ratio = <$from>::FRACTION.divide_by(&<$to>::FRACTION);
+                    // For any conversion ratio that is lossless, this division will not truncate.
+                    let factor = combined_ratio.numerator() / combined_ratio.denominator();
+                    self * Self::from(factor)
+                }
+            }
         )+
     };
 }
