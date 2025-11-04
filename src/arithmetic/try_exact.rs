@@ -3,6 +3,9 @@
 
 use core::fmt::Debug;
 
+#[cfg(feature = "i256")]
+use i256::{I256, U256};
+
 use num_traits::{ConstZero, Float, Zero};
 use thiserror::Error;
 
@@ -54,6 +57,7 @@ macro_rules! derive_from_try_from {
         paste::paste! {
             /// This proof harness ensures that none of the derived `TryFromExact` implementations
             /// ever result in undefined behaviour, panics, or arithmetic errors.
+            #[allow(non_snake_case)]
             #[kani::proof]
             fn [<try_from_exact_ $into _from_ $from _infallible >]() {
                 use crate::TryIntoExact;
@@ -71,11 +75,15 @@ macro_rules! derive_from_try_from_all_integers {
         derive_from_try_from!($from, u32);
         derive_from_try_from!($from, u64);
         derive_from_try_from!($from, u128);
+        #[cfg(feature = "i256")]
+        derive_from_try_from!($from, U256);
         derive_from_try_from!($from, i8);
         derive_from_try_from!($from, i16);
         derive_from_try_from!($from, i32);
         derive_from_try_from!($from, i64);
         derive_from_try_from!($from, i128);
+        #[cfg(feature = "i256")]
+        derive_from_try_from!($from, I256);
     };
 }
 

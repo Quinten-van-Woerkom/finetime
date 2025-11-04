@@ -47,9 +47,10 @@ dependencies = [
 
 [[package]]
 name = "finetime"
-version = "0.7.2"
+version = "0.8.0"
 dependencies = [
  "derive_more",
+ "i256",
  "lexical-core",
  "num-integer",
  "num-traits",
@@ -71,6 +72,12 @@ dependencies = [
  "r-efi",
  "wasi",
 ]
+
+[[package]]
+name = "i256"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a8ef3cf3581bc32d50c9e593ff6bad06c85054861ea6cc640660d73490c2c316"
 
 [[package]]
 name = "lexical-core"
